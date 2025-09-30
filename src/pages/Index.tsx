@@ -71,8 +71,12 @@ const Index = () => {
             </div>
             <div className="flex gap-3">
               <Button variant="ghost">عن النظام</Button>
-              <Button variant="outline">تسجيل الدخول</Button>
-              <Button variant="hero">ابدأ الآن</Button>
+              <Link to="/auth">
+                <Button variant="outline">تسجيل الدخول</Button>
+              </Link>
+              <Link to="/auth">
+                <Button variant="hero">ابدأ الآن</Button>
+              </Link>
             </div>
           </div>
         </div>
@@ -102,10 +106,12 @@ const Index = () => {
               صمم، وزّع، وحلل استبياناتك بذكاء اصطناعي متقدم. احصل على تقارير احترافية جاهزة للتنزيل بصيغ PDF وExcel مع تحليلات عميقة وتوصيات قابلة للتطبيق
             </p>
             <div className="flex gap-4 justify-center flex-wrap">
-              <Button variant="hero" size="lg" className="text-lg px-8">
-                <Sparkles className="w-5 h-5 ml-2" />
-                ابدأ مجانًا
-              </Button>
+              <Link to="/auth">
+                <Button variant="hero" size="lg" className="text-lg px-8">
+                  <Sparkles className="w-5 h-5 ml-2" />
+                  ابدأ مجانًا
+                </Button>
+              </Link>
               <Button variant="outline" size="lg" className="text-lg">
                 <BarChart3 className="w-5 h-5 ml-2" />
                 استكشف المزايا
@@ -223,10 +229,12 @@ const Index = () => {
               انضم إلى منظومة الاستبيانات الذكية وابدأ في إنشاء استبيانات احترافية اليوم
             </p>
             <div className="flex gap-4 justify-center flex-wrap">
-              <Button variant="accent" size="lg" className="text-lg">
-                <Users className="w-5 h-5 ml-2" />
-                ابدأ الآن مجانًا
-              </Button>
+              <Link to="/auth">
+                <Button variant="accent" size="lg" className="text-lg">
+                  <Users className="w-5 h-5 ml-2" />
+                  ابدأ الآن مجانًا
+                </Button>
+              </Link>
               <Button variant="outline" size="lg" className="text-lg bg-white/10 text-white border-white/30 hover:bg-white/20">
                 <Shield className="w-5 h-5 ml-2" />
                 تواصل معنا
