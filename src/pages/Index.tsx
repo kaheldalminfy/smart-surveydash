@@ -1,17 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Link } from "react-router-dom";
-import { 
-  BarChart3, 
-  Brain, 
-  FileText, 
-  Users, 
-  CheckCircle, 
-  TrendingUp,
-  Sparkles,
-  Download,
-  Shield
-} from "lucide-react";
+import { BarChart3, Brain, FileText, Users, CheckCircle, TrendingUp, Sparkles, Download, Shield } from "lucide-react";
 import heroBanner from "@/assets/hero-banner.jpg";
 import aiIcon from "@/assets/ai-icon.png";
 import surveyIcon from "@/assets/survey-icon.png";
@@ -33,25 +23,25 @@ const Index = () => {
     {
       icon: <img src={surveyIcon} alt="تصميم الاستبيانات" className="w-16 h-16" />,
       title: "تصميم استبيانات ذكي",
-      description: "واجهة سهلة لإنشاء استبيانات احترافية بمقاييس ليكرت والأسئلة المفتوحة والمغلقة"
+      description: "واجهة سهلة لإنشاء استبيانات احترافية بمقاييس ليكرت والأسئلة المفتوحة والمغلقة",
     },
     {
       icon: <img src={aiIcon} alt="تحليل ذكي" className="w-16 h-16" />,
       title: "تحليل مدعوم بالذكاء الاصطناعي",
-      description: "تحليل آلي للبيانات مع توليد تقارير ذكية وتوصيات قابلة للتطبيق"
+      description: "تحليل آلي للبيانات مع توليد تقارير ذكية وتوصيات قابلة للتطبيق",
     },
     {
       icon: <img src={analyticsIcon} alt="تقارير شاملة" className="w-16 h-16" />,
       title: "تقارير جاهزة للتنزيل",
-      description: "تصدير تقارير PDF وExcel مع رسوم بيانية تفاعلية وإحصائيات دقيقة"
-    }
+      description: "تصدير تقارير PDF وExcel مع رسوم بيانية تفاعلية وإحصائيات دقيقة",
+    },
   ];
 
   const stats = [
     { value: "8", label: "برامج أكاديمية", icon: <Users className="w-6 h-6" /> },
     { value: "100%", label: "آلي بالكامل", icon: <Sparkles className="w-6 h-6" /> },
     { value: "AI", label: "تحليل ذكي", icon: <Brain className="w-6 h-6" /> },
-    { value: "PDF+Excel", label: "تقارير احترافية", icon: <Download className="w-6 h-6" /> }
+    { value: "PDF+Excel", label: "تقارير احترافية", icon: <Download className="w-6 h-6" /> },
   ];
 
   return (
@@ -85,12 +75,12 @@ const Index = () => {
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 gradient-hero opacity-5" />
-        <div 
+        <div
           className="absolute inset-0 opacity-10"
           style={{
             backgroundImage: `url(${heroBanner})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center'
+            backgroundSize: "cover",
+            backgroundPosition: "center",
           }}
         />
         <div className="container mx-auto px-4 py-24 relative">
@@ -100,16 +90,17 @@ const Index = () => {
               <span className="text-sm font-medium">مدعوم بالذكاء الاصطناعي المتقدم</span>
             </div>
             <h2 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent leading-tight">
-              منظومة متكاملة لإدارة الاستبيانات
+              منظومة متكاملة لإدارة الجودة الشاملة
             </h2>
             <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
-              صمم، وزّع، وحلل استبياناتك بذكاء اصطناعي متقدم. احصل على تقارير احترافية جاهزة للتنزيل بصيغ PDF وExcel مع تحليلات عميقة وتوصيات قابلة للتطبيق
+              صمم، وزّع، وحلل استبياناتك بذكاء اصطناعي متقدم. احصل على تقارير احترافية جاهزة للتنزيل بصيغ PDF وExcel مع
+              تحليلات عميقة وتوصيات قابلة للتطبيق
             </p>
             <div className="flex gap-4 justify-center flex-wrap">
               <Link to="/auth">
                 <Button variant="hero" size="lg" className="text-lg px-8">
                   <Sparkles className="w-5 h-5 ml-2" />
-                  ابدأ مجانًا
+                  ابدأ الآن
                 </Button>
               </Link>
               <Button variant="outline" size="lg" className="text-lg">
@@ -148,9 +139,7 @@ const Index = () => {
           <div className="grid md:grid-cols-3 gap-8">
             {features.map((feature, index) => (
               <Card key={index} className="p-8 hover:shadow-elegant transition-all gradient-card group">
-                <div className="mb-6 transform group-hover:scale-110 transition-transform">
-                  {feature.icon}
-                </div>
+                <div className="mb-6 transform group-hover:scale-110 transition-transform">{feature.icon}</div>
                 <h4 className="text-2xl font-bold mb-4">{feature.title}</h4>
                 <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
               </Card>
@@ -164,19 +153,15 @@ const Index = () => {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h3 className="text-4xl font-bold mb-4">البرامج الأكاديمية</h3>
-            <p className="text-xl text-muted-foreground">
-              ثمانية برامج متميزة في كلية العلوم الإنسانية والاجتماعية
-            </p>
+            <p className="text-xl text-muted-foreground">ثمانية برامج متميزة في كلية العلوم الإنسانية والاجتماعية</p>
           </div>
           <div className="grid md:grid-cols-4 gap-6">
             {programs.map((program) => (
-              <Card 
-                key={program.id} 
+              <Card
+                key={program.id}
                 className="p-6 hover:shadow-elegant transition-all cursor-pointer group gradient-card"
               >
-                <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">
-                  {program.icon}
-                </div>
+                <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">{program.icon}</div>
                 <h5 className="font-bold text-lg leading-relaxed">{program.name}</h5>
               </Card>
             ))}
@@ -226,16 +211,20 @@ const Index = () => {
           <div className="max-w-3xl mx-auto text-center text-white">
             <h3 className="text-4xl font-bold mb-6">جاهز للبدء؟</h3>
             <p className="text-xl mb-8 opacity-90">
-              انضم إلى منظومة الاستبيانات الذكية وابدأ في إنشاء استبيانات احترافية اليوم
+              انضم إلى منظومة ادارة الجودة الشاملة الذكية وابدأ في إنشاء استبيانات احترافية اليوم
             </p>
             <div className="flex gap-4 justify-center flex-wrap">
               <Link to="/auth">
                 <Button variant="accent" size="lg" className="text-lg">
                   <Users className="w-5 h-5 ml-2" />
-                  ابدأ الآن مجانًا
+                  ابدأ الآن
                 </Button>
               </Link>
-              <Button variant="outline" size="lg" className="text-lg bg-white/10 text-white border-white/30 hover:bg-white/20">
+              <Button
+                variant="outline"
+                size="lg"
+                className="text-lg bg-white/10 text-white border-white/30 hover:bg-white/20"
+              >
                 <Shield className="w-5 h-5 ml-2" />
                 تواصل معنا
               </Button>
@@ -257,17 +246,41 @@ const Index = () => {
             <div>
               <h6 className="font-bold mb-4">روابط سريعة</h6>
               <ul className="space-y-2 text-sm">
-                <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors">الرئيسية</a></li>
-                <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors">البرامج</a></li>
-                <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors">المزايا</a></li>
+                <li>
+                  <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
+                    الرئيسية
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
+                    البرامج
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
+                    المزايا
+                  </a>
+                </li>
               </ul>
             </div>
             <div>
               <h6 className="font-bold mb-4">الدعم</h6>
               <ul className="space-y-2 text-sm">
-                <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors">مركز المساعدة</a></li>
-                <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors">الأسئلة الشائعة</a></li>
-                <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors">اتصل بنا</a></li>
+                <li>
+                  <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
+                    مركز المساعدة
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
+                    الأسئلة الشائعة
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
+                    اتصل بنا
+                  </a>
+                </li>
               </ul>
             </div>
             <div>
@@ -280,7 +293,7 @@ const Index = () => {
             </div>
           </div>
           <div className="border-t pt-8 text-center text-sm text-muted-foreground">
-            <p>© 2025 منظومة الاستبيانات الذكية - كلية العلوم الإنسانية والاجتماعية. جميع الحقوق محفوظة.</p>
+            <p>© 2025 منظومة ادارة الجودة الشاملة الذكية - كلية العلوم الإنسانية والاجتماعية. جميع الحقوق محفوظة.</p>
           </div>
         </div>
       </footer>
