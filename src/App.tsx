@@ -11,6 +11,9 @@ import Surveys from "./pages/Surveys";
 import Reports from "./pages/Reports";
 import TakeSurvey from "./pages/TakeSurvey";
 import SurveyComplete from "./pages/SurveyComplete";
+import Complaints from "./pages/Complaints";
+import Recommendations from "./pages/Recommendations";
+import Archives from "./pages/Archives";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +33,9 @@ const App = () => (
           <Route path="/reports/:id" element={<Reports />} />
           <Route path="/take/:id" element={<TakeSurvey />} />
           <Route path="/survey-complete" element={<SurveyComplete />} />
+          <Route path="/complaints" element={<Complaints />} />
+          <Route path="/recommendations" element={<Recommendations />} />
+          <Route path="/archives" element={<Archives />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

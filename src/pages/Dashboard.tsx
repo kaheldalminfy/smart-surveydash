@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BarChart3, FileText, Plus, TrendingUp, Users, ClipboardList } from "lucide-react";
+import { BarChart3, FileText, Plus, TrendingUp, Users, ClipboardList, AlertCircle, CheckCircle2, Archive } from "lucide-react";
 
 const Dashboard = () => {
   const stats = [
@@ -104,10 +104,22 @@ const Dashboard = () => {
                   إدارة الاستبيانات
                 </Button>
               </Link>
-              <Link to="/reports">
+              <Link to="/complaints">
                 <Button variant="outline" className="w-full justify-start">
-                  <BarChart3 className="h-4 w-4 ml-2" />
-                  عرض التقارير
+                  <AlertCircle className="h-4 w-4 ml-2" />
+                  إدارة الشكاوى
+                </Button>
+              </Link>
+              <Link to="/recommendations">
+                <Button variant="outline" className="w-full justify-start">
+                  <CheckCircle2 className="h-4 w-4 ml-2" />
+                  متابعة التوصيات
+                </Button>
+              </Link>
+              <Link to="/archives">
+                <Button variant="outline" className="w-full justify-start">
+                  <Archive className="h-4 w-4 ml-2" />
+                  الأرشيف الفصلي
                 </Button>
               </Link>
             </CardContent>
