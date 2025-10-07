@@ -6,46 +6,71 @@ import heroBanner from "@/assets/hero-banner.jpg";
 import aiIcon from "@/assets/ai-icon.png";
 import surveyIcon from "@/assets/survey-icon.png";
 import analyticsIcon from "@/assets/analytics-icon.png";
-
 const Index = () => {
-  const programs = [
-    { id: 1, name: "برنامج القانون", icon: "⚖️" },
-    { id: 2, name: "برنامج التسويق", icon: "📊" },
-    { id: 3, name: "برنامج إدارة الأعمال", icon: "💼" },
-    { id: 4, name: "برنامج التمويل والمصارف", icon: "💰" },
-    { id: 5, name: "برنامج إدارة المشاريع", icon: "📋" },
-    { id: 6, name: "برنامج إدارة الرعاية الصحية", icon: "🏥" },
-    { id: 7, name: "برنامج اللغة الإنجليزية والتواصل العالمي", icon: "🌍" },
-    { id: 8, name: "برنامج ماجستير إدارة الرعاية الصحية", icon: "🎓" },
-  ];
-
-  const features = [
-    {
-      icon: <img src={surveyIcon} alt="تصميم الاستبيانات" className="w-16 h-16" />,
-      title: "تصميم استبيانات ذكي",
-      description: "واجهة سهلة لإنشاء استبيانات احترافية بمقاييس ليكرت والأسئلة المفتوحة والمغلقة",
-    },
-    {
-      icon: <img src={aiIcon} alt="تحليل ذكي" className="w-16 h-16" />,
-      title: "تحليل مدعوم بالذكاء الاصطناعي",
-      description: "تحليل آلي للبيانات مع توليد تقارير ذكية وتوصيات قابلة للتطبيق",
-    },
-    {
-      icon: <img src={analyticsIcon} alt="تقارير شاملة" className="w-16 h-16" />,
-      title: "تقارير جاهزة للتنزيل",
-      description: "تصدير تقارير PDF وExcel مع رسوم بيانية تفاعلية وإحصائيات دقيقة",
-    },
-  ];
-
-  const stats = [
-    { value: "8", label: "برامج أكاديمية", icon: <Users className="w-6 h-6" /> },
-    { value: "100%", label: "آلي بالكامل", icon: <Sparkles className="w-6 h-6" /> },
-    { value: "AI", label: "تحليل ذكي", icon: <Brain className="w-6 h-6" /> },
-    { value: "PDF+Excel", label: "تقارير احترافية", icon: <Download className="w-6 h-6" /> },
-  ];
-
-  return (
-    <div className="min-h-screen bg-background">
+  const programs = [{
+    id: 1,
+    name: "برنامج القانون",
+    icon: "⚖️"
+  }, {
+    id: 2,
+    name: "برنامج التسويق",
+    icon: "📊"
+  }, {
+    id: 3,
+    name: "برنامج إدارة الأعمال",
+    icon: "💼"
+  }, {
+    id: 4,
+    name: "برنامج التمويل والمصارف",
+    icon: "💰"
+  }, {
+    id: 5,
+    name: "برنامج إدارة المشاريع",
+    icon: "📋"
+  }, {
+    id: 6,
+    name: "برنامج إدارة الرعاية الصحية",
+    icon: "🏥"
+  }, {
+    id: 7,
+    name: "برنامج اللغة الإنجليزية والتواصل العالمي",
+    icon: "🌍"
+  }, {
+    id: 8,
+    name: "برنامج ماجستير إدارة الرعاية الصحية",
+    icon: "🎓"
+  }];
+  const features = [{
+    icon: <img src={surveyIcon} alt="تصميم الاستبيانات" className="w-16 h-16" />,
+    title: "تصميم استبيانات ذكي",
+    description: "واجهة سهلة لإنشاء استبيانات احترافية بمقاييس ليكرت والأسئلة المفتوحة والمغلقة"
+  }, {
+    icon: <img src={aiIcon} alt="تحليل ذكي" className="w-16 h-16" />,
+    title: "تحليل مدعوم بالذكاء الاصطناعي",
+    description: "تحليل آلي للبيانات مع توليد تقارير ذكية وتوصيات قابلة للتطبيق"
+  }, {
+    icon: <img src={analyticsIcon} alt="تقارير شاملة" className="w-16 h-16" />,
+    title: "تقارير جاهزة للتنزيل",
+    description: "تصدير تقارير PDF وExcel مع رسوم بيانية تفاعلية وإحصائيات دقيقة"
+  }];
+  const stats = [{
+    value: "8",
+    label: "برامج أكاديمية",
+    icon: <Users className="w-6 h-6" />
+  }, {
+    value: "100%",
+    label: "آلي بالكامل",
+    icon: <Sparkles className="w-6 h-6" />
+  }, {
+    value: "AI",
+    label: "تحليل ذكي",
+    icon: <Brain className="w-6 h-6" />
+  }, {
+    value: "PDF+Excel",
+    label: "تقارير احترافية",
+    icon: <Download className="w-6 h-6" />
+  }];
+  return <div className="min-h-screen bg-background">
       {/* Navigation */}
       <nav className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-4 py-4">
@@ -55,7 +80,7 @@ const Index = () => {
                 <FileText className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-foreground">منظومة الاستبيانات الذكية</h1>
+                <h1 className="text-xl font-bold text-foreground">منظومة  ادارة الجودة الشاملة الذكية</h1>
                 <p className="text-xs text-muted-foreground">كلية العلوم الإنسانية والاجتماعية</p>
               </div>
             </div>
@@ -75,14 +100,11 @@ const Index = () => {
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 gradient-hero opacity-5" />
-        <div
-          className="absolute inset-0 opacity-10"
-          style={{
-            backgroundImage: `url(${heroBanner})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        />
+        <div className="absolute inset-0 opacity-10" style={{
+        backgroundImage: `url(${heroBanner})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center"
+      }} />
         <div className="container mx-auto px-4 py-24 relative">
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full mb-6 animate-float">
@@ -116,13 +138,11 @@ const Index = () => {
       <section className="py-12 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {stats.map((stat, index) => (
-              <Card key={index} className="p-6 text-center hover:shadow-card transition-all gradient-card">
+            {stats.map((stat, index) => <Card key={index} className="p-6 text-center hover:shadow-card transition-all gradient-card">
                 <div className="flex justify-center mb-3 text-primary">{stat.icon}</div>
                 <div className="text-3xl font-bold text-foreground mb-1">{stat.value}</div>
                 <div className="text-sm text-muted-foreground">{stat.label}</div>
-              </Card>
-            ))}
+              </Card>)}
           </div>
         </div>
       </section>
@@ -137,13 +157,11 @@ const Index = () => {
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <Card key={index} className="p-8 hover:shadow-elegant transition-all gradient-card group">
+            {features.map((feature, index) => <Card key={index} className="p-8 hover:shadow-elegant transition-all gradient-card group">
                 <div className="mb-6 transform group-hover:scale-110 transition-transform">{feature.icon}</div>
                 <h4 className="text-2xl font-bold mb-4">{feature.title}</h4>
                 <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
-              </Card>
-            ))}
+              </Card>)}
           </div>
         </div>
       </section>
@@ -156,15 +174,10 @@ const Index = () => {
             <p className="text-xl text-muted-foreground">ثمانية برامج متميزة في كلية العلوم الإنسانية والاجتماعية</p>
           </div>
           <div className="grid md:grid-cols-4 gap-6">
-            {programs.map((program) => (
-              <Card
-                key={program.id}
-                className="p-6 hover:shadow-elegant transition-all cursor-pointer group gradient-card"
-              >
+            {programs.map(program => <Card key={program.id} className="p-6 hover:shadow-elegant transition-all cursor-pointer group gradient-card">
                 <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">{program.icon}</div>
                 <h5 className="font-bold text-lg leading-relaxed">{program.name}</h5>
-              </Card>
-            ))}
+              </Card>)}
           </div>
         </div>
       </section>
@@ -220,11 +233,7 @@ const Index = () => {
                   ابدأ الآن
                 </Button>
               </Link>
-              <Button
-                variant="outline"
-                size="lg"
-                className="text-lg bg-white/10 text-white border-white/30 hover:bg-white/20"
-              >
+              <Button variant="outline" size="lg" className="text-lg bg-white/10 text-white border-white/30 hover:bg-white/20">
                 <Shield className="w-5 h-5 ml-2" />
                 تواصل معنا
               </Button>
@@ -297,8 +306,6 @@ const Index = () => {
           </div>
         </div>
       </footer>
-    </div>
-  );
+    </div>;
 };
-
 export default Index;
