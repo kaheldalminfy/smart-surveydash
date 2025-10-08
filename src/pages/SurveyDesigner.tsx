@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,31 +7,127 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Trash2, GripVertical, Sparkles, Save, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const SurveyDesigner = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [programs, setPrograms] = useState<any[]>([]);
+  const [survey, setSurvey] = useState({
+    title: "",
+    description: "",
+    programId: "",
+    isAnonymous: true,
+    startDate: "",
+    endDate: ""
+  });
   const [questions, setQuestions] = useState([
-    { id: 1, text: "", type: "likert" }
+    { id: 1, text: "", type: "likert", orderIndex: 0 }
   ]);
+
+  useEffect(() => {
+    loadPrograms();
+  }, []);
+
+  const loadPrograms = async () => {
+    const { data } = await supabase.from("programs").select("*").order("name");
+    if (data) setPrograms(data);
+  };
 
   const questionTypes = [
     { value: "likert", label: "مقياس ليكرت" },
-    { value: "mcq", label: "اختيار متعدد" },
     { value: "text", label: "نص مفتوح" },
     { value: "rating", label: "تقييم/ترتيب" },
   ];
 
   const addQuestion = () => {
-    setQuestions([...questions, { id: Date.now(), text: "", type: "likert" }]);
+    setQuestions([...questions, { 
+      id: Date.now(), 
+      text: "", 
+      type: "likert",
+      orderIndex: questions.length 
+    }]);
   };
 
   const removeQuestion = (id: number) => {
     setQuestions(questions.filter(q => q.id !== id));
   };
 
-  const handleSave = () => {
-    // Save logic here
-    navigate("/surveys");
+  const handleSave = async () => {
+    if (!survey.title || !survey.programId) {
+      toast({
+        title: "خطأ",
+        description: "الرجاء إدخال عنوان الاستبيان واختيار البرنامج",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (questions.some(q => !q.text)) {
+      toast({
+        title: "خطأ",
+        description: "الرجاء إدخال نص جميع الأسئلة",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not found");
+
+      // Create survey
+      const { data: surveyData, error: surveyError } = await supabase
+        .from("surveys")
+        .insert({
+          title: survey.title,
+          description: survey.description,
+          program_id: survey.programId,
+          is_anonymous: survey.isAnonymous,
+          start_date: survey.startDate || null,
+          end_date: survey.endDate || null,
+          created_by: user.id,
+          status: "draft",
+        })
+        .select()
+        .single();
+
+      if (surveyError) throw surveyError;
+
+      // Create questions
+      const questionsData = questions.map((q, index) => ({
+        survey_id: surveyData.id,
+        text: q.text,
+        type: q.type,
+        order_index: index,
+        is_required: true,
+      }));
+
+      const { error: questionsError } = await supabase
+        .from("questions")
+        .insert(questionsData);
+
+      if (questionsError) throw questionsError;
+
+      toast({
+        title: "تم الحفظ",
+        description: "تم حفظ الاستبيان بنجاح",
+      });
+
+      navigate("/surveys");
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -49,9 +145,9 @@ const SurveyDesigner = () => {
                 <Sparkles className="h-4 w-4 ml-2" />
                 اقتراحات AI
               </Button>
-              <Button onClick={handleSave} variant="hero" size="sm">
+              <Button onClick={handleSave} variant="hero" size="sm" disabled={isLoading}>
                 <Save className="h-4 w-4 ml-2" />
-                حفظ
+                {isLoading ? "جاري الحفظ..." : "حفظ"}
               </Button>
             </div>
           </div>
@@ -68,28 +164,48 @@ const SurveyDesigner = () => {
               <CardContent className="space-y-4">
                 <div>
                   <Label htmlFor="title">عنوان الاستبيان</Label>
-                  <Input id="title" placeholder="مثال: تقييم جودة المقرر - القانون التجاري" />
+                  <Input 
+                    id="title" 
+                    placeholder="مثال: تقييم جودة المقرر - القانون التجاري"
+                    value={survey.title}
+                    onChange={(e) => setSurvey({...survey, title: e.target.value})}
+                  />
                 </div>
                 <div>
                   <Label htmlFor="description">الوصف</Label>
-                  <Textarea id="description" placeholder="وصف مختصر للاستبيان وأهدافه" rows={3} />
+                  <Textarea 
+                    id="description" 
+                    placeholder="وصف مختصر للاستبيان وأهدافه" 
+                    rows={3}
+                    value={survey.description}
+                    onChange={(e) => setSurvey({...survey, description: e.target.value})}
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="program">البرنامج</Label>
-                    <select id="program" className="w-full rounded-md border border-input bg-background px-3 py-2">
+                    <select 
+                      id="program" 
+                      className="w-full rounded-md border border-input bg-background px-3 py-2"
+                      value={survey.programId}
+                      onChange={(e) => setSurvey({...survey, programId: e.target.value})}
+                    >
                       <option value="">اختر البرنامج</option>
-                      <option value="law">القانون</option>
-                      <option value="marketing">التسويق</option>
-                      <option value="business">إدارة الأعمال</option>
-                      <option value="finance">التمويل والمصارف</option>
-                      <option value="project">إدارة المشاريع</option>
-                      <option value="healthcare">إدارة الرعاية الصحية</option>
+                      {programs.map((program) => (
+                        <option key={program.id} value={program.id}>
+                          {program.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div>
                     <Label htmlFor="anonymous">نوع الاستبيان</Label>
-                    <select id="anonymous" className="w-full rounded-md border border-input bg-background px-3 py-2">
+                    <select 
+                      id="anonymous" 
+                      className="w-full rounded-md border border-input bg-background px-3 py-2"
+                      value={survey.isAnonymous ? "anonymous" : "identified"}
+                      onChange={(e) => setSurvey({...survey, isAnonymous: e.target.value === "anonymous"})}
+                    >
                       <option value="anonymous">مجهول الهوية</option>
                       <option value="identified">محدد الهوية</option>
                     </select>
@@ -193,11 +309,21 @@ const SurveyDesigner = () => {
               <CardContent className="space-y-4">
                 <div>
                   <Label htmlFor="start-date">تاريخ البدء</Label>
-                  <Input id="start-date" type="date" />
+                  <Input 
+                    id="start-date" 
+                    type="date"
+                    value={survey.startDate}
+                    onChange={(e) => setSurvey({...survey, startDate: e.target.value})}
+                  />
                 </div>
                 <div>
                   <Label htmlFor="end-date">تاريخ الانتهاء</Label>
-                  <Input id="end-date" type="date" />
+                  <Input 
+                    id="end-date" 
+                    type="date"
+                    value={survey.endDate}
+                    onChange={(e) => setSurvey({...survey, endDate: e.target.value})}
+                  />
                 </div>
               </CardContent>
             </Card>

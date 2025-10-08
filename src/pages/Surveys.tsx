@@ -1,43 +1,59 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, BarChart3, Link2, QrCode, Edit, Trash2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const Surveys = () => {
-  const surveys = [
-    {
-      id: 1,
-      title: "تقييم جودة المقرر - القانون التجاري",
-      program: "القانون",
-      status: "نشط",
-      responses: 45,
-      total: 60,
-      startDate: "2025-09-15",
-      endDate: "2025-10-01",
-    },
-    {
-      id: 2,
-      title: "رضا الطلاب - برنامج التسويق",
-      program: "التسويق",
-      status: "نشط",
-      responses: 123,
-      total: 150,
-      startDate: "2025-09-20",
-      endDate: "2025-10-05",
-    },
-    {
-      id: 3,
-      title: "تقييم أعضاء هيئة التدريس",
-      program: "إدارة الأعمال",
-      status: "مكتمل",
-      responses: 100,
-      total: 100,
-      startDate: "2025-08-01",
-      endDate: "2025-08-30",
-    },
-  ];
+  const { toast } = useToast();
+  const [surveys, setSurveys] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadSurveys();
+  }, []);
+
+  const loadSurveys = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("surveys")
+      .select(`
+        *,
+        programs(name),
+        responses(count)
+      `)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      toast({
+        title: "خطأ",
+        description: "فشل في تحميل الاستبيانات",
+        variant: "destructive",
+      });
+    } else if (data) {
+      setSurveys(data);
+    }
+    setLoading(false);
+  };
+
+  const getSurveyStatus = (survey: any) => {
+    if (survey.status === "active") return { label: "نشط", variant: "default" as const };
+    if (survey.status === "closed") return { label: "مغلق", variant: "secondary" as const };
+    return { label: "مسودة", variant: "outline" as const };
+  };
+
+  const copyLink = (surveyId: string) => {
+    const link = `${window.location.origin}/take/${surveyId}`;
+    navigator.clipboard.writeText(link);
+    toast({
+      title: "تم النسخ",
+      description: "تم نسخ رابط الاستبيان",
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
@@ -69,67 +85,78 @@ const Surveys = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6">
-          {surveys.map((survey) => (
-            <Card key={survey.id} className="hover-scale">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <CardTitle className="text-xl">{survey.title}</CardTitle>
-                      <Badge variant={survey.status === "نشط" ? "default" : "secondary"}>
-                        {survey.status}
-                      </Badge>
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        ) : surveys.length === 0 ? (
+          <Card>
+            <CardContent className="text-center py-12">
+              <p className="text-muted-foreground mb-4">لا توجد استبيانات حالياً</p>
+              <Link to="/surveys/new">
+                <Button variant="hero">
+                  <Plus className="h-4 w-4 ml-2" />
+                  إنشاء أول استبيان
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 gap-6">
+            {surveys.map((survey) => {
+              const status = getSurveyStatus(survey);
+              const responsesCount = survey.responses?.[0]?.count || 0;
+              
+              return (
+                <Card key={survey.id} className="hover-scale">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <CardTitle className="text-xl">{survey.title}</CardTitle>
+                          <Badge variant={status.variant}>
+                            {status.label}
+                          </Badge>
+                        </div>
+                        <CardDescription>
+                          برنامج {survey.programs?.name} • 
+                          {survey.start_date && ` ${new Date(survey.start_date).toLocaleDateString('ar-SA')}`}
+                          {survey.end_date && ` إلى ${new Date(survey.end_date).toLocaleDateString('ar-SA')}`}
+                        </CardDescription>
+                      </div>
                     </div>
-                    <CardDescription>
-                      برنامج {survey.program} • {survey.startDate} إلى {survey.endDate}
-                    </CardDescription>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="ghost" size="sm">
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm">
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-6 text-sm">
-                    <div>
-                      <span className="font-semibold">{survey.responses}</span>
-                      <span className="text-muted-foreground"> / {survey.total} استجابة</span>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-6 text-sm">
+                        <div>
+                          <span className="font-semibold">{responsesCount}</span>
+                          <span className="text-muted-foreground"> استجابة</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => copyLink(survey.id)}
+                        >
+                          <Link2 className="h-4 w-4 ml-2" />
+                          رابط
+                        </Button>
+                        <Link to={`/reports/${survey.id}`}>
+                          <Button variant="accent" size="sm">
+                            <BarChart3 className="h-4 w-4 ml-2" />
+                            التقرير
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
-                    <div className="h-2 w-48 bg-secondary rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-primary transition-all"
-                        style={{ width: `${(survey.responses / survey.total) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                      <QrCode className="h-4 w-4 ml-2" />
-                      باركود
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      <Link2 className="h-4 w-4 ml-2" />
-                      رابط
-                    </Button>
-                    <Link to={`/reports/${survey.id}`}>
-                      <Button variant="accent" size="sm">
-                        <BarChart3 className="h-4 w-4 ml-2" />
-                        التقرير
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </main>
     </div>
   );
