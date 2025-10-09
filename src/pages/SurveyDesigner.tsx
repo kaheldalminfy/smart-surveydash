@@ -5,27 +5,45 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Trash2, GripVertical, Sparkles, Save, Eye } from "lucide-react";
+import { Plus, Trash2, GripVertical, Sparkles, Save, Eye, ArrowLeft, Copy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import SurveyTemplates from "@/components/SurveyTemplates";
+
+interface Question {
+  id: number;
+  text: string;
+  type: string;
+  orderIndex: number;
+  options?: string[];
+  required?: boolean;
+  helpText?: string;
+}
 
 const SurveyDesigner = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [programs, setPrograms] = useState<any[]>([]);
+  const [currentTab, setCurrentTab] = useState("templates");
   const [survey, setSurvey] = useState({
     title: "",
     description: "",
     programId: "",
     isAnonymous: true,
     startDate: "",
-    endDate: ""
+    endDate: "",
+    settings: {
+      allowMultipleResponses: false,
+      showProgressBar: true,
+      randomizeQuestions: false,
+      requireAllQuestions: true,
+    }
   });
-  const [questions, setQuestions] = useState([
-    { id: 1, text: "", type: "likert", orderIndex: 0 }
-  ]);
+  const [questions, setQuestions] = useState<Question[]>([]);
 
   useEffect(() => {
     loadPrograms();
@@ -37,23 +55,104 @@ const SurveyDesigner = () => {
   };
 
   const questionTypes = [
-    { value: "likert", label: "مقياس ليكرت" },
-    { value: "text", label: "نص مفتوح" },
-    { value: "mcq", label: "اختيارات متعددة" },
-    { value: "rating", label: "تقييم/ترتيب" },
+    { value: "likert", label: "مقياس ليكرت", description: "مقياس من 1-5 للموافقة" },
+    { value: "text", label: "نص مفتوح", description: "إجابة نصية حرة" },
+    { value: "mcq", label: "اختيارات متعددة", description: "اختيار من عدة خيارات" },
+    { value: "rating", label: "تقييم/ترتيب", description: "تقييم بالنجوم أو ترتيب" },
   ];
+
+  const handleTemplateSelect = (template: any) => {
+    setSurvey(prev => ({
+      ...prev,
+      title: template.name,
+      description: template.description,
+    }));
+    
+    const templateQuestions = template.questions.map((q: any, index: number) => ({
+      id: Date.now() + index,
+      text: q.text,
+      type: q.type,
+      orderIndex: index,
+      options: q.options || [],
+      required: q.required !== false,
+      helpText: q.help_text || "",
+    }));
+    
+    setQuestions(templateQuestions);
+    setCurrentTab("design");
+    
+    toast({
+      title: "تم تحميل القالب",
+      description: `تم تحميل قالب "${template.name}" بنجاح`,
+    });
+  };
+
+  const handleCreateCustom = () => {
+    setCurrentTab("design");
+    if (questions.length === 0) {
+      setQuestions([{ 
+        id: Date.now(), 
+        text: "", 
+        type: "likert",
+        orderIndex: 0,
+        required: true,
+        helpText: "",
+      }]);
+    }
+  };
 
   const addQuestion = () => {
     setQuestions([...questions, { 
       id: Date.now(), 
       text: "", 
       type: "likert",
-      orderIndex: questions.length 
+      orderIndex: questions.length,
+      required: true,
+      helpText: "",
     }]);
   };
 
   const removeQuestion = (id: number) => {
     setQuestions(questions.filter(q => q.id !== id));
+  };
+
+  const updateQuestion = (id: number, field: string, value: any) => {
+    setQuestions(questions.map(q => 
+      q.id === id ? { ...q, [field]: value } : q
+    ));
+  };
+
+  const duplicateQuestion = (id: number) => {
+    const questionToDuplicate = questions.find(q => q.id === id);
+    if (questionToDuplicate) {
+      const newQuestion = {
+        ...questionToDuplicate,
+        id: Date.now(),
+        text: questionToDuplicate.text + " (نسخة)",
+        orderIndex: questions.length,
+      };
+      setQuestions([...questions, newQuestion]);
+    }
+  };
+
+  const moveQuestion = (id: number, direction: 'up' | 'down') => {
+    const currentIndex = questions.findIndex(q => q.id === id);
+    if (
+      (direction === 'up' && currentIndex > 0) ||
+      (direction === 'down' && currentIndex < questions.length - 1)
+    ) {
+      const newQuestions = [...questions];
+      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      [newQuestions[currentIndex], newQuestions[targetIndex]] = 
+      [newQuestions[targetIndex], newQuestions[currentIndex]];
+      
+      // Update order indices
+      newQuestions.forEach((q, index) => {
+        q.orderIndex = index;
+      });
+      
+      setQuestions(newQuestions);
+    }
   };
 
   const handleSave = async () => {
@@ -83,17 +182,6 @@ const SurveyDesigner = () => {
         throw new Error("المستخدم غير مسجل الدخول");
       }
 
-      console.log("Creating survey with data:", {
-        title: survey.title,
-        description: survey.description,
-        program_id: survey.programId,
-        is_anonymous: survey.isAnonymous,
-        start_date: survey.startDate || null,
-        end_date: survey.endDate || null,
-        created_by: user.id,
-        status: "draft",
-      });
-
       // Create survey
       const { data: surveyData, error: surveyError } = await supabase
         .from("surveys")
@@ -106,6 +194,7 @@ const SurveyDesigner = () => {
           end_date: survey.endDate || null,
           created_by: user.id,
           status: "draft",
+          settings: survey.settings,
         })
         .select()
         .single();
@@ -115,21 +204,20 @@ const SurveyDesigner = () => {
         throw new Error(`خطأ في إنشاء الاستبيان: ${surveyError.message}`);
       }
 
-      console.log("Survey created successfully:", surveyData);
-
       // Create questions
       const questionsData = questions.map((q, index) => ({
         survey_id: surveyData.id,
         text: q.text,
         type: q.type,
         order_index: index,
-        is_required: true,
+        is_required: q.required,
+        help_text: q.helpText || null,
         options: q.type === "likert" ? {
           scale: ["غير موافق بشدة", "غير موافق", "محايد", "موافق", "موافق بشدة"]
+        } : q.type === "mcq" && q.options ? {
+          choices: q.options
         } : null,
       }));
-
-      console.log("Creating questions with data:", questionsData);
 
       const { error: questionsError } = await supabase
         .from("questions")
@@ -139,8 +227,6 @@ const SurveyDesigner = () => {
         console.error("Questions creation error:", questionsError);
         throw new Error(`خطأ في إنشاء الأسئلة: ${questionsError.message}`);
       }
-
-      console.log("Questions created successfully");
 
       toast({
         title: "تم الحفظ",
@@ -160,205 +246,342 @@ const SurveyDesigner = () => {
     }
   };
 
+  const handlePreview = () => {
+    // TODO: Implement preview functionality
+    toast({
+      title: "قريباً",
+      description: "ميزة المعاينة ستكون متاحة قريباً",
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <header className="bg-card border-b shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold">مصمم الاستبيان</h1>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm">
-                <Eye className="h-4 w-4 ml-2" />
-                معاينة
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="sm" onClick={() => navigate("/surveys")}>
+                <ArrowLeft className="h-4 w-4 ml-2" />
+                العودة
               </Button>
-              <Button variant="accent" size="sm">
-                <Sparkles className="h-4 w-4 ml-2" />
-                اقتراحات AI
-              </Button>
-              <Button onClick={handleSave} variant="hero" size="sm" disabled={isLoading}>
-                <Save className="h-4 w-4 ml-2" />
-                {isLoading ? "جاري الحفظ..." : "حفظ"}
-              </Button>
+              <div>
+                <h1 className="text-2xl font-bold">مصمم الاستبيان</h1>
+                <p className="text-sm text-muted-foreground">
+                  {currentTab === "templates" ? "اختر قالباً أو ابدأ من الصفر" : "صمم استبيانك"}
+                </p>
+              </div>
             </div>
+            {currentTab === "design" && (
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handlePreview}>
+                  <Eye className="h-4 w-4 ml-2" />
+                  معاينة
+                </Button>
+                <Button variant="accent" size="sm">
+                  <Sparkles className="h-4 w-4 ml-2" />
+                  اقتراحات AI
+                </Button>
+                <Button onClick={handleSave} variant="hero" size="sm" disabled={isLoading}>
+                  <Save className="h-4 w-4 ml-2" />
+                  {isLoading ? "جاري الحفظ..." : "حفظ"}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>معلومات الاستبيان</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="title">عنوان الاستبيان</Label>
-                  <Input 
-                    id="title" 
-                    placeholder="مثال: تقييم جودة المقرر - القانون التجاري"
-                    value={survey.title}
-                    onChange={(e) => setSurvey({...survey, title: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="description">الوصف</Label>
-                  <Textarea 
-                    id="description" 
-                    placeholder="وصف مختصر للاستبيان وأهدافه" 
-                    rows={3}
-                    value={survey.description}
-                    onChange={(e) => setSurvey({...survey, description: e.target.value})}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="program">البرنامج</Label>
-                    <select 
-                      id="program" 
-                      className="w-full rounded-md border border-input bg-background px-3 py-2"
-                      value={survey.programId}
-                      onChange={(e) => setSurvey({...survey, programId: e.target.value})}
-                    >
-                      <option value="">اختر البرنامج</option>
-                      {programs.map((program) => (
-                        <option key={program.id} value={program.id}>
-                          {program.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label htmlFor="anonymous">نوع الاستبيان</Label>
-                    <select 
-                      id="anonymous" 
-                      className="w-full rounded-md border border-input bg-background px-3 py-2"
-                      value={survey.isAnonymous ? "anonymous" : "identified"}
-                      onChange={(e) => setSurvey({...survey, isAnonymous: e.target.value === "anonymous"})}
-                    >
-                      <option value="anonymous">مجهول الهوية</option>
-                      <option value="identified">محدد الهوية</option>
-                    </select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        <Tabs value={currentTab} onValueChange={setCurrentTab}>
+          <TabsList className="grid w-full grid-cols-2 mb-8">
+            <TabsTrigger value="templates">القوالب الجاهزة</TabsTrigger>
+            <TabsTrigger value="design">تصميم الاستبيان</TabsTrigger>
+          </TabsList>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>الأسئلة</CardTitle>
-                <Button onClick={addQuestion} size="sm" variant="outline">
-                  <Plus className="h-4 w-4 ml-2" />
-                  إضافة سؤال
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {questions.map((question, index) => (
-                  <div key={question.id} className="p-4 border rounded-lg bg-card space-y-3">
-                    <div className="flex items-start gap-3">
-                      <GripVertical className="h-5 w-5 text-muted-foreground mt-2 cursor-move" />
-                      <div className="flex-1 space-y-3">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">سؤال {index + 1}</Badge>
-                          <select 
-                            value={question.type}
-                            onChange={(e) => {
-                              const updated = [...questions];
-                              updated[index].type = e.target.value;
-                              setQuestions(updated);
-                            }}
-                            className="text-sm rounded-md border border-input bg-background px-2 py-1"
-                          >
-                            {questionTypes.map(type => (
-                              <option key={type.value} value={type.value}>{type.label}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <Input 
-                          placeholder="اكتب نص السؤال هنا"
-                          value={question.text}
-                          onChange={(e) => {
-                            const updated = [...questions];
-                            updated[index].text = e.target.value;
-                            setQuestions(updated);
-                          }}
-                        />
-                        {question.type === "likert" && (
-                          <div className="flex gap-2 text-sm text-muted-foreground">
-                            <span>غير موافق بشدة</span>
-                            <span>•</span>
-                            <span>غير موافق</span>
-                            <span>•</span>
-                            <span>محايد</span>
-                            <span>•</span>
-                            <span>موافق</span>
-                            <span>•</span>
-                            <span>موافق بشدة</span>
-                          </div>
-                        )}
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => removeQuestion(question.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+          <TabsContent value="templates">
+            <SurveyTemplates 
+              onSelectTemplate={handleTemplateSelect}
+              onCreateCustom={handleCreateCustom}
+            />
+          </TabsContent>
+
+          <TabsContent value="design">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                {/* معلومات الاستبيان */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>معلومات الاستبيان</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label htmlFor="title">عنوان الاستبيان</Label>
+                      <Input 
+                        id="title" 
+                        placeholder="مثال: تقييم جودة المقرر - القانون التجاري"
+                        value={survey.title}
+                        onChange={(e) => setSurvey({...survey, title: e.target.value})}
+                      />
                     </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
+                    <div>
+                      <Label htmlFor="description">الوصف</Label>
+                      <Textarea 
+                        id="description" 
+                        placeholder="وصف مختصر للاستبيان وأهدافه" 
+                        rows={3}
+                        value={survey.description}
+                        onChange={(e) => setSurvey({...survey, description: e.target.value})}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="program">البرنامج</Label>
+                        <select 
+                          id="program" 
+                          className="w-full rounded-md border border-input bg-background px-3 py-2"
+                          value={survey.programId}
+                          onChange={(e) => setSurvey({...survey, programId: e.target.value})}
+                        >
+                          <option value="">اختر البرنامج</option>
+                          {programs.map((program) => (
+                            <option key={program.id} value={program.id}>
+                              {program.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <Label htmlFor="anonymous">نوع الاستبيان</Label>
+                        <select 
+                          id="anonymous" 
+                          className="w-full rounded-md border border-input bg-background px-3 py-2"
+                          value={survey.isAnonymous ? "anonymous" : "identified"}
+                          onChange={(e) => setSurvey({...survey, isAnonymous: e.target.value === "anonymous"})}
+                        >
+                          <option value="anonymous">مجهول الهوية</option>
+                          <option value="identified">محدد الهوية</option>
+                        </select>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>القوالب الجاهزة</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button variant="outline" className="w-full justify-start" size="sm">
-                  تقييم المقرر الدراسي
-                </Button>
-                <Button variant="outline" className="w-full justify-start" size="sm">
-                  رضا الطلاب العام
-                </Button>
-                <Button variant="outline" className="w-full justify-start" size="sm">
-                  تقييم عضو هيئة التدريس
-                </Button>
-                <Button variant="outline" className="w-full justify-start" size="sm">
-                  جودة البرنامج الأكاديمي
-                </Button>
-              </CardContent>
-            </Card>
+                {/* الأسئلة */}
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>الأسئلة ({questions.length})</CardTitle>
+                    <Button onClick={addQuestion} size="sm" variant="outline">
+                      <Plus className="h-4 w-4 ml-2" />
+                      إضافة سؤال
+                    </Button>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {questions.map((question, index) => (
+                      <div key={question.id} className="p-4 border rounded-lg bg-card space-y-3">
+                        <div className="flex items-start gap-3">
+                          <GripVertical className="h-5 w-5 text-muted-foreground mt-2 cursor-move" />
+                          <div className="flex-1 space-y-3">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">سؤال {index + 1}</Badge>
+                              <select 
+                                value={question.type}
+                                onChange={(e) => updateQuestion(question.id, 'type', e.target.value)}
+                                className="text-sm rounded-md border border-input bg-background px-2 py-1"
+                              >
+                                {questionTypes.map(type => (
+                                  <option key={type.value} value={type.value}>{type.label}</option>
+                                ))}
+                              </select>
+                              <div className="flex items-center gap-2 mr-auto">
+                                <Label htmlFor={`required-${question.id}`} className="text-sm">مطلوب</Label>
+                                <Switch
+                                  id={`required-${question.id}`}
+                                  checked={question.required}
+                                  onCheckedChange={(checked) => updateQuestion(question.id, 'required', checked)}
+                                />
+                              </div>
+                            </div>
+                            <Input 
+                              placeholder="اكتب نص السؤال هنا"
+                              value={question.text}
+                              onChange={(e) => updateQuestion(question.id, 'text', e.target.value)}
+                            />
+                            <Input 
+                              placeholder="نص مساعد (اختياري)"
+                              value={question.helpText}
+                              onChange={(e) => updateQuestion(question.id, 'helpText', e.target.value)}
+                              className="text-sm"
+                            />
+                            
+                            {question.type === "likert" && (
+                              <div className="flex gap-2 text-sm text-muted-foreground">
+                                <span>غير موافق بشدة</span>
+                                <span>•</span>
+                                <span>غير موافق</span>
+                                <span>•</span>
+                                <span>محايد</span>
+                                <span>•</span>
+                                <span>موافق</span>
+                                <span>•</span>
+                                <span>موافق بشدة</span>
+                              </div>
+                            )}
 
-            <Card>
-              <CardHeader>
-                <CardTitle>الإعدادات</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="start-date">تاريخ البدء</Label>
-                  <Input 
-                    id="start-date" 
-                    type="date"
-                    value={survey.startDate}
-                    onChange={(e) => setSurvey({...survey, startDate: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="end-date">تاريخ الانتهاء</Label>
-                  <Input 
-                    id="end-date" 
-                    type="date"
-                    value={survey.endDate}
-                    onChange={(e) => setSurvey({...survey, endDate: e.target.value})}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+                            {question.type === "mcq" && (
+                              <div className="space-y-2">
+                                <Label className="text-sm">الخيارات:</Label>
+                                {(question.options || []).map((option, optionIndex) => (
+                                  <div key={optionIndex} className="flex gap-2">
+                                    <Input
+                                      placeholder={`الخيار ${optionIndex + 1}`}
+                                      value={option}
+                                      onChange={(e) => {
+                                        const newOptions = [...(question.options || [])];
+                                        newOptions[optionIndex] = e.target.value;
+                                        updateQuestion(question.id, 'options', newOptions);
+                                      }}
+                                      className="text-sm"
+                                    />
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => {
+                                        const newOptions = (question.options || []).filter((_, i) => i !== optionIndex);
+                                        updateQuestion(question.id, 'options', newOptions);
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    const newOptions = [...(question.options || []), ""];
+                                    updateQuestion(question.id, 'options', newOptions);
+                                  }}
+                                >
+                                  <Plus className="h-4 w-4 ml-2" />
+                                  إضافة خيار
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => duplicateQuestion(question.id)}
+                              title="نسخ السؤال"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => removeQuestion(question.id)}
+                              title="حذف السؤال"
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* الشريط الجانبي */}
+              <div className="space-y-6">
+                {/* إعدادات متقدمة */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>الإعدادات</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label htmlFor="start-date">تاريخ البدء</Label>
+                      <Input 
+                        id="start-date" 
+                        type="date"
+                        value={survey.startDate}
+                        onChange={(e) => setSurvey({...survey, startDate: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="end-date">تاريخ الانتهاء</Label>
+                      <Input 
+                        id="end-date" 
+                        type="date"
+                        value={survey.endDate}
+                        onChange={(e) => setSurvey({...survey, endDate: e.target.value})}
+                      />
+                    </div>
+                    
+                    <div className="space-y-3 pt-4 border-t">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="multiple-responses" className="text-sm">السماح بردود متعددة</Label>
+                        <Switch
+                          id="multiple-responses"
+                          checked={survey.settings.allowMultipleResponses}
+                          onCheckedChange={(checked) => setSurvey({
+                            ...survey, 
+                            settings: {...survey.settings, allowMultipleResponses: checked}
+                          })}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="progress-bar" className="text-sm">إظهار شريط التقدم</Label>
+                        <Switch
+                          id="progress-bar"
+                          checked={survey.settings.showProgressBar}
+                          onCheckedChange={(checked) => setSurvey({
+                            ...survey, 
+                            settings: {...survey.settings, showProgressBar: checked}
+                          })}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="randomize" className="text-sm">ترتيب عشوائي للأسئلة</Label>
+                        <Switch
+                          id="randomize"
+                          checked={survey.settings.randomizeQuestions}
+                          onCheckedChange={(checked) => setSurvey({
+                            ...survey, 
+                            settings: {...survey.settings, randomizeQuestions: checked}
+                          })}
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* نصائح */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>نصائح للتصميم</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="p-3 bg-blue-50 rounded-lg">
+                      <p className="font-medium text-blue-900">استخدم لغة واضحة</p>
+                      <p className="text-blue-700">اكتب أسئلة مباشرة وسهلة الفهم</p>
+                    </div>
+                    <div className="p-3 bg-green-50 rounded-lg">
+                      <p className="font-medium text-green-900">رتب الأسئلة منطقياً</p>
+                      <p className="text-green-700">ابدأ بالأسئلة العامة ثم المحددة</p>
+                    </div>
+                    <div className="p-3 bg-amber-50 rounded-lg">
+                      <p className="font-medium text-amber-900">اختبر الاستبيان</p>
+                      <p className="text-amber-700">استخدم المعاينة قبل النشر</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );

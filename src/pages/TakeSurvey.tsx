@@ -1,24 +1,59 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { CheckCircle2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { 
+  CheckCircle, 
+  Clock, 
+  AlertCircle, 
+  ArrowRight, 
+  ArrowLeft,
+  Send,
+  Star,
+  HelpCircle,
+  CheckCircle2
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+interface Question {
+  id: string;
+  text: string;
+  type: string;
+  order_index: number;
+  is_required: boolean;
+  help_text?: string;
+  options?: any;
+}
+
+interface Survey {
+  id: string;
+  title: string;
+  description: string;
+  is_anonymous: boolean;
+  status: string;
+  settings?: any;
+}
+
 const TakeSurvey = () => {
-  const navigate = useNavigate();
   const { id } = useParams();
+  const navigate = useNavigate();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [survey, setSurvey] = useState<any>(null);
-  const [questions, setQuestions] = useState<any[]>([]);
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
+  
+  const [survey, setSurvey] = useState<Survey | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [responses, setResponses] = useState<Record<string, any>>({});
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [startTime] = useState(Date.now());
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (id) {
@@ -27,82 +62,125 @@ const TakeSurvey = () => {
   }, [id]);
 
   const loadSurvey = async () => {
-    setLoading(true);
-    const { data: surveyData, error: surveyError } = await supabase
-      .from("surveys")
-      .select("*, programs(name)")
-      .eq("id", id)
-      .single();
+    setIsLoading(true);
+    try {
+      // Load survey details
+      const { data: surveyData, error: surveyError } = await supabase
+        .from("surveys")
+        .select("*")
+        .eq("id", id)
+        .single();
 
-    if (surveyError || !surveyData) {
+      if (surveyError) throw surveyError;
+
+      if (surveyData.status !== "active") {
+        toast({
+          title: "الاستبيان غير متاح",
+          description: "هذا الاستبيان غير نشط حالياً",
+          variant: "destructive",
+        });
+        navigate("/");
+        return;
+      }
+
+      setSurvey(surveyData);
+
+      // Load questions
+      const { data: questionsData, error: questionsError } = await supabase
+        .from("questions")
+        .select("*")
+        .eq("survey_id", id)
+        .order("order_index");
+
+      if (questionsError) throw questionsError;
+      setQuestions(questionsData || []);
+
+    } catch (error: any) {
       toast({
         title: "خطأ",
         description: "فشل في تحميل الاستبيان",
         variant: "destructive",
       });
       navigate("/");
-      return;
+    } finally {
+      setIsLoading(false);
     }
-
-    const { data: questionsData, error: questionsError } = await supabase
-      .from("questions")
-      .select("*")
-      .eq("survey_id", id)
-      .order("order_index");
-
-    if (questionsError) {
-      toast({
-        title: "خطأ",
-        description: "فشل في تحميل الأسئلة",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setSurvey(surveyData);
-    setQuestions(questionsData || []);
-    setLoading(false);
   };
 
-  const likertOptions = [
-    { value: "1", label: "غير موافق بشدة" },
-    { value: "2", label: "غير موافق" },
-    { value: "3", label: "محايد" },
-    { value: "4", label: "موافق" },
-    { value: "5", label: "موافق بشدة" },
-  ];
+  const handleResponseChange = (questionId: string, value: any) => {
+    setResponses(prev => ({
+      ...prev,
+      [questionId]: value
+    }));
+    
+    // Clear validation error for this question
+    if (validationErrors[questionId]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[questionId];
+        return newErrors;
+      });
+    }
+  };
 
-  const handleNext = async () => {
-    if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion(currentQuestion + 1);
-    } else {
-      await submitSurvey();
+  const validateCurrentQuestion = () => {
+    const currentQuestion = questions[currentQuestionIndex];
+    if (!currentQuestion) return true;
+
+    if (currentQuestion.is_required && !responses[currentQuestion.id]) {
+      setValidationErrors(prev => ({
+        ...prev,
+        [currentQuestion.id]: "هذا السؤال مطلوب"
+      }));
+      return false;
+    }
+
+    return true;
+  };
+
+  const nextQuestion = () => {
+    if (validateCurrentQuestion() && currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+    }
+  };
+
+  const previousQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(prev => prev - 1);
     }
   };
 
   const submitSurvey = async () => {
-    setSubmitting(true);
+    if (!validateCurrentQuestion()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
     try {
-      // Create response
+      const { data: { user } } = await supabase.auth.getUser();
+      const completionTime = Math.floor((Date.now() - startTime) / 1000);
+
+      // Create response record
       const { data: responseData, error: responseError } = await supabase
         .from("responses")
         .insert({
           survey_id: id,
-          respondent_id: null, // Anonymous
+          respondent_id: survey?.is_anonymous ? null : user?.id,
+          submitted_at: new Date().toISOString(),
+          completion_time: completionTime,
+          is_complete: true,
         })
         .select()
         .single();
 
       if (responseError) throw responseError;
 
-      // Create answers
-      const answersData = questions.map((question, index) => ({
+      // Create answer records
+      const answersData = questions.map(question => ({
         response_id: responseData.id,
         question_id: question.id,
-        value: answers[index] || "",
-        numeric_value: question.type === "likert" || question.type === "rating" 
-          ? parseInt(answers[index] || "0") 
-          : null,
+        answer_value: responses[question.id] || null,
       }));
 
       const { error: answersError } = await supabase
@@ -111,45 +189,154 @@ const TakeSurvey = () => {
 
       if (answersError) throw answersError;
 
-      navigate("/survey-complete");
-    } catch (error: any) {
       toast({
-        title: "خطأ",
-        description: error.message || "فشل في إرسال الاستبيان",
+        title: "تم إرسال الاستبيان",
+        description: "شكراً لك على مشاركتك في الاستبيان",
+      });
+
+      navigate("/survey-completed");
+
+    } catch (error: any) {
+      console.error("Submit error:", error);
+      toast({
+        title: "خطأ في الإرسال",
+        description: "حدث خطأ أثناء إرسال الاستبيان. يرجى المحاولة مرة أخرى.",
         variant: "destructive",
       });
     } finally {
-      setSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handlePrevious = () => {
-    if (currentQuestion > 0) {
-      setCurrentQuestion(currentQuestion - 1);
+  const renderQuestionInput = (question: Question) => {
+    const value = responses[question.id];
+
+    switch (question.type) {
+      case "likert":
+        const likertOptions = [
+          "غير موافق بشدة",
+          "غير موافق", 
+          "محايد",
+          "موافق",
+          "موافق بشدة"
+        ];
+        
+        return (
+          <RadioGroup 
+            value={value} 
+            onValueChange={(val) => handleResponseChange(question.id, val)}
+            className="space-y-3"
+          >
+            {likertOptions.map((option: string, index: number) => (
+              <div key={index} className="flex items-center space-x-2 space-x-reverse p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer">
+                <RadioGroupItem value={String(index + 1)} id={`${question.id}-${index}`} />
+                <Label 
+                  htmlFor={`${question.id}-${index}`} 
+                  className="flex-1 cursor-pointer font-medium"
+                >
+                  {option}
+                </Label>
+              </div>
+            ))}
+          </RadioGroup>
+        );
+
+      case "mcq":
+        const mcqOptions = question.options?.choices || [];
+        
+        return (
+          <RadioGroup 
+            value={value} 
+            onValueChange={(val) => handleResponseChange(question.id, val)}
+            className="space-y-3"
+          >
+            {mcqOptions.map((option: string, index: number) => (
+              <div key={index} className="flex items-center space-x-2 space-x-reverse p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer">
+                <RadioGroupItem value={option} id={`${question.id}-${index}`} />
+                <Label 
+                  htmlFor={`${question.id}-${index}`} 
+                  className="flex-1 cursor-pointer font-medium"
+                >
+                  {option}
+                </Label>
+              </div>
+            ))}
+          </RadioGroup>
+        );
+
+      case "rating":
+        return (
+          <div className="flex items-center gap-2">
+            {[1, 2, 3, 4, 5].map((rating) => (
+              <button
+                key={rating}
+                type="button"
+                onClick={() => handleResponseChange(question.id, rating)}
+                className={`p-2 rounded-lg transition-colors ${
+                  value >= rating 
+                    ? 'text-yellow-500' 
+                    : 'text-gray-300 hover:text-yellow-400'
+                }`}
+              >
+                <Star className="h-6 w-6 fill-current" />
+              </button>
+            ))}
+            <span className="mr-2 text-sm text-muted-foreground">
+              {value ? `${value} من 5` : 'اختر التقييم'}
+            </span>
+          </div>
+        );
+
+      case "text":
+        return (
+          <Textarea
+            placeholder="اكتب إجابتك هنا..."
+            value={value || ""}
+            onChange={(e) => handleResponseChange(question.id, e.target.value)}
+            rows={6}
+            className="resize-none"
+          />
+        );
+
+      default:
+        return (
+          <Input
+            placeholder="اكتب إجابتك هنا..."
+            value={value || ""}
+            onChange={(e) => handleResponseChange(question.id, e.target.value)}
+          />
+        );
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">جاري تحميل الاستبيان...</p>
+        </div>
       </div>
     );
   }
 
   if (!survey || questions.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card>
-          <CardContent className="text-center py-12">
-            <p className="text-muted-foreground">لا توجد أسئلة في هذا الاستبيان</p>
+      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="text-center py-8">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">الاستبيان غير موجود</h2>
+            <p className="text-muted-foreground">لم يتم العثور على الاستبيان المطلوب</p>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  const progress = ((currentQuestion + 1) / questions.length) * 100;
+  const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+  const currentQuestion = questions[currentQuestionIndex];
+  const hasError = validationErrors[currentQuestion?.id];
 
   return (
     <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-4">
@@ -157,7 +344,7 @@ const TakeSurvey = () => {
         <div className="mb-6">
           <div className="flex justify-between items-center mb-2">
             <h2 className="text-sm font-medium text-muted-foreground">
-              السؤال {currentQuestion + 1} من {questions.length}
+              السؤال {currentQuestionIndex + 1} من {questions.length}
             </h2>
             <span className="text-sm font-medium text-primary">{Math.round(progress)}%</span>
           </div>
@@ -169,79 +356,94 @@ const TakeSurvey = () => {
           </div>
         </div>
 
-        <Card className="shadow-elegant">
+        <Card className={`shadow-elegant ${hasError ? 'border-red-500' : ''}`}>
           <CardHeader>
-            <CardTitle className="text-2xl">{survey.title}</CardTitle>
-            <CardDescription>
-              {survey.programs?.name} • {survey.description}
-            </CardDescription>
+            <div className="flex items-start justify-between">
+              <div>
+                <CardTitle className="text-2xl mb-2">{survey.title}</CardTitle>
+                <p className="text-muted-foreground">{survey.description}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {currentQuestion?.is_required && (
+                  <Badge variant="destructive" className="text-xs">مطلوب</Badge>
+                )}
+                {survey.is_anonymous && (
+                  <Badge variant="outline" className="text-xs">مجهول</Badge>
+                )}
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="min-h-[300px]">
-              <h3 className="text-lg font-semibold mb-6">
-                {questions[currentQuestion].text}
+              <h3 className="text-lg font-semibold mb-4">
+                {currentQuestion?.text}
               </h3>
 
-              {questions[currentQuestion].type === "likert" && (
-                <RadioGroup 
-                  value={answers[currentQuestion]?.toString()}
-                  onValueChange={(value) => setAnswers({...answers, [currentQuestion]: value})}
-                  className="space-y-3"
-                >
-                  {likertOptions.map((option) => (
-                    <div 
-                      key={option.value}
-                      className="flex items-center space-x-3 space-x-reverse p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
-                    >
-                      <RadioGroupItem value={option.value} id={option.value} />
-                      <Label 
-                        htmlFor={option.value} 
-                        className="flex-1 cursor-pointer font-medium"
-                      >
-                        {option.label}
-                      </Label>
-                    </div>
-                  ))}
-                </RadioGroup>
+              {currentQuestion?.help_text && (
+                <div className="flex items-start gap-2 mb-6 p-3 bg-blue-50 rounded-lg">
+                  <HelpCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-blue-800">{currentQuestion.help_text}</p>
+                </div>
               )}
 
-              {questions[currentQuestion].type === "text" && (
-                <Textarea 
-                  placeholder="اكتب ملاحظاتك ومقترحاتك هنا..."
-                  rows={8}
-                  value={answers[currentQuestion] || ""}
-                  onChange={(e) => setAnswers({...answers, [currentQuestion]: e.target.value})}
-                />
+              {currentQuestion && renderQuestionInput(currentQuestion)}
+
+              {hasError && (
+                <div className="flex items-center gap-2 mt-4 text-red-600">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="text-sm">{hasError}</span>
+                </div>
               )}
             </div>
 
-            <div className="flex justify-between pt-4 border-t">
+            <div className="flex justify-between items-center pt-4 border-t">
               <Button 
                 variant="outline" 
-                onClick={handlePrevious}
-                disabled={currentQuestion === 0}
+                onClick={previousQuestion}
+                disabled={currentQuestionIndex === 0}
               >
+                <ArrowLeft className="h-4 w-4 ml-2" />
                 السابق
               </Button>
-              <Button 
-                variant={currentQuestion === questions.length - 1 ? "hero" : "default"}
-                onClick={handleNext}
-                disabled={submitting}
-              >
-                {submitting ? (
-                  "جاري الإرسال..."
-                ) : currentQuestion === questions.length - 1 ? (
-                  <>
-                    <CheckCircle2 className="h-4 w-4 ml-2" />
-                    إرسال الاستبيان
-                  </>
-                ) : (
-                  "التالي"
-                )}
-              </Button>
+
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                <span>الوقت: {Math.floor((Date.now() - startTime) / 60000)} دقيقة</span>
+              </div>
+
+              {currentQuestionIndex === questions.length - 1 ? (
+                <Button 
+                  variant="hero"
+                  onClick={submitSurvey} 
+                  disabled={isSubmitting}
+                  className="min-w-32"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>
+                      جاري الإرسال...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 ml-2" />
+                      إرسال الاستبيان
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button onClick={nextQuestion}>
+                  التالي
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
+
+        {/* Footer */}
+        <div className="text-center mt-6 text-sm text-muted-foreground">
+          <p>كلية العلوم الإنسانية والاجتماعية - منظومة الاستبيانات الذكية</p>
+        </div>
       </div>
     </div>
   );
