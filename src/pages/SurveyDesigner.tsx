@@ -39,6 +39,7 @@ const SurveyDesigner = () => {
   const questionTypes = [
     { value: "likert", label: "مقياس ليكرت" },
     { value: "text", label: "نص مفتوح" },
+    { value: "mcq", label: "اختيارات متعددة" },
     { value: "rating", label: "تقييم/ترتيب" },
   ];
 
@@ -78,7 +79,20 @@ const SurveyDesigner = () => {
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("User not found");
+      if (!user) {
+        throw new Error("المستخدم غير مسجل الدخول");
+      }
+
+      console.log("Creating survey with data:", {
+        title: survey.title,
+        description: survey.description,
+        program_id: survey.programId,
+        is_anonymous: survey.isAnonymous,
+        start_date: survey.startDate || null,
+        end_date: survey.endDate || null,
+        created_by: user.id,
+        status: "draft",
+      });
 
       // Create survey
       const { data: surveyData, error: surveyError } = await supabase
@@ -96,7 +110,12 @@ const SurveyDesigner = () => {
         .select()
         .single();
 
-      if (surveyError) throw surveyError;
+      if (surveyError) {
+        console.error("Survey creation error:", surveyError);
+        throw new Error(`خطأ في إنشاء الاستبيان: ${surveyError.message}`);
+      }
+
+      console.log("Survey created successfully:", surveyData);
 
       // Create questions
       const questionsData = questions.map((q, index) => ({
@@ -105,13 +124,23 @@ const SurveyDesigner = () => {
         type: q.type,
         order_index: index,
         is_required: true,
+        options: q.type === "likert" ? {
+          scale: ["غير موافق بشدة", "غير موافق", "محايد", "موافق", "موافق بشدة"]
+        } : null,
       }));
+
+      console.log("Creating questions with data:", questionsData);
 
       const { error: questionsError } = await supabase
         .from("questions")
         .insert(questionsData);
 
-      if (questionsError) throw questionsError;
+      if (questionsError) {
+        console.error("Questions creation error:", questionsError);
+        throw new Error(`خطأ في إنشاء الأسئلة: ${questionsError.message}`);
+      }
+
+      console.log("Questions created successfully");
 
       toast({
         title: "تم الحفظ",
@@ -120,9 +149,10 @@ const SurveyDesigner = () => {
 
       navigate("/surveys");
     } catch (error: any) {
+      console.error("Save error:", error);
       toast({
-        title: "خطأ",
-        description: error.message,
+        title: "خطأ في الحفظ",
+        description: error.message || "حدث خطأ غير متوقع",
         variant: "destructive",
       });
     } finally {
