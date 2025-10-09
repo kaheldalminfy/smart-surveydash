@@ -1,24 +1,104 @@
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, FileSpreadsheet, FileText, Sparkles, TrendingUp } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Sparkles, TrendingUp, ArrowRight } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const Reports = () => {
-  const likertData = [
-    { name: "غير موافق بشدة", value: 5, color: "hsl(var(--destructive))" },
-    { name: "غير موافق", value: 12, color: "hsl(var(--destructive) / 0.6)" },
-    { name: "محايد", value: 23, color: "hsl(var(--muted-foreground))" },
-    { name: "موافق", value: 35, color: "hsl(var(--primary) / 0.6)" },
-    { name: "موافق بشدة", value: 45, color: "hsl(var(--primary))" },
-  ];
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [report, setReport] = useState<any>(null);
+  const [survey, setSurvey] = useState<any>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const questions = [
-    { q: "وضوح أهداف المقرر", mean: 4.2, sd: 0.8 },
-    { q: "جودة المحتوى العلمي", mean: 4.5, sd: 0.6 },
-    { q: "فعالية طرق التدريس", mean: 4.1, sd: 0.9 },
-    { q: "التقييم والمتابعة", mean: 3.9, sd: 1.0 },
-  ];
+  useEffect(() => {
+    loadReport();
+  }, [id]);
+
+  const loadReport = async () => {
+    try {
+      const { data: reportData } = await supabase
+        .from("reports")
+        .select("*, surveys(title, program_id, programs(name))")
+        .eq("survey_id", id)
+        .single();
+
+      if (reportData) {
+        setReport(reportData);
+        setSurvey(reportData.surveys);
+      }
+    } catch (error) {
+      console.error("Error loading report:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateReport = async () => {
+    setIsGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("analyze-survey", {
+        body: { surveyId: id },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "تم إنشاء التقرير بنجاح",
+        description: "تم تحليل البيانات بالذكاء الاصطناعي",
+      });
+
+      loadReport();
+    } catch (error) {
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء إنشاء التقرير",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!report) {
+    return (
+      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>لا يوجد تقرير</CardTitle>
+            <CardDescription>لم يتم إنشاء تقرير لهذا الاستبيان بعد</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button onClick={generateReport} disabled={isGenerating} className="w-full">
+              <Sparkles className="h-4 w-4 ml-2" />
+              {isGenerating ? "جاري إنشاء التقرير..." : "إنشاء تقرير بالذكاء الاصطناعي"}
+            </Button>
+            <Button variant="outline" onClick={() => navigate("/surveys")} className="w-full">
+              <ArrowRight className="h-4 w-4 ml-2" />
+              العودة إلى الاستبيانات
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const stats = report.statistics || {};
+  const likertData = stats.likertDistribution || [];
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
@@ -28,19 +108,19 @@ const Reports = () => {
             <div>
               <h1 className="text-2xl font-bold">التقارير والتحليلات</h1>
               <p className="text-sm text-muted-foreground">
-                تقييم جودة المقرر - القانون التجاري
+                {survey?.title} - {survey?.programs?.name}
               </p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline">
+              <Button variant="outline" onClick={generateReport} disabled={isGenerating}>
                 <Sparkles className="h-4 w-4 ml-2" />
-                تحليل AI
+                {isGenerating ? "جاري التحليل..." : "إعادة التحليل"}
               </Button>
-              <Button variant="accent">
+              <Button variant="accent" disabled>
                 <Download className="h-4 w-4 ml-2" />
                 تنزيل PDF
               </Button>
-              <Button variant="secondary">
+              <Button variant="secondary" disabled>
                 <FileSpreadsheet className="h-4 w-4 ml-2" />
                 تنزيل Excel
               </Button>
@@ -58,8 +138,8 @@ const Reports = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">120</div>
-              <p className="text-xs text-muted-foreground mt-1">من أصل 150 طالب</p>
+              <div className="text-3xl font-bold">{stats.totalResponses || 0}</div>
+              <p className="text-xs text-muted-foreground mt-1">استجابة</p>
             </CardContent>
           </Card>
 
@@ -70,11 +150,8 @@ const Reports = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">80%</div>
-              <p className="text-xs text-accent flex items-center gap-1 mt-1">
-                <TrendingUp className="h-3 w-3" />
-                +5% عن السابق
-              </p>
+              <div className="text-3xl font-bold">{stats.responseRate || 0}%</div>
+              <p className="text-xs text-muted-foreground mt-1">من المستهدف</p>
             </CardContent>
           </Card>
 
@@ -85,7 +162,7 @@ const Reports = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">4.18</div>
+              <div className="text-3xl font-bold">{stats.overallMean?.toFixed(2) || "N/A"}</div>
               <p className="text-xs text-muted-foreground mt-1">من 5.0</p>
             </CardContent>
           </Card>
@@ -97,8 +174,8 @@ const Reports = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">0.82</div>
-              <p className="text-xs text-muted-foreground mt-1">تجانس جيد</p>
+              <div className="text-3xl font-bold">{stats.overallStdDev?.toFixed(2) || "N/A"}</div>
+              <p className="text-xs text-muted-foreground mt-1">التجانس</p>
             </CardContent>
           </Card>
         </div>
@@ -109,79 +186,79 @@ const Reports = () => {
             <CardDescription>تحليل آلي للنتائج والتوصيات</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-              <div className="flex items-start gap-3">
-                <Sparkles className="h-5 w-5 text-primary mt-0.5" />
-                <div>
-                  <h3 className="font-semibold mb-2">النتائج الرئيسية:</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    يُظهر الاستبيان مستوى رضا عالٍ عن جودة المقرر بمتوسط عام 4.18 من 5. 
-                    حصلت "جودة المحتوى العلمي" على أعلى تقييم (4.5)، بينما سجل "التقييم والمتابعة" 
-                    أدنى متوسط (3.9). معدل الاستجابة المرتفع (80%) يعكس اهتمام الطلاب بالمشاركة.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 bg-accent/5 rounded-lg border border-accent/20">
-              <div className="flex items-start gap-3">
-                <FileText className="h-5 w-5 text-accent mt-0.5" />
-                <div>
-                  <h3 className="font-semibold mb-2">التوصيات:</h3>
-                  <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                    <li>تحسين آليات التقييم والمتابعة الطلابية</li>
-                    <li>الاستمرار في الحفاظ على جودة المحتوى العلمي</li>
-                    <li>تطوير طرق التدريس التفاعلية</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>توزيع الإجابات - مثال سؤال</CardTitle>
-            <CardDescription>مدى وضوح أهداف المقرر الدراسي</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={likertData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                  {likertData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>تفاصيل النتائج حسب الأسئلة</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {questions.map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex-1">
-                    <h4 className="font-medium mb-2">{item.q}</h4>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>المتوسط: <Badge variant="outline">{item.mean}</Badge></span>
-                      <span>الانحراف: <Badge variant="outline">{item.sd}</Badge></span>
-                    </div>
+            {report.summary && (
+              <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                <div className="flex items-start gap-3">
+                  <Sparkles className="h-5 w-5 text-primary mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold mb-2">الملخص التنفيذي:</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                      {report.summary}
+                    </p>
                   </div>
-                  <div className="text-2xl font-bold text-primary">{item.mean}</div>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
+
+            {report.recommendations_text && (
+              <div className="p-4 bg-accent/5 rounded-lg border border-accent/20">
+                <div className="flex items-start gap-3">
+                  <FileText className="h-5 w-5 text-accent mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold mb-2">التوصيات:</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                      {report.recommendations_text}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
+
+        {likertData.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>توزيع الإجابات</CardTitle>
+              <CardDescription>توزيع إجابات مقياس ليكرت</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={likertData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="label" angle={-45} textAnchor="end" height={100} />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="count" radius={[8, 8, 0, 0]} fill="hsl(var(--primary))" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {stats.questionStats && stats.questionStats.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>تفاصيل النتائج حسب الأسئلة</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {stats.questionStats.map((item: any, index: number) => (
+                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex-1">
+                      <h4 className="font-medium mb-2">{item.question}</h4>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        {item.mean && <span>المتوسط: <Badge variant="outline">{item.mean.toFixed(2)}</Badge></span>}
+                        {item.stdDev && <span>الانحراف: <Badge variant="outline">{item.stdDev.toFixed(2)}</Badge></span>}
+                      </div>
+                    </div>
+                    {item.mean && <div className="text-2xl font-bold text-primary">{item.mean.toFixed(2)}</div>}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );
