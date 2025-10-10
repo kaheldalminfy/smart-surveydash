@@ -73,10 +73,11 @@ const TakeSurvey = () => {
 
       if (surveyError) throw surveyError;
 
-      if (surveyData.status !== "active") {
+      // Allow viewing surveys in draft or active status
+      if (surveyData.status !== "active" && surveyData.status !== "draft") {
         toast({
           title: "الاستبيان غير متاح",
-          description: "هذا الاستبيان غير نشط حالياً",
+          description: "هذا الاستبيان مغلق حالياً",
           variant: "destructive",
         });
         navigate("/");
@@ -159,7 +160,6 @@ const TakeSurvey = () => {
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const completionTime = Math.floor((Date.now() - startTime) / 1000);
 
       // Create response record
       const { data: responseData, error: responseError } = await supabase
@@ -167,9 +167,6 @@ const TakeSurvey = () => {
         .insert({
           survey_id: id,
           respondent_id: survey?.is_anonymous ? null : user?.id,
-          submitted_at: new Date().toISOString(),
-          completion_time: completionTime,
-          is_complete: true,
         })
         .select()
         .single();
@@ -177,11 +174,15 @@ const TakeSurvey = () => {
       if (responseError) throw responseError;
 
       // Create answer records
-      const answersData = questions.map(question => ({
-        response_id: responseData.id,
-        question_id: question.id,
-        answer_value: responses[question.id] || null,
-      }));
+      const answersData = questions.map(question => {
+        const responseValue = responses[question.id];
+        return {
+          response_id: responseData.id,
+          question_id: question.id,
+          value: responseValue ? String(responseValue) : null,
+          numeric_value: !isNaN(Number(responseValue)) ? Number(responseValue) : null,
+        };
+      });
 
       const { error: answersError } = await supabase
         .from("answers")
