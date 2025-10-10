@@ -85,12 +85,23 @@ const Auth = () => {
 
       if (error) throw error;
 
-      // Update profile with program
-      if (data.user && formData.programId) {
+      // Update profile with program and add coordinator role
+      if (data.user) {
+        if (formData.programId) {
+          await supabase
+            .from("profiles")
+            .update({ program_id: formData.programId })
+            .eq("id", data.user.id);
+        }
+
+        // Add coordinator role for the user
         await supabase
-          .from("profiles")
-          .update({ program_id: formData.programId })
-          .eq("id", data.user.id);
+          .from("user_roles")
+          .insert({
+            user_id: data.user.id,
+            role: "coordinator",
+            program_id: formData.programId || null
+          });
       }
 
       toast({
