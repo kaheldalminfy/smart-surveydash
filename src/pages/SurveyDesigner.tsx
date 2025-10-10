@@ -44,8 +44,22 @@ const SurveyDesigner = () => {
   }, []);
 
   const loadPrograms = async () => {
-    const { data } = await supabase.from("programs").select("*").order("name");
-    if (data) setPrograms(data);
+    try {
+      const { data, error } = await supabase.from("programs").select("*").order("name");
+      if (error) {
+        console.error("خطأ في تحميل البرامج:", error);
+        toast({
+          title: "خطأ",
+          description: "فشل في تحميل البرامج",
+          variant: "destructive",
+        });
+        return;
+      }
+      console.log("البرامج المحملة:", data);
+      if (data) setPrograms(data);
+    } catch (error) {
+      console.error("خطأ غير متوقع:", error);
+    }
   };
 
   const questionTypes = [
