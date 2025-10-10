@@ -20,7 +20,6 @@ interface Question {
   orderIndex: number;
   options?: string[];
   required?: boolean;
-  helpText?: string;
 }
 
 const SurveyDesigner = () => {
@@ -83,7 +82,6 @@ const SurveyDesigner = () => {
       orderIndex: index,
       options: q.options || [],
       required: q.required !== false,
-      helpText: q.help_text || "",
     }));
     
     setQuestions(templateQuestions);
@@ -104,7 +102,6 @@ const SurveyDesigner = () => {
         type: "likert",
         orderIndex: 0,
         required: true,
-        helpText: "",
       }]);
     }
   };
@@ -116,7 +113,6 @@ const SurveyDesigner = () => {
       type: "likert",
       orderIndex: questions.length,
       required: true,
-      helpText: "",
     }]);
   };
 
@@ -218,7 +214,6 @@ const SurveyDesigner = () => {
         type: q.type,
         order_index: index,
         is_required: q.required,
-        help_text: q.helpText || null,
         options: q.type === "likert" ? {
           scale: ["غير موافق بشدة", "غير موافق", "محايد", "موافق", "موافق بشدة"]
         } : q.type === "mcq" && q.options ? {
@@ -412,12 +407,6 @@ const SurveyDesigner = () => {
                               placeholder="اكتب نص السؤال هنا"
                               value={question.text}
                               onChange={(e) => updateQuestion(question.id, 'text', e.target.value)}
-                            />
-                            <Input 
-                              placeholder="نص مساعد (اختياري)"
-                              value={question.helpText}
-                              onChange={(e) => updateQuestion(question.id, 'helpText', e.target.value)}
-                              className="text-sm"
                             />
                             
                             {question.type === "likert" && (
