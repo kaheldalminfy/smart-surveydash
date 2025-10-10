@@ -32,25 +32,9 @@ const SurveyTemplates = ({ onSelectTemplate, onCreateCustom }: SurveyTemplatesPr
   }, []);
 
   const loadTemplates = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("survey_templates")
-        .select("*")
-        .eq("is_active", true)
-        .order("name");
-
-      if (error) throw error;
-      setTemplates(data || []);
-    } catch (error: any) {
-      toast({
-        title: "خطأ",
-        description: "فشل في تحميل القوالب",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+    setLoading(false);
+    // استخدام قوالب ثابتة مؤقتاً
+    setTemplates([]);
   };
 
   const categories = [

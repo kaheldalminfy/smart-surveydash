@@ -36,12 +36,6 @@ const SurveyDesigner = () => {
     isAnonymous: true,
     startDate: "",
     endDate: "",
-    settings: {
-      allowMultipleResponses: false,
-      showProgressBar: true,
-      randomizeQuestions: false,
-      requireAllQuestions: true,
-    }
   });
   const [questions, setQuestions] = useState<Question[]>([]);
 
@@ -194,7 +188,6 @@ const SurveyDesigner = () => {
           end_date: survey.endDate || null,
           created_by: user.id,
           status: "draft",
-          settings: survey.settings,
         })
         .select()
         .single();
@@ -518,42 +511,6 @@ const SurveyDesigner = () => {
                         value={survey.endDate}
                         onChange={(e) => setSurvey({...survey, endDate: e.target.value})}
                       />
-                    </div>
-                    
-                    <div className="space-y-3 pt-4 border-t">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="multiple-responses" className="text-sm">السماح بردود متعددة</Label>
-                        <Switch
-                          id="multiple-responses"
-                          checked={survey.settings.allowMultipleResponses}
-                          onCheckedChange={(checked) => setSurvey({
-                            ...survey, 
-                            settings: {...survey.settings, allowMultipleResponses: checked}
-                          })}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="progress-bar" className="text-sm">إظهار شريط التقدم</Label>
-                        <Switch
-                          id="progress-bar"
-                          checked={survey.settings.showProgressBar}
-                          onCheckedChange={(checked) => setSurvey({
-                            ...survey, 
-                            settings: {...survey.settings, showProgressBar: checked}
-                          })}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="randomize" className="text-sm">ترتيب عشوائي للأسئلة</Label>
-                        <Switch
-                          id="randomize"
-                          checked={survey.settings.randomizeQuestions}
-                          onCheckedChange={(checked) => setSurvey({
-                            ...survey, 
-                            settings: {...survey.settings, randomizeQuestions: checked}
-                          })}
-                        />
-                      </div>
                     </div>
                   </CardContent>
                 </Card>
