@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import SurveyTemplates from "@/components/SurveyTemplates";
+import QRCode from "qrcode";
 
 interface Question {
   id: number;
@@ -230,9 +231,29 @@ const SurveyDesigner = () => {
         throw new Error(`خطأ في إنشاء الأسئلة: ${questionsError.message}`);
       }
 
+      // Generate QR Code
+      const surveyLink = `${window.location.origin}/take/${surveyData.id}`;
+      const qrCodeDataURL = await QRCode.toDataURL(surveyLink, {
+        width: 400,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+
+      // Update survey with QR code
+      await supabase
+        .from("surveys")
+        .update({ 
+          qr_code: qrCodeDataURL,
+          survey_link: surveyLink
+        })
+        .eq("id", surveyData.id);
+
       toast({
         title: "تم الحفظ",
-        description: "تم حفظ الاستبيان بنجاح",
+        description: "تم حفظ الاستبيان وإنشاء رمز الاستجابة السريع بنجاح",
       });
 
       navigate("/surveys");

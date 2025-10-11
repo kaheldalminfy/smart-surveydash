@@ -7,11 +7,17 @@ import { Input } from "@/components/ui/input";
 import { Plus, Search, BarChart3, Link2, QrCode, Edit, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import QRCodeDialog from "@/components/QRCodeDialog";
 
 const Surveys = () => {
   const { toast } = useToast();
   const [surveys, setSurveys] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedQRCode, setSelectedQRCode] = useState<{
+    qrCode: string;
+    title: string;
+    link: string;
+  } | null>(null);
 
   useEffect(() => {
     loadSurveys();
@@ -52,6 +58,23 @@ const Surveys = () => {
     toast({
       title: "تم النسخ",
       description: "تم نسخ رابط الاستبيان",
+    });
+  };
+
+  const showQRCode = (survey: any) => {
+    if (!survey.qr_code) {
+      toast({
+        title: "غير متوفر",
+        description: "رمز الاستجابة السريع غير متوفر لهذا الاستبيان",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setSelectedQRCode({
+      qrCode: survey.qr_code,
+      title: survey.title,
+      link: survey.survey_link || `${window.location.origin}/take/${survey.id}`
     });
   };
 
@@ -138,6 +161,14 @@ const Surveys = () => {
                         <Button 
                           variant="outline" 
                           size="sm"
+                          onClick={() => showQRCode(survey)}
+                        >
+                          <QrCode className="h-4 w-4 ml-2" />
+                          QR
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
                           onClick={() => copyLink(survey.id)}
                         >
                           <Link2 className="h-4 w-4 ml-2" />
@@ -158,6 +189,16 @@ const Surveys = () => {
           </div>
         )}
       </main>
+
+      {selectedQRCode && (
+        <QRCodeDialog
+          open={!!selectedQRCode}
+          onOpenChange={(open) => !open && setSelectedQRCode(null)}
+          qrCode={selectedQRCode.qrCode}
+          surveyTitle={selectedQRCode.title}
+          surveyLink={selectedQRCode.link}
+        />
+      )}
     </div>
   );
 };
