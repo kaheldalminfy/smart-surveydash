@@ -23,11 +23,15 @@ const Reports = () => {
 
   const loadReport = async () => {
     try {
-      const { data: reportData } = await supabase
+      const { data: reportData, error } = await supabase
         .from("reports")
         .select("*, surveys(title, program_id, programs(name))")
         .eq("survey_id", id)
-        .single();
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error loading report:", error);
+      }
 
       if (reportData) {
         setReport(reportData);

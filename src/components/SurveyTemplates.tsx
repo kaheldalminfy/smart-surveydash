@@ -32,9 +32,218 @@ const SurveyTemplates = ({ onSelectTemplate, onCreateCustom }: SurveyTemplatesPr
   }, []);
 
   const loadTemplates = async () => {
+    // قوالب حقيقية للاستبيانات
+    const predefinedTemplates: Template[] = [
+      {
+        id: "course-eval-1",
+        name: "تقييم المقرر الدراسي",
+        name_en: "Course Evaluation",
+        description: "قالب شامل لتقييم جودة المقرر والأستاذ",
+        category: "course_evaluation",
+        is_active: true,
+        questions: [
+          {
+            text: "كان محتوى المقرر واضحاً ومنظماً",
+            type: "likert",
+            order_index: 0,
+            is_required: true
+          },
+          {
+            text: "ساعدني المقرر على تحقيق أهداف التعلم",
+            type: "likert",
+            order_index: 1,
+            is_required: true
+          },
+          {
+            text: "كان الأستاذ متمكناً من المادة العلمية",
+            type: "likert",
+            order_index: 2,
+            is_required: true
+          },
+          {
+            text: "استخدم الأستاذ أساليب تدريس فعالة",
+            type: "likert",
+            order_index: 3,
+            is_required: true
+          },
+          {
+            text: "كانت طرق التقييم عادلة وواضحة",
+            type: "likert",
+            order_index: 4,
+            is_required: true
+          },
+          {
+            text: "ما هي مقترحاتك لتحسين المقرر؟",
+            type: "text",
+            order_index: 5,
+            is_required: false
+          }
+        ]
+      },
+      {
+        id: "satisfaction-1",
+        name: "استبيان رضا الطلاب",
+        name_en: "Student Satisfaction Survey",
+        description: "قياس مستوى رضا الطلاب عن الخدمات التعليمية",
+        category: "satisfaction",
+        is_active: true,
+        questions: [
+          {
+            text: "ما مدى رضاك عن جودة التعليم بشكل عام؟",
+            type: "likert",
+            order_index: 0,
+            is_required: true
+          },
+          {
+            text: "ما مدى رضاك عن المرافق والتجهيزات؟",
+            type: "likert",
+            order_index: 1,
+            is_required: true
+          },
+          {
+            text: "ما مدى رضاك عن خدمات الدعم الطلابي؟",
+            type: "likert",
+            order_index: 2,
+            is_required: true
+          },
+          {
+            text: "هل تنصح الآخرين بالالتحاق بهذا البرنامج؟",
+            type: "likert",
+            order_index: 3,
+            is_required: true
+          },
+          {
+            text: "ما هي أبرز نقاط القوة في البرنامج؟",
+            type: "text",
+            order_index: 4,
+            is_required: false
+          },
+          {
+            text: "ما هي المجالات التي تحتاج للتحسين؟",
+            type: "text",
+            order_index: 5,
+            is_required: false
+          }
+        ]
+      },
+      {
+        id: "quality-1",
+        name: "تقييم جودة البرنامج الأكاديمي",
+        name_en: "Academic Program Quality",
+        description: "تقييم شامل لجودة البرنامج الأكاديمي ومخرجاته",
+        category: "quality",
+        is_active: true,
+        questions: [
+          {
+            text: "يلبي البرنامج احتياجات سوق العمل",
+            type: "likert",
+            order_index: 0,
+            is_required: true
+          },
+          {
+            text: "المقررات الدراسية متنوعة وشاملة",
+            type: "likert",
+            order_index: 1,
+            is_required: true
+          },
+          {
+            text: "يوفر البرنامج فرصاً للتدريب العملي",
+            type: "likert",
+            order_index: 2,
+            is_required: true
+          },
+          {
+            text: "الخطة الدراسية منطقية ومتسلسلة",
+            type: "likert",
+            order_index: 3,
+            is_required: true
+          },
+          {
+            text: "يطور البرنامج مهارات التفكير النقدي",
+            type: "likert",
+            order_index: 4,
+            is_required: true
+          }
+        ]
+      },
+      {
+        id: "facilities-1",
+        name: "تقييم المرافق والخدمات",
+        name_en: "Facilities Evaluation",
+        description: "تقييم جودة المرافق والخدمات الجامعية",
+        category: "satisfaction",
+        is_active: true,
+        questions: [
+          {
+            text: "جودة القاعات الدراسية",
+            type: "rating",
+            order_index: 0,
+            is_required: true
+          },
+          {
+            text: "جودة المختبرات والمعامل",
+            type: "rating",
+            order_index: 1,
+            is_required: true
+          },
+          {
+            text: "جودة المكتبة ومصادر التعلم",
+            type: "rating",
+            order_index: 2,
+            is_required: true
+          },
+          {
+            text: "جودة خدمات الإنترنت",
+            type: "rating",
+            order_index: 3,
+            is_required: true
+          },
+          {
+            text: "ما هي المرافق التي تحتاج لتحسين عاجل؟",
+            type: "text",
+            order_index: 4,
+            is_required: false
+          }
+        ]
+      },
+      {
+        id: "teaching-1",
+        name: "تقييم أساليب التدريس",
+        name_en: "Teaching Methods Evaluation",
+        description: "تقييم فعالية أساليب التدريس المستخدمة",
+        category: "course_evaluation",
+        is_active: true,
+        questions: [
+          {
+            text: "يستخدم الأساتذة أساليب تدريس متنوعة",
+            type: "likert",
+            order_index: 0,
+            is_required: true
+          },
+          {
+            text: "يشجع الأساتذة على المشاركة الفعالة",
+            type: "likert",
+            order_index: 1,
+            is_required: true
+          },
+          {
+            text: "يستخدم الأساتذة التقنية بشكل فعال",
+            type: "likert",
+            order_index: 2,
+            is_required: true
+          },
+          {
+            text: "يربط الأساتذة المحتوى بالواقع العملي",
+            type: "likert",
+            order_index: 3,
+            is_required: true
+          }
+        ]
+      }
+    ];
+
+    setTemplates(predefinedTemplates);
     setLoading(false);
-    // استخدام قوالب ثابتة مؤقتاً
-    setTemplates([]);
   };
 
   const categories = [
