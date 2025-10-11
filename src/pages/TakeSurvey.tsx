@@ -152,7 +152,25 @@ const TakeSurvey = () => {
   };
 
   const submitSurvey = async () => {
-    if (!validateCurrentQuestion()) {
+    // Validate all required questions, not just the current one
+    const missingRequiredQuestions = questions.filter(
+      q => q.is_required && !responses[q.id]
+    );
+
+    if (missingRequiredQuestions.length > 0) {
+      toast({
+        title: "أسئلة مطلوبة",
+        description: `يرجى الإجابة على جميع الأسئلة المطلوبة (${missingRequiredQuestions.length} سؤال متبقي)`,
+        variant: "destructive",
+      });
+      
+      // Navigate to first missing required question
+      const firstMissingIndex = questions.findIndex(
+        q => q.is_required && !responses[q.id]
+      );
+      if (firstMissingIndex !== -1) {
+        setCurrentQuestionIndex(firstMissingIndex);
+      }
       return;
     }
 
@@ -275,8 +293,8 @@ const TakeSurvey = () => {
                 onClick={() => handleResponseChange(question.id, rating)}
                 className={`p-2 rounded-lg transition-colors ${
                   value >= rating 
-                    ? 'text-yellow-500' 
-                    : 'text-gray-300 hover:text-yellow-400'
+                    ? 'text-accent' 
+                    : 'text-muted-foreground hover:text-accent/70'
                 }`}
               >
                 <Star className="h-6 w-6 fill-current" />

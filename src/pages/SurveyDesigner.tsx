@@ -80,8 +80,8 @@ const SurveyDesigner = () => {
       text: q.text,
       type: q.type,
       orderIndex: index,
-      options: q.options || [],
-      required: q.required !== false,
+      options: q.options?.choices || q.options || [],
+      required: q.is_required !== false && q.required !== false,
     }));
     
     setQuestions(templateQuestions);
