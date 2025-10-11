@@ -195,7 +195,7 @@ const TakeSurvey = () => {
         description: "شكراً لك على مشاركتك في الاستبيان",
       });
 
-      navigate("/survey-completed");
+      navigate("/survey-complete");
 
     } catch (error: any) {
       console.error("Submit error:", error);
