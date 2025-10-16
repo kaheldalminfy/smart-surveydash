@@ -7,6 +7,7 @@ import { Download, FileSpreadsheet, FileText, Sparkles, TrendingUp, ArrowRight }
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { exportToPDF, exportToExcel } from "@/utils/exportReport";
 
 const Reports = () => {
   const { id } = useParams();
@@ -120,11 +121,17 @@ const Reports = () => {
                 <Sparkles className="h-4 w-4 ml-2" />
                 {isGenerating ? "جاري التحليل..." : "إعادة التحليل"}
               </Button>
-              <Button variant="accent" disabled>
+              <Button 
+                variant="accent" 
+                onClick={() => exportToPDF(report, survey, stats)}
+              >
                 <Download className="h-4 w-4 ml-2" />
                 تنزيل PDF
               </Button>
-              <Button variant="secondary" disabled>
+              <Button 
+                variant="secondary" 
+                onClick={() => exportToExcel(report, survey, stats)}
+              >
                 <FileSpreadsheet className="h-4 w-4 ml-2" />
                 تنزيل Excel
               </Button>

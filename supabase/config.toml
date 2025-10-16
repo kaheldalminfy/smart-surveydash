@@ -2,3 +2,7 @@ project_id = "dzjglpfhwmgbsprpgzbk"
 
 [functions.analyze-survey]
 verify_jwt = true
+
+[functions.suggest-questions]
+verify_jwt = false
+

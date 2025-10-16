@@ -287,7 +287,7 @@ const SurveyAnalytics = ({ surveyId }: SurveyAnalyticsProps) => {
                 <p className="text-sm font-medium text-muted-foreground">إجمالي الاستجابات</p>
                 <p className="text-2xl font-bold">{analytics.totalResponses}</p>
               </div>
-              <Users className="h-8 w-8 text-blue-600" />
+              <Users className="h-8 w-8 text-primary" />
             </div>
           </CardContent>
         </Card>
@@ -299,7 +299,7 @@ const SurveyAnalytics = ({ surveyId }: SurveyAnalyticsProps) => {
                 <p className="text-sm font-medium text-muted-foreground">معدل الإكمال</p>
                 <p className="text-2xl font-bold">{analytics.completionRate.toFixed(1)}%</p>
               </div>
-              <Target className="h-8 w-8 text-green-600" />
+              <Target className="h-8 w-8 text-accent" />
             </div>
           </CardContent>
         </Card>
@@ -311,7 +311,7 @@ const SurveyAnalytics = ({ surveyId }: SurveyAnalyticsProps) => {
                 <p className="text-sm font-medium text-muted-foreground">متوسط الوقت</p>
                 <p className="text-2xl font-bold">{Math.round(analytics.averageTime / 60)} دقيقة</p>
               </div>
-              <Clock className="h-8 w-8 text-orange-600" />
+              <Clock className="h-8 w-8 text-secondary" />
             </div>
           </CardContent>
         </Card>
@@ -323,7 +323,7 @@ const SurveyAnalytics = ({ surveyId }: SurveyAnalyticsProps) => {
                 <p className="text-sm font-medium text-muted-foreground">النمو</p>
                 <p className="text-2xl font-bold">+12%</p>
               </div>
-              <TrendingUp className="h-8 w-8 text-purple-600" />
+              <TrendingUp className="h-8 w-8 text-primary" />
             </div>
           </CardContent>
         </Card>
@@ -432,7 +432,7 @@ const SurveyAnalytics = ({ surveyId }: SurveyAnalyticsProps) => {
 
                     <div className="space-y-3">
                       {question.data.map((item: any, index: number) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div key={index} className="flex items-center justify-between p-3 bg-secondary/10 rounded-lg">
                           <div className="flex items-center gap-3">
                             <div 
                               className="w-4 h-4 rounded-full" 
@@ -450,8 +450,8 @@ const SurveyAnalytics = ({ surveyId }: SurveyAnalyticsProps) => {
                       ))}
                       
                       {(question.type === "likert" || question.type === "rating") && (
-                        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                          <p className="text-sm font-medium text-blue-900">
+                        <div className="mt-4 p-3 bg-primary/10 rounded-lg">
+                          <p className="text-sm font-medium text-primary">
                             المتوسط: {question.average?.toFixed(2)} من {question.type === "likert" ? "5" : "5"}
                           </p>
                         </div>
@@ -465,7 +465,7 @@ const SurveyAnalytics = ({ surveyId }: SurveyAnalyticsProps) => {
                     <p className="font-medium">عينة من الإجابات:</p>
                     <div className="grid gap-3">
                       {question.data.slice(0, 5).map((answer: string, index: number) => (
-                        <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                        <div key={index} className="p-3 bg-secondary/10 rounded-lg">
                           <p className="text-sm">{answer}</p>
                         </div>
                       ))}

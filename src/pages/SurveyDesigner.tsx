@@ -27,6 +27,7 @@ const SurveyDesigner = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isAISuggesting, setIsAISuggesting] = useState(false);
   const [programs, setPrograms] = useState<any[]>([]);
   const [currentTab, setCurrentTab] = useState("templates");
   const [survey, setSurvey] = useState({
@@ -269,6 +270,55 @@ const SurveyDesigner = () => {
     }
   };
 
+  const handleAISuggestions = async () => {
+    if (!survey.title) {
+      toast({
+        title: "تنبيه",
+        description: "يرجى إدخال عنوان الاستبيان أولاً",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsAISuggesting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("suggest-questions", {
+        body: { 
+          surveyTitle: survey.title,
+          surveyDescription: survey.description,
+          questionType: "likert"
+        },
+      });
+
+      if (error) throw error;
+
+      if (data && data.questions) {
+        const newQuestions = data.questions.map((q: any, index: number) => ({
+          id: Date.now() + index,
+          text: q.text,
+          type: "likert",
+          orderIndex: questions.length + index,
+          options: q.choices || [],
+          required: true,
+        }));
+
+        setQuestions([...questions, ...newQuestions]);
+        toast({
+          title: "تم إضافة الاقتراحات",
+          description: `تم إضافة ${newQuestions.length} أسئلة مقترحة من الذكاء الاصطناعي`,
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في الحصول على اقتراحات الذكاء الاصطناعي",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAISuggesting(false);
+    }
+  };
+
   const handlePreview = () => {
     // TODO: Implement preview functionality
     toast({
@@ -300,9 +350,14 @@ const SurveyDesigner = () => {
                   <Eye className="h-4 w-4 ml-2" />
                   معاينة
                 </Button>
-                <Button variant="accent" size="sm">
+                <Button 
+                  variant="accent" 
+                  size="sm"
+                  onClick={handleAISuggestions}
+                  disabled={isAISuggesting || !survey.title}
+                >
                   <Sparkles className="h-4 w-4 ml-2" />
-                  اقتراحات AI
+                  {isAISuggesting ? "جاري الاقتراح..." : "اقتراحات AI"}
                 </Button>
                 <Button onClick={handleSave} variant="hero" size="sm" disabled={isLoading}>
                   <Save className="h-4 w-4 ml-2" />
