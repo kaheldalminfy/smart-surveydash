@@ -450,8 +450,8 @@ const SurveyAnalytics = ({ surveyId }: SurveyAnalyticsProps) => {
                       ))}
                       
                       {(question.type === "likert" || question.type === "rating") && (
-                        <div className="mt-4 p-3 bg-primary/10 rounded-lg">
-                          <p className="text-sm font-medium text-primary">
+                        <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
+                          <p className="text-sm font-medium">
                             المتوسط: {question.average?.toFixed(2)} من {question.type === "likert" ? "5" : "5"}
                           </p>
                         </div>

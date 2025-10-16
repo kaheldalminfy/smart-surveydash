@@ -1,18 +1,20 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Trash2, GripVertical, Sparkles, Save, Eye, ArrowLeft, Copy } from "lucide-react";
+import { Plus, Trash2, GripVertical, Sparkles, Save, Eye, ArrowLeft, Copy, Upload, Download, FileJson, FileSpreadsheet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import SurveyTemplates from "@/components/SurveyTemplates";
+import SurveyPreview from "@/components/SurveyPreview";
 import QRCode from "qrcode";
+import { exportSurveyToJSON, exportSurveyToCSV, importSurveyFromJSON, importSurveyFromCSV } from "@/utils/surveyImportExport";
 
 interface Question {
   id: number;
@@ -28,8 +30,10 @@ const SurveyDesigner = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isAISuggesting, setIsAISuggesting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [programs, setPrograms] = useState<any[]>([]);
   const [currentTab, setCurrentTab] = useState("templates");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [survey, setSurvey] = useState({
     title: "",
     description: "",
@@ -320,11 +324,130 @@ const SurveyDesigner = () => {
   };
 
   const handlePreview = () => {
-    // TODO: Implement preview functionality
-    toast({
-      title: "قريباً",
-      description: "ميزة المعاينة ستكون متاحة قريباً",
+    if (!survey.title || questions.length === 0) {
+      toast({
+        title: "تنبيه",
+        description: "يرجى إضافة عنوان وأسئلة للاستبيان أولاً",
+        variant: "destructive",
+      });
+      return;
+    }
+    setShowPreview(true);
+  };
+
+  const handleExportJSON = () => {
+    if (!survey.title || questions.length === 0) {
+      toast({
+        title: "تنبيه",
+        description: "لا يوجد استبيان لتصديره",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    exportSurveyToJSON({
+      title: survey.title,
+      description: survey.description,
+      programId: survey.programId,
+      isAnonymous: survey.isAnonymous,
+      questions: questions.map(q => ({
+        text: q.text,
+        type: q.type,
+        required: q.required || false,
+        options: q.options,
+      })),
     });
+    
+    toast({
+      title: "تم التصدير",
+      description: "تم تصدير الاستبيان بصيغة JSON بنجاح",
+    });
+  };
+
+  const handleExportCSV = () => {
+    if (!survey.title || questions.length === 0) {
+      toast({
+        title: "تنبيه",
+        description: "لا يوجد استبيان لتصديره",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    exportSurveyToCSV({
+      title: survey.title,
+      description: survey.description,
+      programId: survey.programId,
+      isAnonymous: survey.isAnonymous,
+      questions: questions.map(q => ({
+        text: q.text,
+        type: q.type,
+        required: q.required || false,
+        options: q.options,
+      })),
+    });
+    
+    toast({
+      title: "تم التصدير",
+      description: "تم تصدير الاستبيان بصيغة CSV بنجاح",
+    });
+  };
+
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      let importedData;
+      
+      if (file.name.endsWith('.json')) {
+        importedData = await importSurveyFromJSON(file);
+      } else if (file.name.endsWith('.csv')) {
+        importedData = await importSurveyFromCSV(file);
+      } else {
+        toast({
+          title: "خطأ",
+          description: "صيغة الملف غير مدعومة. يرجى استخدام JSON أو CSV",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setSurvey(prev => ({
+        ...prev,
+        title: importedData.title,
+        description: importedData.description,
+        isAnonymous: importedData.isAnonymous,
+        programId: importedData.programId || prev.programId,
+      }));
+
+      const importedQuestions = importedData.questions.map((q: any, index: number) => ({
+        id: Date.now() + index,
+        text: q.text,
+        type: q.type,
+        orderIndex: index,
+        options: q.options,
+        required: q.required,
+      }));
+
+      setQuestions(importedQuestions);
+      setCurrentTab("design");
+
+      toast({
+        title: "تم الاستيراد",
+        description: `تم استيراد ${importedQuestions.length} سؤال بنجاح`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "خطأ في الاستيراد",
+        description: error.message || "فشل في استيراد الملف",
+        variant: "destructive",
+      });
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   return (
@@ -345,7 +468,19 @@ const SurveyDesigner = () => {
               </div>
             </div>
             {currentTab === "design" && (
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
+                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="h-4 w-4 ml-2" />
+                  استيراد
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleExportJSON}>
+                  <FileJson className="h-4 w-4 ml-2" />
+                  تصدير JSON
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleExportCSV}>
+                  <FileSpreadsheet className="h-4 w-4 ml-2" />
+                  تصدير CSV
+                </Button>
                 <Button variant="outline" size="sm" onClick={handlePreview}>
                   <Eye className="h-4 w-4 ml-2" />
                   معاينة
@@ -619,6 +754,23 @@ const SurveyDesigner = () => {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Hidden file input for import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json,.csv"
+        onChange={handleImportFile}
+        className="hidden"
+      />
+
+      {/* Preview Dialog */}
+      <SurveyPreview
+        isOpen={showPreview}
+        onClose={() => setShowPreview(false)}
+        survey={survey}
+        questions={questions}
+      />
     </div>
   );
 };

@@ -6,3 +6,6 @@ verify_jwt = true
 [functions.suggest-questions]
 verify_jwt = false
 
+[functions.analyze-text-responses]
+verify_jwt = false
+

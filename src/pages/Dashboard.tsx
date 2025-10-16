@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BarChart3, FileText, Plus, TrendingUp, Users, ClipboardList, AlertCircle, CheckCircle2, Archive, LogOut } from "lucide-react";
+import { BarChart3, FileText, Plus, TrendingUp, Users, ClipboardList, AlertCircle, CheckCircle2, Archive, LogOut, BarChart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -196,6 +196,12 @@ const Dashboard = () => {
                 <Button variant="outline" className="w-full justify-start">
                   <AlertCircle className="h-4 w-4 ml-2" />
                   إدارة الشكاوى
+                </Button>
+              </Link>
+              <Link to="/comparison">
+                <Button variant="outline" className="w-full justify-start">
+                  <BarChart className="h-4 w-4 ml-2" />
+                  مقارنة البرامج
                 </Button>
               </Link>
               <Link to="/recommendations">

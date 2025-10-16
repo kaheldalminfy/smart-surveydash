@@ -15,6 +15,7 @@ import SurveyComplete from "./pages/SurveyComplete";
 import Complaints from "./pages/Complaints";
 import Recommendations from "./pages/Recommendations";
 import Archives from "./pages/Archives";
+import ProgramComparison from "./pages/ProgramComparison";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +38,7 @@ const App = () => (
           <Route path="/complaints" element={<ProtectedRoute><Complaints /></ProtectedRoute>} />
           <Route path="/recommendations" element={<ProtectedRoute><Recommendations /></ProtectedRoute>} />
           <Route path="/archives" element={<ProtectedRoute><Archives /></ProtectedRoute>} />
+          <Route path="/comparison" element={<ProtectedRoute><ProgramComparison /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
