@@ -71,10 +71,15 @@ const Surveys = () => {
       return;
     }
     
+    // Always use the current origin to ensure the link works
+    const surveyLink = `${window.location.origin}/take/${survey.id}`;
+    
+    console.log("QR Code link:", surveyLink);
+    
     setSelectedQRCode({
       qrCode: survey.qr_code,
       title: survey.title,
-      link: survey.survey_link || `${window.location.origin}/take/${survey.id}`
+      link: surveyLink
     });
   };
 

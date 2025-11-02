@@ -73,16 +73,20 @@ const TakeSurvey = () => {
 
       if (surveyError) throw surveyError;
 
-      // Allow viewing surveys in draft or active status
-      if (surveyData.status !== "active" && surveyData.status !== "draft") {
+      // Allow viewing active surveys for public, all statuses for authenticated users
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user && surveyData.status !== "active") {
         toast({
           title: "الاستبيان غير متاح",
-          description: "هذا الاستبيان مغلق حالياً",
+          description: "هذا الاستبيان غير نشط حالياً",
           variant: "destructive",
         });
         navigate("/");
         return;
       }
+
+      console.log("Survey loaded:", surveyData);
 
       setSurvey(surveyData);
 
@@ -128,7 +132,11 @@ const TakeSurvey = () => {
     const currentQuestion = questions[currentQuestionIndex];
     if (!currentQuestion) return true;
 
-    if (currentQuestion.is_required && !responses[currentQuestion.id]) {
+    // Check if required question has a valid response
+    if (currentQuestion.is_required && 
+        (responses[currentQuestion.id] === undefined || 
+         responses[currentQuestion.id] === null || 
+         responses[currentQuestion.id] === "")) {
       setValidationErrors(prev => ({
         ...prev,
         [currentQuestion.id]: "هذا السؤال مطلوب"
@@ -152,10 +160,18 @@ const TakeSurvey = () => {
   };
 
   const submitSurvey = async () => {
-    // Validate all required questions, not just the current one
+    // Validate all required questions - check if response exists and is not empty
     const missingRequiredQuestions = questions.filter(
-      q => q.is_required && !responses[q.id]
+      q => q.is_required && (
+        responses[q.id] === undefined || 
+        responses[q.id] === null || 
+        responses[q.id] === ""
+      )
     );
+
+    console.log("All responses:", responses);
+    console.log("Required questions:", questions.filter(q => q.is_required));
+    console.log("Missing required questions:", missingRequiredQuestions);
 
     if (missingRequiredQuestions.length > 0) {
       toast({
@@ -166,7 +182,11 @@ const TakeSurvey = () => {
       
       // Navigate to first missing required question
       const firstMissingIndex = questions.findIndex(
-        q => q.is_required && !responses[q.id]
+        q => q.is_required && (
+          responses[q.id] === undefined || 
+          responses[q.id] === null || 
+          responses[q.id] === ""
+        )
       );
       if (firstMissingIndex !== -1) {
         setCurrentQuestionIndex(firstMissingIndex);
