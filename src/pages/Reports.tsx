@@ -3,7 +3,16 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, FileSpreadsheet, FileText, Sparkles, TrendingUp, ArrowRight } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Download, FileSpreadsheet, FileText, Sparkles, TrendingUp, ArrowRight, ArrowLeft, Save } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -17,9 +26,14 @@ const Reports = () => {
   const [survey, setSurvey] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [semester, setSemester] = useState("");
+  const [academicYear, setAcademicYear] = useState("");
+  const [reportStatus, setReportStatus] = useState("responding");
+  const [collegeLogo, setCollegeLogo] = useState("");
 
   useEffect(() => {
     loadReport();
+    loadSettings();
   }, [id]);
 
   const loadReport = async () => {
@@ -37,12 +51,54 @@ const Reports = () => {
       if (reportData) {
         setReport(reportData);
         setSurvey(reportData.surveys);
+        setSemester(reportData.semester || "");
+        setAcademicYear(reportData.academic_year || "");
+        setReportStatus(reportData.status || "responding");
       }
     } catch (error) {
       console.error("Error loading report:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadSettings = async () => {
+    const { data } = await supabase
+      .from("system_settings")
+      .select("value")
+      .eq("key", "college_logo")
+      .single();
+
+    if (data?.value) {
+      setCollegeLogo(data.value);
+    }
+  };
+
+  const saveReportMetadata = async () => {
+    const { error } = await supabase
+      .from("reports")
+      .update({
+        semester,
+        academic_year: academicYear,
+        status: reportStatus,
+      })
+      .eq("id", report.id);
+
+    if (error) {
+      toast({
+        title: "خطأ",
+        description: "فشل حفظ بيانات التقرير",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "تم الحفظ",
+      description: "تم حفظ بيانات التقرير بنجاح",
+    });
+
+    loadReport();
   };
 
   const generateReport = async () => {
@@ -117,13 +173,21 @@ const Reports = () => {
               </p>
             </div>
             <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate("/dashboard")}
+                title="العودة"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
               <Button variant="outline" onClick={generateReport} disabled={isGenerating}>
                 <Sparkles className="h-4 w-4 ml-2" />
                 {isGenerating ? "جاري التحليل..." : "إعادة التحليل"}
               </Button>
               <Button 
                 variant="accent" 
-                onClick={() => exportToPDF(report, survey, stats)}
+                onClick={() => exportToPDF(report, survey, stats, collegeLogo)}
               >
                 <Download className="h-4 w-4 ml-2" />
                 تنزيل PDF
@@ -141,6 +205,56 @@ const Reports = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8 space-y-6">
+        {/* Report Metadata Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>بيانات التقرير</CardTitle>
+            <CardDescription>تحديد الفصل الدراسي وحالة التقرير</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="semester">الفصل الدراسي</Label>
+                <Input
+                  id="semester"
+                  placeholder="الفصل الأول"
+                  value={semester}
+                  onChange={(e) => setSemester(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="academic-year">العام الأكاديمي</Label>
+                <Input
+                  id="academic-year"
+                  placeholder="2024-2025"
+                  value={academicYear}
+                  onChange={(e) => setAcademicYear(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="status">حالة التقرير</Label>
+                <Select value={reportStatus} onValueChange={setReportStatus}>
+                  <SelectTrigger id="status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="responding">تحت الاستجابة للردود</SelectItem>
+                    <SelectItem value="completed">منتهي</SelectItem>
+                    <SelectItem value="no_response">لم يتم الاستجابة</SelectItem>
+                    <SelectItem value="cancelled">ملغي</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="mt-4">
+              <Button onClick={saveReportMetadata}>
+                <Save className="h-4 w-4 ml-2" />
+                حفظ بيانات التقرير
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-3">

@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BarChart3, FileText, Plus, TrendingUp, Users, ClipboardList, AlertCircle, CheckCircle2, Archive, LogOut, BarChart } from "lucide-react";
+import { BarChart3, FileText, Plus, TrendingUp, Users, ClipboardList, AlertCircle, CheckCircle2, Archive, LogOut, BarChart, Home, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -99,6 +99,14 @@ const Dashboard = () => {
       <header className="bg-card border-b shadow-sm">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/")}
+              title="الصفحة الرئيسية"
+            >
+              <Home className="h-5 w-5" />
+            </Button>
             <ClipboardList className="h-8 w-8 text-primary" />
             <div>
               <h1 className="text-2xl font-bold">لوحة التحكم</h1>
@@ -214,6 +222,18 @@ const Dashboard = () => {
                 <Button variant="outline" className="w-full justify-start">
                   <Archive className="h-4 w-4 ml-2" />
                   الأرشيف الفصلي
+                </Button>
+              </Link>
+              <Link to="/users">
+                <Button variant="outline" className="w-full justify-start">
+                  <Users className="h-4 w-4 ml-2" />
+                  إدارة المستخدمين
+                </Button>
+              </Link>
+              <Link to="/system-settings">
+                <Button variant="outline" className="w-full justify-start">
+                  <Settings className="h-4 w-4 ml-2" />
+                  إعدادات النظام
                 </Button>
               </Link>
             </CardContent>

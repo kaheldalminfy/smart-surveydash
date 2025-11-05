@@ -104,6 +104,11 @@ export type Database = {
         Row: {
           academic_year: string | null
           attachments: Json | null
+          complainant_academic_id: string | null
+          complainant_id: string | null
+          complainant_job_id: string | null
+          complainant_type: string | null
+          complaint_category: string | null
           created_at: string | null
           description: string
           id: string
@@ -123,6 +128,11 @@ export type Database = {
         Insert: {
           academic_year?: string | null
           attachments?: Json | null
+          complainant_academic_id?: string | null
+          complainant_id?: string | null
+          complainant_job_id?: string | null
+          complainant_type?: string | null
+          complaint_category?: string | null
           created_at?: string | null
           description: string
           id?: string
@@ -142,6 +152,11 @@ export type Database = {
         Update: {
           academic_year?: string | null
           attachments?: Json | null
+          complainant_academic_id?: string | null
+          complainant_id?: string | null
+          complainant_job_id?: string | null
+          complainant_type?: string | null
+          complaint_category?: string | null
           created_at?: string | null
           description?: string
           id?: string
@@ -161,6 +176,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "complaints_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      courses: {
+        Row: {
+          academic_year: string | null
+          code: string
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          name_en: string | null
+          program_id: string | null
+          semester: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          academic_year?: string | null
+          code: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          name_en?: string | null
+          program_id?: string | null
+          semester?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          academic_year?: string | null
+          code?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          name_en?: string | null
+          program_id?: string | null
+          semester?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "courses_program_id_fkey"
             columns: ["program_id"]
             isOneToOne: false
             referencedRelation: "programs"
@@ -344,10 +406,13 @@ export type Database = {
           generated_by: string | null
           generated_by_ai: boolean | null
           id: string
+          logo_url: string | null
           pdf_url: string | null
           recommendations_text: string | null
+          report_type: Database["public"]["Enums"]["report_type"] | null
           semester: string | null
           statistics: Json | null
+          status: Database["public"]["Enums"]["report_status"] | null
           summary: string | null
           survey_id: string | null
         }
@@ -358,10 +423,13 @@ export type Database = {
           generated_by?: string | null
           generated_by_ai?: boolean | null
           id?: string
+          logo_url?: string | null
           pdf_url?: string | null
           recommendations_text?: string | null
+          report_type?: Database["public"]["Enums"]["report_type"] | null
           semester?: string | null
           statistics?: Json | null
+          status?: Database["public"]["Enums"]["report_status"] | null
           summary?: string | null
           survey_id?: string | null
         }
@@ -372,10 +440,13 @@ export type Database = {
           generated_by?: string | null
           generated_by_ai?: boolean | null
           id?: string
+          logo_url?: string | null
           pdf_url?: string | null
           recommendations_text?: string | null
+          report_type?: Database["public"]["Enums"]["report_type"] | null
           semester?: string | null
           statistics?: Json | null
+          status?: Database["public"]["Enums"]["report_status"] | null
           summary?: string | null
           survey_id?: string | null
         }
@@ -417,6 +488,75 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      survey_courses: {
+        Row: {
+          course_id: string | null
+          created_at: string | null
+          id: string
+          survey_id: string | null
+        }
+        Insert: {
+          course_id?: string | null
+          created_at?: string | null
+          id?: string
+          survey_id?: string | null
+        }
+        Update: {
+          course_id?: string | null
+          created_at?: string | null
+          id?: string
+          survey_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "survey_courses_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "survey_courses_survey_id_fkey"
+            columns: ["survey_id"]
+            isOneToOne: false
+            referencedRelation: "surveys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      survey_templates: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_public: boolean | null
+          name: string
+          template_data: Json
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          name: string
+          template_data: Json
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          name?: string
+          template_data?: Json
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       surveys: {
         Row: {
@@ -473,6 +613,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      system_settings: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          key: string
+          updated_at: string | null
+          value: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          key: string
+          updated_at?: string | null
+          value?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          key?: string
+          updated_at?: string | null
+          value?: string | null
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
@@ -537,6 +704,8 @@ export type Database = {
         | "in_progress"
         | "completed"
         | "postponed"
+      report_status: "responding" | "completed" | "no_response" | "cancelled"
+      report_type: "survey" | "program"
       survey_status: "draft" | "active" | "closed"
     }
     CompositeTypes: {
@@ -675,6 +844,8 @@ export const Constants = {
         "completed",
         "postponed",
       ],
+      report_status: ["responding", "completed", "no_response", "cancelled"],
+      report_type: ["survey", "program"],
       survey_status: ["draft", "active", "closed"],
     },
   },

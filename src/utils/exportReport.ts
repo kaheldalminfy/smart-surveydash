@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
-export const exportToPDF = (report: any, survey: any, stats: any) => {
+export const exportToPDF = async (report: any, survey: any, stats: any, logoUrl?: string) => {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -12,16 +12,43 @@ export const exportToPDF = (report: any, survey: any, stats: any) => {
   // Add Arabic font support
   doc.setLanguage('ar');
   
+  let yPos = 20;
+
+  // Add college logo if available
+  if (logoUrl && logoUrl.trim()) {
+    try {
+      // Add logo at top center
+      doc.addImage(logoUrl, 'PNG', 85, yPos, 40, 40);
+      yPos += 45;
+    } catch (error) {
+      console.error('Error adding logo to PDF:', error);
+      yPos = 20;
+    }
+  }
+  
   // Header
   doc.setFontSize(20);
-  doc.text('تقرير الاستبيان', 105, 20, { align: 'center' });
+  doc.text('تقرير الاستبيان', 105, yPos, { align: 'center' });
+  yPos += 10;
   
   doc.setFontSize(14);
-  doc.text(survey?.title || 'استبيان', 105, 30, { align: 'center' });
-  doc.text(survey?.programs?.name || '', 105, 37, { align: 'center' });
+  doc.text(survey?.title || 'استبيان', 105, yPos, { align: 'center' });
+  yPos += 7;
+  doc.text(survey?.programs?.name || '', 105, yPos, { align: 'center' });
+  yPos += 7;
+
+  // Add semester and academic year
+  if (report?.semester || report?.academic_year) {
+    doc.setFontSize(12);
+    const semesterText = report.semester ? `الفصل الدراسي: ${report.semester}` : '';
+    const yearText = report.academic_year ? `العام الأكاديمي: ${report.academic_year}` : '';
+    const infoText = [semesterText, yearText].filter(Boolean).join(' - ');
+    doc.text(infoText, 105, yPos, { align: 'center' });
+    yPos += 7;
+  }
   
   // Stats
-  let yPos = 50;
+  yPos += 10;
   doc.setFontSize(12);
   doc.text('الإحصائيات الرئيسية:', 20, yPos);
   yPos += 10;
@@ -101,6 +128,8 @@ export const exportToExcel = (report: any, survey: any, stats: any) => {
     [''],
     ['عنوان الاستبيان', survey?.title || ''],
     ['البرنامج', survey?.programs?.name || ''],
+    ...(report?.semester ? [['الفصل الدراسي', report.semester]] : []),
+    ...(report?.academic_year ? [['العام الأكاديمي', report.academic_year]] : []),
     [''],
     ['الإحصائيات الرئيسية'],
     ['إجمالي الاستجابات', stats.totalResponses || 0],

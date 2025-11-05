@@ -94,12 +94,12 @@ const Auth = () => {
             .eq("id", data.user.id);
         }
 
-        // Add coordinator role for the user
+        // Add user role by default (security fix - only admins can assign coordinator role)
         await supabase
           .from("user_roles")
           .insert({
             user_id: data.user.id,
-            role: "coordinator",
+            role: "user",
             program_id: formData.programId || null
           });
       }
