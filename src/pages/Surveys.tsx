@@ -61,23 +61,47 @@ const Surveys = () => {
     });
   };
 
-  const showQRCode = (survey: any) => {
-    if (!survey.qr_code) {
-      toast({
-        title: "غير متوفر",
-        description: "رمز الاستجابة السريع غير متوفر لهذا الاستبيان",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Always use the current origin to ensure the link works
+  const showQRCode = async (survey: any) => {
     const surveyLink = `${window.location.origin}/take/${survey.id}`;
     
-    console.log("QR Code link:", surveyLink);
+    // If QR code doesn't exist, generate it
+    let qrCodeData = survey.qr_code;
+    
+    if (!qrCodeData) {
+      try {
+        const QRCode = (await import('qrcode')).default;
+        qrCodeData = await QRCode.toDataURL(surveyLink, {
+          width: 256,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+          }
+        });
+        
+        // Save the generated QR code to the database
+        await supabase
+          .from('surveys')
+          .update({ qr_code: qrCodeData, survey_link: surveyLink })
+          .eq('id', survey.id);
+          
+        toast({
+          title: "تم إنشاء الرمز",
+          description: "تم إنشاء رمز الاستجابة السريع بنجاح",
+        });
+      } catch (error) {
+        console.error('Error generating QR code:', error);
+        toast({
+          title: "خطأ",
+          description: "فشل في إنشاء رمز الاستجابة السريع",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     
     setSelectedQRCode({
-      qrCode: survey.qr_code,
+      qrCode: qrCodeData,
       title: survey.title,
       link: surveyLink
     });

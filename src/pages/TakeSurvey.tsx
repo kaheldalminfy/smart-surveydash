@@ -359,7 +359,7 @@ const TakeSurvey = () => {
     );
   }
 
-  if (!survey || questions.length === 0) {
+  if (!survey) {
     return (
       <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
         <Card className="w-full max-w-md">
@@ -367,6 +367,20 @@ const TakeSurvey = () => {
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">الاستبيان غير موجود</h2>
             <p className="text-muted-foreground">لم يتم العثور على الاستبيان المطلوب</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (questions.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="text-center py-8">
+            <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">لا توجد أسئلة</h2>
+            <p className="text-muted-foreground">هذا الاستبيان لا يحتوي على أسئلة حالياً. يرجى المحاولة لاحقاً.</p>
           </CardContent>
         </Card>
       </div>

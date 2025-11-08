@@ -60,7 +60,7 @@ ${survey.description}
 
   const generateSurveyUrl = async () => {
     const baseUrl = window.location.origin;
-    const url = `${baseUrl}/survey/${survey.id}`;
+    const url = `${baseUrl}/take/${survey.id}`;
     setSurveyUrl(url);
     
     try {
