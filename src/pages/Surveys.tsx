@@ -62,6 +62,16 @@ const Surveys = () => {
   };
 
   const showQRCode = async (survey: any) => {
+    // تحذير إذا لم يكن الاستبيان نشطاً
+    if (survey.status !== "active") {
+      toast({
+        title: "تحذير",
+        description: "هذا الاستبيان غير نشط. يجب تفعيل الاستبيان أولاً حتى يتمكن المستخدمون من الوصول إليه عبر رمز QR",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const surveyLink = `${window.location.origin}/take/${survey.id}`;
     
     // If QR code doesn't exist, generate it
@@ -105,6 +115,28 @@ const Surveys = () => {
       title: survey.title,
       link: surveyLink
     });
+  };
+
+  const toggleSurveyStatus = async (surveyId: string, currentStatus: string) => {
+    const newStatus = currentStatus === "active" ? "draft" : "active";
+    const { error } = await supabase
+      .from("surveys")
+      .update({ status: newStatus })
+      .eq("id", surveyId);
+
+    if (error) {
+      toast({
+        title: "خطأ",
+        description: "فشل في تغيير حالة الاستبيان",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "تم التحديث",
+        description: `تم ${newStatus === "active" ? "تفعيل" : "إيقاف"} الاستبيان بنجاح`,
+      });
+      loadSurveys();
+    }
   };
 
   return (
@@ -187,6 +219,13 @@ const Surveys = () => {
                         </div>
                       </div>
                       <div className="flex gap-2">
+                        <Button 
+                          variant={survey.status === "active" ? "destructive" : "default"}
+                          size="sm"
+                          onClick={() => toggleSurveyStatus(survey.id, survey.status)}
+                        >
+                          {survey.status === "active" ? "إيقاف" : "تفعيل"}
+                        </Button>
                         <Button 
                           variant="outline" 
                           size="sm"
