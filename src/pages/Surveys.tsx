@@ -74,40 +74,36 @@ const Surveys = () => {
 
     const surveyLink = `${window.location.origin}/take/${survey.id}`;
     
-    // If QR code doesn't exist, generate it
-    let qrCodeData = survey.qr_code;
+    // Always regenerate QR code to ensure it uses the current URL
+    let qrCodeData = null;
     
-    if (!qrCodeData) {
-      try {
-        const QRCode = (await import('qrcode')).default;
-        qrCodeData = await QRCode.toDataURL(surveyLink, {
-          width: 256,
-          margin: 2,
-          color: {
-            dark: '#000000',
-            light: '#FFFFFF'
-          }
-        });
+    // Always regenerate QR code with current URL
+    try {
+      const QRCode = (await import('qrcode')).default;
+      qrCodeData = await QRCode.toDataURL(surveyLink, {
+        width: 256,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+      
+      // Save the generated QR code to the database
+      await supabase
+        .from('surveys')
+        .update({ qr_code: qrCodeData, survey_link: surveyLink })
+        .eq('id', survey.id);
         
-        // Save the generated QR code to the database
-        await supabase
-          .from('surveys')
-          .update({ qr_code: qrCodeData, survey_link: surveyLink })
-          .eq('id', survey.id);
-          
-        toast({
-          title: "تم إنشاء الرمز",
-          description: "تم إنشاء رمز الاستجابة السريع بنجاح",
-        });
-      } catch (error) {
-        console.error('Error generating QR code:', error);
-        toast({
-          title: "خطأ",
-          description: "فشل في إنشاء رمز الاستجابة السريع",
-          variant: "destructive",
-        });
-        return;
-      }
+      console.log('QR Code generated for:', surveyLink);
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      toast({
+        title: "خطأ",
+        description: "فشل في إنشاء رمز الاستجابة السريع",
+        variant: "destructive",
+      });
+      return;
     }
     
     setSelectedQRCode({

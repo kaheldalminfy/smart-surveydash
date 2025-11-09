@@ -64,19 +64,25 @@ const TakeSurvey = () => {
   const loadSurvey = async () => {
     setIsLoading(true);
     try {
-      // Check if user is authenticated
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      // Load survey details
+      // Load survey details - public surveys don't need authentication
       const { data: surveyData, error: surveyError } = await supabase
         .from("surveys")
         .select("*")
         .eq("id", id)
         .maybeSingle();
 
+      console.log("Survey data:", surveyData);
+      console.log("Survey error:", surveyError);
+
       if (surveyError) {
         console.error("Survey error:", surveyError);
-        throw surveyError;
+        toast({
+          title: "خطأ في التحميل",
+          description: "فشل في تحميل الاستبيان. يرجى التأكد من أن الاستبيان موجود",
+          variant: "destructive",
+        });
+        navigate("/");
+        return;
       }
 
       if (!surveyData) {
@@ -89,18 +95,18 @@ const TakeSurvey = () => {
         return;
       }
 
-      // Check if survey is accessible
-      if (!user && surveyData.status !== "active") {
+      // Check if survey is active
+      if (surveyData.status !== "active") {
         toast({
           title: "الاستبيان غير متاح",
-          description: "هذا الاستبيان غير نشط حالياً. يرجى التأكد من أن الاستبيان في حالة 'نشط'",
+          description: "هذا الاستبيان غير نشط حالياً. يرجى التواصل مع منسق البرنامج.",
           variant: "destructive",
         });
         navigate("/");
         return;
       }
 
-      console.log("Survey loaded:", surveyData);
+      console.log("Survey loaded successfully:", surveyData.title);
       setSurvey(surveyData);
 
       // Load questions
