@@ -218,6 +218,8 @@ const TakeSurvey = () => {
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      console.log("Current user:", user);
+      console.log("Survey is_anonymous:", survey?.is_anonymous);
 
       // Create response record
       const { data: responseData, error: responseError } = await supabase
@@ -229,7 +231,18 @@ const TakeSurvey = () => {
         .select()
         .single();
 
-      if (responseError) throw responseError;
+      console.log("Response data:", responseData);
+      console.log("Response error:", responseError);
+
+      if (responseError) {
+        console.error("Response insert error details:", {
+          message: responseError.message,
+          details: responseError.details,
+          hint: responseError.hint,
+          code: responseError.code
+        });
+        throw responseError;
+      }
 
       // Create answer records
       const answersData = questions.map(question => {
@@ -242,11 +255,23 @@ const TakeSurvey = () => {
         };
       });
 
+      console.log("Inserting answers:", answersData);
+
       const { error: answersError } = await supabase
         .from("answers")
         .insert(answersData);
 
-      if (answersError) throw answersError;
+      console.log("Answers error:", answersError);
+
+      if (answersError) {
+        console.error("Answers insert error details:", {
+          message: answersError.message,
+          details: answersError.details,
+          hint: answersError.hint,
+          code: answersError.code
+        });
+        throw answersError;
+      }
 
       toast({
         title: "تم إرسال الاستبيان",
@@ -259,7 +284,7 @@ const TakeSurvey = () => {
       console.error("Submit error:", error);
       toast({
         title: "خطأ في الإرسال",
-        description: "حدث خطأ أثناء إرسال الاستبيان. يرجى المحاولة مرة أخرى.",
+        description: error.message || "حدث خطأ أثناء إرسال الاستبيان. يرجى المحاولة مرة أخرى.",
         variant: "destructive",
       });
     } finally {
