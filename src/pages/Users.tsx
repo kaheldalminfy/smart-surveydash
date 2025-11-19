@@ -93,26 +93,43 @@ export default function Users() {
 
   const loadUsers = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    
+    // Load profiles with programs
+    const { data: profilesData, error: profilesError } = await supabase
       .from("profiles")
       .select(`
         *,
-        programs(name),
-        user_roles(role, program_id)
+        programs(name)
       `)
       .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error("Error loading users:", error);
+    if (profilesError) {
+      console.error("Error loading users:", profilesError);
       toast({
         title: "خطأ",
         description: "فشل تحميل المستخدمين",
         variant: "destructive",
       });
-    } else {
-      setUsers(data || []);
+      setLoading(false);
+      return;
     }
 
+    // Load all user roles
+    const { data: rolesData, error: rolesError } = await supabase
+      .from("user_roles")
+      .select("user_id, role, program_id");
+
+    if (rolesError) {
+      console.error("Error loading roles:", rolesError);
+    }
+
+    // Merge profiles with their roles
+    const usersWithRoles = profilesData?.map(profile => ({
+      ...profile,
+      user_roles: rolesData?.filter(role => role.user_id === profile.id) || []
+    })) || [];
+
+    setUsers(usersWithRoles);
     setLoading(false);
   };
 
