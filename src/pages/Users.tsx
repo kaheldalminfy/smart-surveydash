@@ -134,34 +134,54 @@ export default function Users() {
   };
 
   const updateUserRole = async (userId: string, newRole: string, programId: string | null) => {
-    // Delete existing roles for this user
-    await supabase
-      .from("user_roles")
-      .delete()
-      .eq("user_id", userId);
+    try {
+      // Delete existing roles for this user
+      const { error: deleteError } = await supabase
+        .from("user_roles")
+        .delete()
+        .eq("user_id", userId);
 
-    // Insert new role
-    const { error } = await supabase.from("user_roles").insert({
-      user_id: userId,
-      role: newRole,
-      program_id: programId,
-    });
+      if (deleteError) {
+        console.error("Error deleting roles:", deleteError);
+        toast({
+          title: "خطأ",
+          description: "فشل حذف الأدوار السابقة",
+          variant: "destructive",
+        });
+        return;
+      }
 
-    if (error) {
+      // Insert new role
+      const { error: insertError } = await supabase.from("user_roles").insert({
+        user_id: userId,
+        role: newRole,
+        program_id: programId,
+      });
+
+      if (insertError) {
+        console.error("Error inserting role:", insertError);
+        toast({
+          title: "خطأ",
+          description: "فشل تحديث الدور",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "تم التحديث",
+        description: "تم تحديث دور المستخدم بنجاح",
+      });
+
+      loadUsers();
+    } catch (error) {
+      console.error("Error updating user role:", error);
       toast({
         title: "خطأ",
-        description: "فشل تحديث الدور",
+        description: "حدث خطأ غير متوقع",
         variant: "destructive",
       });
-      return;
     }
-
-    toast({
-      title: "تم التحديث",
-      description: "تم تحديث دور المستخدم بنجاح",
-    });
-
-    loadUsers();
   };
 
   const getRoleBadge = (role: string) => {
