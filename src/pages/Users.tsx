@@ -257,14 +257,14 @@ export default function Users() {
                           </Select>
                           {(currentRole === "coordinator" || currentRole === "dean") && (
                             <Select
-                              value={currentProgramId || ""}
-                              onValueChange={(programId) => updateUserRole(user.id, currentRole, programId || null)}
+                              value={currentProgramId || "no-program"}
+                              onValueChange={(programId) => updateUserRole(user.id, currentRole, programId === "no-program" ? null : programId)}
                             >
                               <SelectTrigger className="w-[150px]">
                                 <SelectValue placeholder="اختر البرنامج" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="">بدون برنامج</SelectItem>
+                                <SelectItem value="no-program">بدون برنامج</SelectItem>
                                 {programs.map((program) => (
                                   <SelectItem key={program.id} value={program.id}>
                                     {program.name}
