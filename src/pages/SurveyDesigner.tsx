@@ -187,10 +187,24 @@ const SurveyDesigner = () => {
     setIsLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error("المستخدم غير مسجل الدخول");
+      // Check authentication with better error handling
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        console.error("Authentication error:", authError);
+        toast({
+          title: "خطأ في المصادقة",
+          description: "جلسة الدخول منتهية. يرجى تسجيل الخروج والدخول مرة أخرى",
+          variant: "destructive",
+        });
+        // Redirect to auth page after a delay
+        setTimeout(() => {
+          navigate("/auth");
+        }, 2000);
+        return;
       }
+
+      console.log("Creating survey with user:", user.id, "program:", survey.programId);
 
       // Create survey
       const { data: surveyData, error: surveyError } = await supabase
@@ -210,6 +224,17 @@ const SurveyDesigner = () => {
 
       if (surveyError) {
         console.error("Survey creation error:", surveyError);
+        
+        // Check if it's an RLS policy error
+        if (surveyError.code === '42501') {
+          toast({
+            title: "خطأ في الصلاحيات",
+            description: "ليس لديك صلاحية لإنشاء استبيان في هذا البرنامج. يرجى التواصل مع المسؤول أو تسجيل الخروج والدخول مرة أخرى",
+            variant: "destructive",
+          });
+          return;
+        }
+        
         throw new Error(`خطأ في إنشاء الاستبيان: ${surveyError.message}`);
       }
 
