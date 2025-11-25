@@ -24,18 +24,28 @@ import { useToast } from "@/hooks/use-toast";
 
 interface Complaint {
   id: string;
-  title: string;
+  subject: string;
   description: string;
-  category: string;
-  priority: string;
+  type: string;
+  complaint_category?: string;
   status: string;
-  submitted_by: string;
-  assigned_to?: string;
+  student_name?: string;
+  student_email?: string;
+  student_id?: string;
+  complainant_type?: string;
+  complainant_id?: string;
+  complainant_academic_id?: string;
+  complainant_job_id?: string;
+  semester?: string;
+  academic_year?: string;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
   program_id?: string;
   programs?: { name: string };
-  profiles?: { full_name: string };
+  attachments?: any;
+  resolution_notes?: string;
+  resolved_at?: string;
+  resolved_by?: string;
 }
 
 const Complaints = () => {
@@ -45,7 +55,6 @@ const Complaints = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [priorityFilter, setPriorityFilter] = useState("all");
   const [showNewComplaintDialog, setShowNewComplaintDialog] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [qrCodeData, setQrCodeData] = useState<string>("");
@@ -97,8 +106,7 @@ const Complaints = () => {
         .from("complaints")
         .select(`
           *,
-          programs (name),
-          profiles!complaints_submitted_by_fkey (full_name)
+          programs (name)
         `)
         .order("created_at", { ascending: false });
 
@@ -240,12 +248,11 @@ const Complaints = () => {
   };
 
   const filteredComplaints = complaints.filter(complaint => {
-    const matchesSearch = complaint.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = complaint.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          complaint.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || complaint.status === statusFilter;
-    const matchesPriority = priorityFilter === "all" || complaint.priority === priorityFilter;
     
-    return matchesSearch && matchesStatus && matchesPriority;
+    return matchesSearch && matchesStatus;
   });
 
   const getComplaintStats = () => {
@@ -509,18 +516,6 @@ const Complaints = () => {
               <option value="resolved">تم الحل</option>
               <option value="closed">مغلقة</option>
             </select>
-
-            <select
-              className="rounded-md border border-input bg-background px-3 py-2"
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-            >
-              <option value="all">جميع الأولويات</option>
-              <option value="low">منخفضة</option>
-              <option value="medium">متوسطة</option>
-              <option value="high">عالية</option>
-              <option value="urgent">عاجلة</option>
-            </select>
           </div>
         </CardContent>
       </Card>
@@ -533,10 +528,9 @@ const Complaints = () => {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold">{complaint.title}</h3>
+                    <h3 className="text-lg font-semibold">{complaint.subject}</h3>
                     {getStatusBadge(complaint.status)}
-                    {getPriorityBadge(complaint.priority)}
-                    <Badge variant="outline">{getCategoryLabel(complaint.category)}</Badge>
+                    <Badge variant="outline">{getCategoryLabel(complaint.type)}</Badge>
                   </div>
                   
                   <p className="text-muted-foreground mb-3 line-clamp-2">
@@ -546,7 +540,7 @@ const Complaints = () => {
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <User className="h-4 w-4" />
-                      <span>{complaint.profiles?.full_name || "غير محدد"}</span>
+                      <span>{complaint.student_name || complaint.student_email || "غير محدد"}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
@@ -601,7 +595,7 @@ const Complaints = () => {
               <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">لا توجد شكاوى</h3>
               <p className="text-muted-foreground">
-                {searchTerm || statusFilter !== "all" || priorityFilter !== "all"
+                {searchTerm || statusFilter !== "all"
                   ? "لا توجد شكاوى تطابق معايير البحث"
                   : "لم يتم تقديم أي شكاوى بعد"}
               </p>
@@ -623,12 +617,14 @@ const Complaints = () => {
             <div className="space-y-6">
               <div className="flex items-center gap-3">
                 {getStatusBadge(selectedComplaint.status)}
-                {getPriorityBadge(selectedComplaint.priority)}
-                <Badge variant="outline">{getCategoryLabel(selectedComplaint.category)}</Badge>
+                <Badge variant="outline">{getCategoryLabel(selectedComplaint.type)}</Badge>
+                {selectedComplaint.complainant_type && (
+                  <Badge variant="secondary">{selectedComplaint.complainant_type}</Badge>
+                )}
               </div>
               
               <div>
-                <h3 className="text-xl font-semibold mb-2">{selectedComplaint.title}</h3>
+                <h3 className="text-xl font-semibold mb-2">{selectedComplaint.subject}</h3>
                 <p className="text-muted-foreground whitespace-pre-wrap">
                   {selectedComplaint.description}
                 </p>
@@ -637,7 +633,11 @@ const Complaints = () => {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="font-medium">مقدم الشكوى:</span>
-                  <p>{selectedComplaint.profiles?.full_name || "غير محدد"}</p>
+                  <p>{selectedComplaint.student_name || "غير محدد"}</p>
+                </div>
+                <div>
+                  <span className="font-medium">البريد الإلكتروني:</span>
+                  <p>{selectedComplaint.student_email || "غير محدد"}</p>
                 </div>
                 <div>
                   <span className="font-medium">البرنامج:</span>
@@ -649,8 +649,20 @@ const Complaints = () => {
                 </div>
                 <div>
                   <span className="font-medium">آخر تحديث:</span>
-                  <p>{new Date(selectedComplaint.updated_at).toLocaleDateString('ar-SA')}</p>
+                  <p>{selectedComplaint.updated_at ? new Date(selectedComplaint.updated_at).toLocaleDateString('ar-SA') : "لا يوجد"}</p>
                 </div>
+                {selectedComplaint.semester && (
+                  <div>
+                    <span className="font-medium">الفصل الدراسي:</span>
+                    <p>{selectedComplaint.semester}</p>
+                  </div>
+                )}
+                {selectedComplaint.academic_year && (
+                  <div>
+                    <span className="font-medium">السنة الأكاديمية:</span>
+                    <p>{selectedComplaint.academic_year}</p>
+                  </div>
+                )}
               </div>
               
               <div className="flex justify-end gap-2">
