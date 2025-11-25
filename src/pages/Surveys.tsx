@@ -135,6 +135,52 @@ const Surveys = () => {
     }
   };
 
+  const regenerateAllQRCodes = async () => {
+    try {
+      const QRCode = (await import('qrcode')).default;
+      const updatedSurveys = [];
+
+      for (const survey of surveys) {
+        const surveyLink = `${window.location.origin}/take/${survey.id}`;
+        const qrCodeData = await QRCode.toDataURL(surveyLink, {
+          width: 256,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+          }
+        });
+
+        updatedSurveys.push({
+          id: survey.id,
+          qr_code: qrCodeData,
+          survey_link: surveyLink
+        });
+      }
+
+      // Update all surveys at once
+      for (const survey of updatedSurveys) {
+        await supabase
+          .from('surveys')
+          .update({ qr_code: survey.qr_code, survey_link: survey.survey_link })
+          .eq('id', survey.id);
+      }
+
+      toast({
+        title: "تم التحديث",
+        description: "تم تحديث جميع رموز QR بنجاح",
+      });
+      loadSurveys();
+    } catch (error) {
+      console.error('Error regenerating QR codes:', error);
+      toast({
+        title: "خطأ",
+        description: "فشل في تحديث رموز QR",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <header className="bg-card border-b shadow-sm">
@@ -144,12 +190,22 @@ const Surveys = () => {
               <h1 className="text-2xl font-bold">إدارة الاستبيانات</h1>
               <p className="text-sm text-muted-foreground">عرض وإدارة جميع الاستبيانات</p>
             </div>
-            <Link to="/surveys/new">
-              <Button variant="hero" size="lg">
-                <Plus className="h-5 w-5 ml-2" />
-                استبيان جديد
+            <div className="flex gap-3">
+              <Button 
+                variant="outline" 
+                size="lg"
+                onClick={regenerateAllQRCodes}
+              >
+                <QrCode className="h-5 w-5 ml-2" />
+                تحديث جميع رموز QR
               </Button>
-            </Link>
+              <Link to="/surveys/new">
+                <Button variant="hero" size="lg">
+                  <Plus className="h-5 w-5 ml-2" />
+                  استبيان جديد
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </header>
