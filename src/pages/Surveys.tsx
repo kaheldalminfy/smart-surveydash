@@ -1,15 +1,16 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, BarChart3, Link2, QrCode, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, BarChart3, Link2, QrCode, Edit, Trash2, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import QRCodeDialog from "@/components/QRCodeDialog";
 
 const Surveys = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [surveys, setSurveys] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -186,9 +187,18 @@ const Surveys = () => {
       <header className="bg-card border-b shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold">إدارة الاستبيانات</h1>
-              <p className="text-sm text-muted-foreground">عرض وإدارة جميع الاستبيانات</p>
+            <div className="flex items-center gap-4">
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => navigate("/dashboard")}
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold">إدارة الاستبيانات</h1>
+                <p className="text-sm text-muted-foreground">عرض وإدارة جميع الاستبيانات</p>
+              </div>
             </div>
             <div className="flex gap-3">
               <Button 
