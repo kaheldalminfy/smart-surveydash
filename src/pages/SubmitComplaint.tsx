@@ -92,10 +92,21 @@ const SubmitComplaint = () => {
     setLoading(true);
 
     try {
+      // Generate a unique ID for the complaint
+      const complaintId = crypto.randomUUID();
+      
+      // Upload attachments first if any
+      let attachmentData = null;
+      if (attachments.length > 0) {
+        const uploadedFiles = await uploadAttachments(complaintId);
+        attachmentData = uploadedFiles;
+      }
+
       // Insert complaint
-      const { data: complaint, error: complaintError } = await supabase
+      const { error: complaintError } = await supabase
         .from("complaints")
         .insert({
+          id: complaintId,
           student_name: formData.studentName,
           student_email: formData.studentEmail,
           complainant_academic_id: formData.complainantAcademicId,
@@ -108,24 +119,10 @@ const SubmitComplaint = () => {
           description: formData.description,
           type: formData.complaintCategory as any || 'other',
           status: 'pending',
-        })
-        .select()
-        .single();
+          attachments: attachmentData,
+        });
 
       if (complaintError) throw complaintError;
-
-      // Upload attachments if any
-      let attachmentData = null;
-      if (attachments.length > 0 && complaint) {
-        const uploadedFiles = await uploadAttachments(complaint.id);
-        attachmentData = uploadedFiles;
-        
-        // Update complaint with attachment data
-        await supabase
-          .from("complaints")
-          .update({ attachments: attachmentData })
-          .eq("id", complaint.id);
-      }
 
       toast({
         title: "تم إرسال الشكوى بنجاح",
