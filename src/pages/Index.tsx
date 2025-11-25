@@ -86,6 +86,9 @@ const Index = () => {
             </div>
             <div className="flex gap-3">
               <Button variant="ghost">عن النظام</Button>
+              <Link to="/submit-complaint">
+                <Button variant="ghost">تقديم شكوى</Button>
+              </Link>
               <Link to="/auth">
                 <Button variant="outline">تسجيل الدخول</Button>
               </Link>

@@ -15,7 +15,9 @@ import {
   User,
   Calendar,
   FileText,
-  Eye
+  Eye,
+  QrCode,
+  Copy
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -46,6 +48,7 @@ const Complaints = () => {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [showNewComplaintDialog, setShowNewComplaintDialog] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
+  const [qrCodeData, setQrCodeData] = useState<string>("");
   const [newComplaint, setNewComplaint] = useState({
     title: "",
     description: "",
@@ -57,7 +60,35 @@ const Complaints = () => {
   useEffect(() => {
     loadComplaints();
     loadPrograms();
+    generateQRCode();
   }, []);
+
+  const generateQRCode = async () => {
+    const complaintUrl = `${window.location.origin}/submit-complaint`;
+    try {
+      const QRCode = (await import('qrcode')).default;
+      const qrData = await QRCode.toDataURL(complaintUrl, {
+        width: 256,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+      setQrCodeData(qrData);
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+    }
+  };
+
+  const copyComplaintLink = () => {
+    const complaintUrl = `${window.location.origin}/submit-complaint`;
+    navigator.clipboard.writeText(complaintUrl);
+    toast({
+      title: "تم النسخ",
+      description: "تم نسخ رابط تقديم الشكوى",
+    });
+  };
 
   const loadComplaints = async () => {
     setLoading(true);
@@ -390,6 +421,66 @@ const Complaints = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* QR Code Section */}
+      <Card className="bg-gradient-to-br from-primary/5 to-secondary/5 border-primary/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <QrCode className="h-6 w-6 text-primary" />
+            رمز QR لتقديم الشكاوى
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="flex flex-col items-center justify-center space-y-4">
+              {qrCodeData && (
+                <div className="bg-white p-4 rounded-lg shadow-lg">
+                  <img src={qrCodeData} alt="QR Code" className="w-64 h-64" />
+                </div>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.download = 'complaint-qr-code.png';
+                  link.href = qrCodeData;
+                  link.click();
+                }}
+                className="w-full"
+              >
+                تحميل رمز QR
+              </Button>
+            </div>
+            <div className="flex flex-col justify-center space-y-4">
+              <div>
+                <h3 className="font-semibold text-lg mb-2">رابط تقديم الشكوى</h3>
+                <p className="text-muted-foreground text-sm mb-4">
+                  يمكن للطلاب وأعضاء هيئة التدريس تقديم شكاواهم مباشرة عبر مسح رمز QR أو استخدام الرابط أدناه
+                </p>
+              </div>
+              <div className="bg-background p-4 rounded-lg border">
+                <p className="text-sm break-all">{`${window.location.origin}/submit-complaint`}</p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={copyComplaintLink}
+                className="w-full"
+              >
+                <Copy className="h-4 w-4 ml-2" />
+                نسخ الرابط
+              </Button>
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p>💡 <strong>نصائح:</strong></p>
+                <ul className="mr-6 space-y-1">
+                  <li>• اطبع رمز QR وضعه في أماكن مرئية بالكلية</li>
+                  <li>• شارك الرابط عبر البريد الإلكتروني أو الواتساب</li>
+                  <li>• الرابط لا يتطلب تسجيل دخول</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filters */}
       <Card>

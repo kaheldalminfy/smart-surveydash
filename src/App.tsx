@@ -13,6 +13,8 @@ import Reports from "./pages/Reports";
 import TakeSurvey from "./pages/TakeSurvey";
 import SurveyComplete from "./pages/SurveyComplete";
 import Complaints from "./pages/Complaints";
+import SubmitComplaint from "./pages/SubmitComplaint";
+import ComplaintSubmitted from "./pages/ComplaintSubmitted";
 import Recommendations from "./pages/Recommendations";
 import Archives from "./pages/Archives";
 import ProgramComparison from "./pages/ProgramComparison";
@@ -33,6 +35,8 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/take/:id" element={<TakeSurvey />} />
           <Route path="/survey-complete" element={<SurveyComplete />} />
+          <Route path="/submit-complaint" element={<SubmitComplaint />} />
+          <Route path="/complaint-submitted" element={<ComplaintSubmitted />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/surveys" element={<ProtectedRoute><Surveys /></ProtectedRoute>} />
           <Route path="/surveys/new" element={<ProtectedRoute><SurveyDesigner /></ProtectedRoute>} />
