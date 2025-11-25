@@ -42,6 +42,8 @@ const Reports = () => {
         .from("reports")
         .select("*, surveys(title, program_id, programs(name))")
         .eq("survey_id", id)
+        .order('generated_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error) {
