@@ -695,7 +695,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "coordinator" | "faculty" | "dean"
+      app_role: "admin" | "coordinator" | "faculty" | "dean" | "program_manager"
       complaint_status: "pending" | "in_progress" | "resolved" | "closed"
       complaint_type: "academic" | "administrative" | "technical" | "other"
       question_type: "likert" | "mcq" | "text" | "rating"
@@ -834,7 +834,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "coordinator", "faculty", "dean"],
+      app_role: ["admin", "coordinator", "faculty", "dean", "program_manager"],
       complaint_status: ["pending", "in_progress", "resolved", "closed"],
       complaint_type: ["academic", "administrative", "technical", "other"],
       question_type: ["likert", "mcq", "text", "rating"],

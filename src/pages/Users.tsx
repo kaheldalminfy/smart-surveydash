@@ -186,9 +186,10 @@ export default function Users() {
 
   const getRoleBadge = (role: string) => {
     const roleMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
-      admin: { label: "مدير", variant: "destructive" },
-      coordinator: { label: "منسق", variant: "default" },
-      dean: { label: "عميد", variant: "secondary" },
+      admin: { label: "مدير النظام", variant: "destructive" },
+      coordinator: { label: "منسق البرنامج", variant: "default" },
+      program_manager: { label: "مدير البرنامج", variant: "secondary" },
+      dean: { label: "العميد", variant: "secondary" },
       user: { label: "مستخدم", variant: "secondary" },
     };
 
@@ -222,6 +223,45 @@ export default function Users() {
               <p className="text-muted-foreground mt-1">إدارة المستخدمين والصلاحيات</p>
             </div>
           </div>
+        </div>
+
+        {/* Roles Info */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <Card className="border-destructive/50">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="destructive">مدير النظام</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">صلاحيات كاملة على كل شيء في النظام</p>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-primary/50">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="default">منسق البرنامج</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">إنشاء استبيانات + إدارة كاملة لبرنامجه</p>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-secondary/50">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="secondary">مدير البرنامج</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">الاطلاع على النتائج فقط لبرنامجه</p>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-secondary/50">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="secondary">العميد</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">الاطلاع على نتائج جميع البرامج</p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Users Table */}
@@ -260,31 +300,31 @@ export default function Users() {
                       <TableCell>{user.programs?.name || "لا يوجد"}</TableCell>
                       <TableCell>{getRoleBadge(currentRole)}</TableCell>
                       <TableCell>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap">
                           <Select
                             value={currentRole}
                             onValueChange={(newRole) => updateUserRole(user.id, newRole, currentProgramId)}
                           >
-                            <SelectTrigger className="w-[130px]">
+                            <SelectTrigger className="w-[160px]">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="user">مستخدم</SelectItem>
-                              <SelectItem value="coordinator">منسق</SelectItem>
-                              <SelectItem value="dean">عميد</SelectItem>
-                              <SelectItem value="admin">مدير</SelectItem>
+                              <SelectItem value="admin">مدير النظام</SelectItem>
+                              <SelectItem value="coordinator">منسق البرنامج</SelectItem>
+                              <SelectItem value="program_manager">مدير البرنامج</SelectItem>
+                              <SelectItem value="dean">العميد</SelectItem>
                             </SelectContent>
                           </Select>
-                          {(currentRole === "coordinator" || currentRole === "dean") && (
+                          {(currentRole === "coordinator" || currentRole === "program_manager") && (
                             <Select
                               value={currentProgramId || "no-program"}
                               onValueChange={(programId) => updateUserRole(user.id, currentRole, programId === "no-program" ? null : programId)}
                             >
-                              <SelectTrigger className="w-[150px]">
+                              <SelectTrigger className="w-[180px]">
                                 <SelectValue placeholder="اختر البرنامج" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="no-program">بدون برنامج</SelectItem>
+                                <SelectItem value="no-program">اختر البرنامج</SelectItem>
                                 {programs.map((program) => (
                                   <SelectItem key={program.id} value={program.id}>
                                     {program.name}
