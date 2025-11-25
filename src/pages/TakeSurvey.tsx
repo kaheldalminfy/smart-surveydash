@@ -217,16 +217,26 @@ const TakeSurvey = () => {
     setIsSubmitting(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log("Current user:", user);
+      // Try to get current user, but don't fail if not logged in
+      let userId = null;
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (!authError && user) {
+          userId = user.id;
+        }
+      } catch (authError) {
+        console.log("User not authenticated, proceeding as anonymous:", authError);
+      }
+
+      console.log("Current user ID:", userId);
       console.log("Survey is_anonymous:", survey?.is_anonymous);
 
-      // Create response record
+      // Create response record - always allow anonymous if user is not logged in or survey is anonymous
       const { data: responseData, error: responseError } = await supabase
         .from("responses")
         .insert({
           survey_id: id,
-          respondent_id: survey?.is_anonymous ? null : user?.id,
+          respondent_id: survey?.is_anonymous || !userId ? null : userId,
         })
         .select()
         .single();
