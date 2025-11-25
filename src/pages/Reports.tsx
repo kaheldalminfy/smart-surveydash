@@ -159,7 +159,21 @@ const Reports = () => {
   }
 
   const stats = report.statistics || {};
-  const likertData = stats.likertDistribution || [];
+  const totalResponses = stats.total_responses || 0;
+  const questionsStats = stats.questions_stats || [];
+  
+  // Calculate overall statistics from questions
+  const overallStats = questionsStats.reduce((acc: any, q: any) => {
+    if (q.type === 'likert' || q.type === 'rating') {
+      acc.count++;
+      acc.meanSum += parseFloat(q.mean) || 0;
+      acc.stdDevSum += parseFloat(q.std_dev) || 0;
+    }
+    return acc;
+  }, { count: 0, meanSum: 0, stdDevSum: 0 });
+  
+  const overallMean = overallStats.count > 0 ? overallStats.meanSum / overallStats.count : 0;
+  const overallStdDev = overallStats.count > 0 ? overallStats.stdDevSum / overallStats.count : 0;
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
@@ -263,7 +277,7 @@ const Reports = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{stats.totalResponses || 0}</div>
+              <div className="text-3xl font-bold">{totalResponses}</div>
               <p className="text-xs text-muted-foreground mt-1">استجابة</p>
             </CardContent>
           </Card>
@@ -271,12 +285,12 @@ const Reports = () => {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                معدل الاستجابة
+                عدد الأسئلة
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{stats.responseRate || 0}%</div>
-              <p className="text-xs text-muted-foreground mt-1">من المستهدف</p>
+              <div className="text-3xl font-bold">{questionsStats.length}</div>
+              <p className="text-xs text-muted-foreground mt-1">سؤال</p>
             </CardContent>
           </Card>
 
@@ -287,7 +301,7 @@ const Reports = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{stats.overallMean?.toFixed(2) || "N/A"}</div>
+              <div className="text-3xl font-bold">{overallMean > 0 ? overallMean.toFixed(2) : "N/A"}</div>
               <p className="text-xs text-muted-foreground mt-1">من 5.0</p>
             </CardContent>
           </Card>
@@ -299,7 +313,7 @@ const Reports = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{stats.overallStdDev?.toFixed(2) || "N/A"}</div>
+              <div className="text-3xl font-bold">{overallStdDev > 0 ? overallStdDev.toFixed(2) : "N/A"}</div>
               <p className="text-xs text-muted-foreground mt-1">التجانس</p>
             </CardContent>
           </Card>
@@ -341,43 +355,34 @@ const Reports = () => {
           </CardContent>
         </Card>
 
-        {likertData.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>توزيع الإجابات</CardTitle>
-              <CardDescription>توزيع إجابات مقياس ليكرت</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={likertData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="label" angle={-45} textAnchor="end" height={100} />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="count" radius={[8, 8, 0, 0]} fill="hsl(var(--primary))" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        )}
-
-        {stats.questionStats && stats.questionStats.length > 0 && (
+        {questionsStats.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle>تفاصيل النتائج حسب الأسئلة</CardTitle>
+              <CardDescription>إحصائيات تفصيلية لكل سؤال</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {stats.questionStats.map((item: any, index: number) => (
-                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                {questionsStats.map((item: any, index: number) => (
+                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/5 transition-colors">
                     <div className="flex-1">
-                      <h4 className="font-medium mb-2">{item.question}</h4>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant="secondary">سؤال {index + 1}</Badge>
+                        <Badge variant="outline">{item.type}</Badge>
+                      </div>
+                      <h4 className="font-medium mb-2">{item.question_text}</h4>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        {item.mean && <span>المتوسط: <Badge variant="outline">{item.mean.toFixed(2)}</Badge></span>}
-                        {item.stdDev && <span>الانحراف: <Badge variant="outline">{item.stdDev.toFixed(2)}</Badge></span>}
+                        <span>عدد الإجابات: <Badge variant="outline">{item.response_count}</Badge></span>
+                        {item.mean && <span>المتوسط: <Badge variant="outline">{item.mean}</Badge></span>}
+                        {item.std_dev && <span>الانحراف: <Badge variant="outline">{item.std_dev}</Badge></span>}
                       </div>
                     </div>
-                    {item.mean && <div className="text-2xl font-bold text-primary">{item.mean.toFixed(2)}</div>}
+                    {item.mean && (
+                      <div className="text-right">
+                        <div className="text-3xl font-bold text-primary">{item.mean}</div>
+                        <p className="text-xs text-muted-foreground">من 5.0</p>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
