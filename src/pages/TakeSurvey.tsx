@@ -231,17 +231,19 @@ const TakeSurvey = () => {
       console.log("Current user ID:", userId);
       console.log("Survey is_anonymous:", survey?.is_anonymous);
 
-      // Create response record - always allow anonymous if user is not logged in or survey is anonymous
-      const { data: responseData, error: responseError } = await supabase
+      // Create response record - generate UUID locally to avoid SELECT permission issue
+      // استخدام UUID محلي لتجنب مشكلة صلاحيات SELECT
+      const responseId = crypto.randomUUID();
+      
+      const { error: responseError } = await supabase
         .from("responses")
         .insert({
+          id: responseId,
           survey_id: id,
           respondent_id: survey?.is_anonymous || !userId ? null : userId,
-        })
-        .select()
-        .single();
+        });
 
-      console.log("Response data:", responseData);
+      console.log("Response ID:", responseId);
       console.log("Response error:", responseError);
 
       if (responseError) {
@@ -254,11 +256,11 @@ const TakeSurvey = () => {
         throw responseError;
       }
 
-      // Create answer records
+      // Create answer records using the generated response ID
       const answersData = questions.map(question => {
         const responseValue = responses[question.id];
         return {
-          response_id: responseData.id,
+          response_id: responseId,  // استخدام الـ ID المُولد محلياً
           question_id: question.id,
           value: responseValue ? String(responseValue) : null,
           numeric_value: !isNaN(Number(responseValue)) ? Number(responseValue) : null,
