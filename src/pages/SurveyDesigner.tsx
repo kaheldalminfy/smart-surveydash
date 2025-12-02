@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Trash2, GripVertical, Sparkles, Save, Eye, ArrowLeft, Copy, Upload, Download, FileJson, FileSpreadsheet } from "lucide-react";
+import { Plus, Trash2, GripVertical, Sparkles, Save, Eye, ArrowLeft, Copy, Upload, Download, FileJson, FileSpreadsheet, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import SurveyTemplates from "@/components/SurveyTemplates";
@@ -27,12 +28,16 @@ interface Question {
 
 const SurveyDesigner = () => {
   const navigate = useNavigate();
+  const { id } = useParams(); // for editing
+  const [searchParams] = useSearchParams();
+  const templateId = searchParams.get('template');
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isAISuggesting, setIsAISuggesting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [programs, setPrograms] = useState<any[]>([]);
-  const [currentTab, setCurrentTab] = useState("templates");
+  const [currentTab, setCurrentTab] = useState(id || templateId ? "design" : "templates");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [survey, setSurvey] = useState({
     title: "",
@@ -43,10 +48,117 @@ const SurveyDesigner = () => {
     endDate: "",
   });
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [templateName, setTemplateName] = useState("");
+  const [templateDescription, setTemplateDescription] = useState("");
+  const [templatePublic, setTemplatePublic] = useState(false);
 
   useEffect(() => {
     loadPrograms();
-  }, []);
+    if (id) {
+      loadSurvey();
+    } else if (templateId) {
+      loadTemplate();
+    }
+  }, [id, templateId]);
+
+  const loadSurvey = async () => {
+    if (!id) return;
+    
+    try {
+      const { data: surveyData, error: surveyError } = await supabase
+        .from("surveys")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (surveyError) throw surveyError;
+
+      if (surveyData) {
+        setSurvey({
+          title: surveyData.title,
+          description: surveyData.description || "",
+          programId: surveyData.program_id,
+          isAnonymous: surveyData.is_anonymous,
+          startDate: surveyData.start_date ? new Date(surveyData.start_date).toISOString().split('T')[0] : "",
+          endDate: surveyData.end_date ? new Date(surveyData.end_date).toISOString().split('T')[0] : "",
+        });
+
+        const { data: questionsData, error: questionsError } = await supabase
+          .from("questions")
+          .select("*")
+          .eq("survey_id", id)
+          .order("order_index");
+
+        if (questionsError) throw questionsError;
+
+        if (questionsData) {
+          const loadedQuestions = questionsData.map((q: any, index) => ({
+            id: Date.now() + index,
+            text: q.text,
+            type: q.type,
+            orderIndex: q.order_index,
+            options: q.type === "mcq" && q.options?.choices ? q.options.choices : [],
+            required: q.is_required,
+          }));
+          setQuestions(loadedQuestions);
+        }
+      }
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: "فشل في تحميل الاستبيان",
+        variant: "destructive",
+      });
+      console.error("Error loading survey:", error);
+    }
+  };
+
+  const loadTemplate = async () => {
+    if (!templateId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("survey_templates")
+        .select("*")
+        .eq("id", templateId)
+        .single();
+
+      if (error) throw error;
+
+      if (data && data.template_data) {
+        setSurvey(prev => ({
+          ...prev,
+          title: data.template_data.title || "",
+          description: data.template_data.description || "",
+          isAnonymous: data.template_data.isAnonymous ?? true,
+        }));
+
+        if (data.template_data.questions) {
+          const templateQuestions = data.template_data.questions.map((q: any, index: number) => ({
+            id: Date.now() + index,
+            text: q.text,
+            type: q.type,
+            orderIndex: index,
+            options: q.options || [],
+            required: q.required ?? true,
+          }));
+          setQuestions(templateQuestions);
+        }
+
+        toast({
+          title: "تم التحميل",
+          description: `تم تحميل النموذج "${data.name}" بنجاح`,
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: "فشل في تحميل النموذج",
+        variant: "destructive",
+      });
+      console.error("Error loading template:", error);
+    }
+  };
 
   const loadPrograms = async () => {
     try {
@@ -187,115 +299,189 @@ const SurveyDesigner = () => {
     setIsLoading(true);
 
     try {
-      // Check authentication with better error handling
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       if (authError || !user) {
-        console.error("Authentication error:", authError);
         toast({
           title: "خطأ في المصادقة",
-          description: "جلسة الدخول منتهية. يرجى تسجيل الخروج والدخول مرة أخرى",
+          description: "جلسة الدخول منتهية",
           variant: "destructive",
         });
-        // Redirect to auth page after a delay
-        setTimeout(() => {
-          navigate("/auth");
-        }, 2000);
+        navigate("/auth");
         return;
       }
 
-      console.log("Creating survey with user:", user.id, "program:", survey.programId);
+      if (id) {
+        // Update existing survey
+        const { error: surveyError } = await supabase
+          .from("surveys")
+          .update({
+            title: survey.title,
+            description: survey.description,
+            program_id: survey.programId,
+            is_anonymous: survey.isAnonymous,
+            start_date: survey.startDate || null,
+            end_date: survey.endDate || null,
+          })
+          .eq("id", id);
 
-      // Create survey
-      const { data: surveyData, error: surveyError } = await supabase
-        .from("surveys")
-        .insert({
-          title: survey.title,
-          description: survey.description,
-          program_id: survey.programId,
-          is_anonymous: survey.isAnonymous,
-          start_date: survey.startDate || null,
-          end_date: survey.endDate || null,
-          created_by: user.id,
-          status: "draft",
-        })
-        .select()
-        .single();
+        if (surveyError) throw surveyError;
 
-      if (surveyError) {
-        console.error("Survey creation error:", surveyError);
-        
-        // Check if it's an RLS policy error
-        if (surveyError.code === '42501') {
-          toast({
-            title: "خطأ في الصلاحيات",
-            description: "ليس لديك صلاحية لإنشاء استبيان في هذا البرنامج. يرجى التواصل مع المسؤول أو تسجيل الخروج والدخول مرة أخرى",
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        throw new Error(`خطأ في إنشاء الاستبيان: ${surveyError.message}`);
+        // Delete old questions
+        await supabase.from("questions").delete().eq("survey_id", id);
+
+        // Insert new questions
+        const questionsData = questions.map((q, index) => ({
+          survey_id: id,
+          text: q.text,
+          type: q.type,
+          order_index: index,
+          is_required: q.required,
+          options: q.type === "likert" ? {
+            scale: ["غير موافق بشدة", "غير موافق", "محايد", "موافق", "موافق بشدة"]
+          } : q.type === "mcq" && q.options ? {
+            choices: q.options
+          } : null,
+        }));
+
+        const { error: questionsError } = await supabase
+          .from("questions")
+          .insert(questionsData);
+
+        if (questionsError) throw questionsError;
+
+        toast({
+          title: "تم التحديث",
+          description: "تم تحديث الاستبيان بنجاح",
+        });
+      } else {
+        // Create new survey
+        const { data: surveyData, error: surveyError } = await supabase
+          .from("surveys")
+          .insert({
+            title: survey.title,
+            description: survey.description,
+            program_id: survey.programId,
+            is_anonymous: survey.isAnonymous,
+            start_date: survey.startDate || null,
+            end_date: survey.endDate || null,
+            created_by: user.id,
+            status: "draft",
+          })
+          .select()
+          .single();
+
+        if (surveyError) throw surveyError;
+
+        const questionsData = questions.map((q, index) => ({
+          survey_id: surveyData.id,
+          text: q.text,
+          type: q.type,
+          order_index: index,
+          is_required: q.required,
+          options: q.type === "likert" ? {
+            scale: ["غير موافق بشدة", "غير موافق", "محايد", "موافق", "موافق بشدة"]
+          } : q.type === "mcq" && q.options ? {
+            choices: q.options
+          } : null,
+        }));
+
+        const { error: questionsError } = await supabase
+          .from("questions")
+          .insert(questionsData);
+
+        if (questionsError) throw questionsError;
+
+        // Generate QR Code
+        const surveyLink = `${window.location.origin}/take/${surveyData.id}`;
+        const qrCodeDataURL = await QRCode.toDataURL(surveyLink, {
+          width: 400,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+          }
+        });
+
+        await supabase
+          .from("surveys")
+          .update({ 
+            qr_code: qrCodeDataURL,
+            survey_link: surveyLink
+          })
+          .eq("id", surveyData.id);
+
+        toast({
+          title: "تم الحفظ",
+          description: "تم حفظ الاستبيان بنجاح",
+        });
       }
-
-      // Create questions
-      const questionsData = questions.map((q, index) => ({
-        survey_id: surveyData.id,
-        text: q.text,
-        type: q.type,
-        order_index: index,
-        is_required: q.required,
-        options: q.type === "likert" ? {
-          scale: ["غير موافق بشدة", "غير موافق", "محايد", "موافق", "موافق بشدة"]
-        } : q.type === "mcq" && q.options ? {
-          choices: q.options
-        } : null,
-      }));
-
-      const { error: questionsError } = await supabase
-        .from("questions")
-        .insert(questionsData);
-
-      if (questionsError) {
-        console.error("Questions creation error:", questionsError);
-        throw new Error(`خطأ في إنشاء الأسئلة: ${questionsError.message}`);
-      }
-
-      // Generate QR Code
-      const surveyLink = `${window.location.origin}/take/${surveyData.id}`;
-      const qrCodeDataURL = await QRCode.toDataURL(surveyLink, {
-        width: 400,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF'
-        }
-      });
-
-      // Update survey with QR code
-      await supabase
-        .from("surveys")
-        .update({ 
-          qr_code: qrCodeDataURL,
-          survey_link: surveyLink
-        })
-        .eq("id", surveyData.id);
-
-      toast({
-        title: "تم الحفظ",
-        description: "تم حفظ الاستبيان وإنشاء رمز الاستجابة السريع بنجاح",
-      });
 
       navigate("/surveys");
     } catch (error: any) {
-      console.error("Save error:", error);
       toast({
-        title: "خطأ في الحفظ",
-        description: error.message || "حدث خطأ غير متوقع",
+        title: "خطأ",
+        description: error.message || "حدث خطأ في الحفظ",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSaveAsTemplate = async () => {
+    if (!templateName) {
+      toast({
+        title: "خطأ",
+        description: "الرجاء إدخال اسم النموذج",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const templateData = {
+        title: survey.title,
+        description: survey.description,
+        isAnonymous: survey.isAnonymous,
+        questions: questions.map(q => ({
+          text: q.text,
+          type: q.type,
+          required: q.required,
+          options: q.options,
+        })),
+      };
+
+      const { error } = await supabase
+        .from("survey_templates")
+        .insert({
+          name: templateName,
+          description: templateDescription,
+          template_data: templateData,
+          is_public: templatePublic,
+          created_by: user.id,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "تم الحفظ",
+        description: "تم حفظ النموذج بنجاح",
+      });
+
+      setShowSaveTemplate(false);
+      setTemplateName("");
+      setTemplateDescription("");
+      setTemplatePublic(false);
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: "فشل في حفظ النموذج",
+        variant: "destructive",
+      });
     }
   };
 
@@ -486,14 +672,18 @@ const SurveyDesigner = () => {
                 العودة
               </Button>
               <div>
-                <h1 className="text-2xl font-bold">مصمم الاستبيان</h1>
+                <h1 className="text-2xl font-bold">{id ? "تعديل الاستبيان" : "مصمم الاستبيان"}</h1>
                 <p className="text-sm text-muted-foreground">
-                  {currentTab === "templates" ? "اختر قالباً أو ابدأ من الصفر" : "صمم استبيانك"}
+                  {currentTab === "templates" ? "اختر قالباً أو ابدأ من الصفر" : id ? "تعديل استبيانك" : "صمم استبيانك"}
                 </p>
               </div>
             </div>
             {currentTab === "design" && (
               <div className="flex gap-2 flex-wrap">
+                <Button variant="outline" size="sm" onClick={() => setShowSaveTemplate(true)}>
+                  <FileText className="h-4 w-4 ml-2" />
+                  حفظ كنموذج
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                   <Upload className="h-4 w-4 ml-2" />
                   استيراد
@@ -521,7 +711,7 @@ const SurveyDesigner = () => {
                 </Button>
                 <Button onClick={handleSave} variant="hero" size="sm" disabled={isLoading}>
                   <Save className="h-4 w-4 ml-2" />
-                  {isLoading ? "جاري الحفظ..." : "حفظ"}
+                  {isLoading ? "جاري الحفظ..." : id ? "تحديث" : "حفظ"}
                 </Button>
               </div>
             )}
@@ -796,6 +986,53 @@ const SurveyDesigner = () => {
         survey={survey}
         questions={questions}
       />
+
+      {/* Save Template Dialog */}
+      <AlertDialog open={showSaveTemplate} onOpenChange={setShowSaveTemplate}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>حفظ كنموذج</AlertDialogTitle>
+            <AlertDialogDescription>
+              احفظ هذا الاستبيان كنموذج لإعادة استخدامه لاحقاً
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="template-name">اسم النموذج</Label>
+              <Input
+                id="template-name"
+                placeholder="مثال: تقييم جودة المقرر"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="template-description">الوصف</Label>
+              <Textarea
+                id="template-description"
+                placeholder="وصف مختصر للنموذج"
+                value={templateDescription}
+                onChange={(e) => setTemplateDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="template-public"
+                checked={templatePublic}
+                onCheckedChange={setTemplatePublic}
+              />
+              <Label htmlFor="template-public">جعل النموذج عاماً (متاح للجميع)</Label>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSaveAsTemplate}>
+              حفظ النموذج
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
