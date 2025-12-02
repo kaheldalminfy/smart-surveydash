@@ -26,16 +26,22 @@ export const exportToPDF = async (report: any, survey: any, stats: any, logoUrl?
     }
   }
   
-  // Header
-  doc.setFontSize(20);
-  doc.text('تقرير الاستبيان', 105, yPos, { align: 'center' });
-  yPos += 10;
+  // Header with border
+  doc.setFillColor(66, 139, 202);
+  doc.rect(15, yPos - 5, 180, 30, 'F');
   
-  doc.setFontSize(14);
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(22);
+  doc.text('تقرير الاستبيان', 105, yPos + 5, { align: 'center' });
+  yPos += 12;
+  
+  doc.setFontSize(16);
   doc.text(survey?.title || 'استبيان', 105, yPos, { align: 'center' });
-  yPos += 7;
+  yPos += 8;
   doc.text(survey?.programs?.name || '', 105, yPos, { align: 'center' });
-  yPos += 7;
+  
+  doc.setTextColor(0, 0, 0);
+  yPos += 15;
 
   // Add semester and academic year
   if (report?.semester || report?.academic_year) {
@@ -47,72 +53,156 @@ export const exportToPDF = async (report: any, survey: any, stats: any, logoUrl?
     yPos += 7;
   }
   
-  // Stats
-  yPos += 10;
-  doc.setFontSize(12);
-  doc.text('الإحصائيات الرئيسية:', 20, yPos);
-  yPos += 10;
+  // Stats Section with enhanced styling
+  doc.setFillColor(240, 248, 255);
+  doc.rect(15, yPos, 180, 10, 'F');
+  
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('📊 الإحصائيات الرئيسية', 20, yPos + 7);
+  yPos += 12;
   
   const statsData = [
-    ['إجمالي الاستجابات', stats.totalResponses || 0],
+    ['إجمالي الاستجابات', String(stats.totalResponses || 0)],
     ['معدل الاستجابة', `${stats.responseRate || 0}%`],
-    ['المتوسط العام', stats.overallMean?.toFixed(2) || 'N/A'],
-    ['الانحراف المعياري', stats.overallStdDev?.toFixed(2) || 'N/A'],
+    ['المتوسط العام', stats.overallMean ? stats.overallMean.toFixed(2) : 'غير متاح'],
+    ['الانحراف المعياري', stats.overallStdDev ? stats.overallStdDev.toFixed(2) : 'غير متاح'],
   ];
 
   autoTable(doc, {
     startY: yPos,
     head: [['المؤشر', 'القيمة']],
     body: statsData,
-    styles: { font: 'helvetica', halign: 'right' },
-    headStyles: { fillColor: [66, 139, 202] },
+    styles: { 
+      font: 'helvetica', 
+      halign: 'right',
+      fontSize: 11,
+      cellPadding: 5
+    },
+    headStyles: { 
+      fillColor: [66, 139, 202],
+      fontSize: 12,
+      fontStyle: 'bold'
+    },
+    alternateRowStyles: { fillColor: [245, 245, 245] },
+    margin: { left: 20, right: 20 }
   });
 
-  // Summary
+  // Summary Section with enhanced styling
   yPos = (doc as any).lastAutoTable.finalY + 15;
-  doc.setFontSize(14);
-  doc.text('الملخص التنفيذي:', 20, yPos);
-  yPos += 8;
   
-  doc.setFontSize(10);
-  const summaryLines = doc.splitTextToSize(report.summary || 'لا يوجد ملخص متاح', 170);
-  doc.text(summaryLines, 20, yPos);
+  doc.setFillColor(240, 248, 255);
+  doc.rect(15, yPos - 3, 180, 10, 'F');
+  
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('📝 الملخص التنفيذي', 20, yPos + 4);
+  yPos += 12;
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  const summaryText = report.summary || 'لا يوجد ملخص متاح حالياً. يرجى مراجعة التفاصيل أدناه.';
+  const summaryLines = doc.splitTextToSize(summaryText, 170);
+  
+  // Add background for summary
+  doc.setFillColor(250, 250, 250);
+  doc.rect(20, yPos - 2, 170, summaryLines.length * 6 + 4, 'F');
+  doc.setDrawColor(200, 200, 200);
+  doc.rect(20, yPos - 2, 170, summaryLines.length * 6 + 4, 'S');
+  
+  doc.text(summaryLines, 25, yPos + 2);
 
-  // Recommendations
-  yPos += summaryLines.length * 5 + 10;
-  if (yPos > 250) {
+  // Recommendations Section
+  yPos += summaryLines.length * 6 + 15;
+  if (yPos > 240) {
     doc.addPage();
     yPos = 20;
   }
   
-  doc.setFontSize(14);
-  doc.text('التوصيات:', 20, yPos);
-  yPos += 8;
+  doc.setFillColor(240, 255, 240);
+  doc.rect(15, yPos - 3, 180, 10, 'F');
   
-  doc.setFontSize(10);
-  const recommendationLines = doc.splitTextToSize(report.recommendations_text || 'لا توجد توصيات متاحة', 170);
-  doc.text(recommendationLines, 20, yPos);
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('💡 التوصيات والمقترحات', 20, yPos + 4);
+  yPos += 12;
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  const recommendationText = report.recommendations_text || 'لا توجد توصيات محددة حالياً. سيتم تحديث هذا القسم بناءً على تحليل النتائج.';
+  const recommendationLines = doc.splitTextToSize(recommendationText, 170);
+  
+  // Add background for recommendations
+  doc.setFillColor(250, 255, 250);
+  doc.rect(20, yPos - 2, 170, recommendationLines.length * 6 + 4, 'F');
+  doc.setDrawColor(200, 220, 200);
+  doc.rect(20, yPos - 2, 170, recommendationLines.length * 6 + 4, 'S');
+  
+  doc.text(recommendationLines, 25, yPos + 2);
+  yPos += recommendationLines.length * 6 + 10;
 
-  // Question Stats
+  // Question Stats with enhanced presentation
   if (stats.questionStats && stats.questionStats.length > 0) {
-    doc.addPage();
-    doc.setFontSize(14);
-    doc.text('تفاصيل الأسئلة:', 20, 20);
+    if (yPos > 200) {
+      doc.addPage();
+      yPos = 20;
+    } else {
+      yPos += 10;
+    }
     
-    const questionData = stats.questionStats.map((q: any) => [
-      q.question,
-      q.mean?.toFixed(2) || 'N/A',
-      q.stdDev?.toFixed(2) || 'N/A',
+    doc.setFillColor(255, 248, 240);
+    doc.rect(15, yPos - 3, 180, 10, 'F');
+    
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('📋 تفاصيل الأسئلة والتقييمات', 20, yPos + 4);
+    yPos += 12;
+    
+    const questionData = stats.questionStats.map((q: any, index: number) => [
+      `${index + 1}. ${q.question}`,
+      q.mean ? q.mean.toFixed(2) : 'غير متاح',
+      q.stdDev ? q.stdDev.toFixed(2) : 'غير متاح',
+      q.responseCount || 0
     ]);
 
     autoTable(doc, {
-      startY: 30,
-      head: [['السؤال', 'المتوسط', 'الانحراف']],
+      startY: yPos,
+      head: [['السؤال', 'المتوسط', 'الانحراف المعياري', 'عدد الإجابات']],
       body: questionData,
-      styles: { font: 'helvetica', halign: 'right', fontSize: 9 },
-      headStyles: { fillColor: [66, 139, 202] },
-      columnStyles: { 0: { cellWidth: 120 } },
+      styles: { 
+        font: 'helvetica', 
+        halign: 'right', 
+        fontSize: 10,
+        cellPadding: 4
+      },
+      headStyles: { 
+        fillColor: [66, 139, 202],
+        fontSize: 11,
+        fontStyle: 'bold'
+      },
+      columnStyles: { 
+        0: { cellWidth: 100 },
+        1: { cellWidth: 25, halign: 'center' },
+        2: { cellWidth: 30, halign: 'center' },
+        3: { cellWidth: 25, halign: 'center' }
+      },
+      alternateRowStyles: { fillColor: [250, 250, 250] },
+      margin: { left: 20, right: 20 }
     });
+  }
+
+  // Footer on all pages
+  const pageCount = (doc as any).internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(9);
+    doc.setTextColor(128, 128, 128);
+    doc.text(
+      `صفحة ${i} من ${pageCount} | كلية العلوم الإنسانية والاجتماعية - نظام إدارة الاستبيانات`,
+      105,
+      285,
+      { align: 'center' }
+    );
   }
 
   // Save

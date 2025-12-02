@@ -61,6 +61,11 @@ const Complaints = () => {
   const [showNewComplaintDialog, setShowNewComplaintDialog] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [qrCodeData, setQrCodeData] = useState<string>("");
+  const [isEditingComplaint, setIsEditingComplaint] = useState(false);
+  const [editComplaintData, setEditComplaintData] = useState<Partial<Complaint>>({});
+  const [resolutionNotes, setResolutionNotes] = useState("");
+  const [showResolutionDialog, setShowResolutionDialog] = useState(false);
+  const [complaintToResolve, setComplaintToResolve] = useState<{id: string, newStatus: string} | null>(null);
   const [newComplaint, setNewComplaint] = useState({
     title: "",
     description: "",
@@ -200,14 +205,25 @@ const Complaints = () => {
     }
   };
 
-  const updateComplaintStatus = async (complaintId: string, newStatus: string) => {
+  const updateComplaintStatus = async (complaintId: string, newStatus: string, notes?: string) => {
     try {
+      const updateData: any = { 
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      };
+      
+      if (notes) {
+        updateData.resolution_notes = notes;
+        if (newStatus === 'resolved' || newStatus === 'closed') {
+          updateData.resolved_at = new Date().toISOString();
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) updateData.resolved_by = user.id;
+        }
+      }
+      
       const { error } = await supabase
         .from("complaints")
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq("id", complaintId);
 
       if (error) throw error;
@@ -217,6 +233,9 @@ const Complaints = () => {
         description: "تم تحديث حالة الشكوى بنجاح",
       });
 
+      setShowResolutionDialog(false);
+      setResolutionNotes("");
+      setComplaintToResolve(null);
       loadComplaints();
     } catch (error: any) {
       toast({
@@ -224,6 +243,49 @@ const Complaints = () => {
         description: "فشل في تحديث حالة الشكوى",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleEditComplaint = async () => {
+    if (!editComplaintData.id) return;
+    
+    try {
+      const { error } = await supabase
+        .from("complaints")
+        .update({
+          subject: editComplaintData.subject,
+          description: editComplaintData.description,
+          type: editComplaintData.type,
+          complaint_category: editComplaintData.complaint_category,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", editComplaintData.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "تم التحديث",
+        description: "تم تحديث الشكوى بنجاح",
+      });
+
+      setIsEditingComplaint(false);
+      setSelectedComplaint(null);
+      loadComplaints();
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: "فشل في تحديث الشكوى",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const initiateStatusChange = (complaintId: string, newStatus: string) => {
+    if (newStatus === 'resolved' || newStatus === 'closed') {
+      setComplaintToResolve({ id: complaintId, newStatus });
+      setShowResolutionDialog(true);
+    } else {
+      updateComplaintStatus(complaintId, newStatus);
     }
   };
 
@@ -605,7 +667,7 @@ const Complaints = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => updateComplaintStatus(complaint.id, "in_progress")}
+                      onClick={() => initiateStatusChange(complaint.id, "in_progress")}
                     >
                       بدء المعالجة
                     </Button>
@@ -615,7 +677,7 @@ const Complaints = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => updateComplaintStatus(complaint.id, "resolved")}
+                      onClick={() => initiateStatusChange(complaint.id, "resolved")}
                     >
                       تم الحل
                     </Button>
@@ -642,9 +704,9 @@ const Complaints = () => {
       </div>
 
       {/* Complaint Details Dialog */}
-      {selectedComplaint && (
+      {selectedComplaint && !isEditingComplaint && (
         <Dialog open={!!selectedComplaint} onOpenChange={() => setSelectedComplaint(null)}>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5" />
@@ -701,25 +763,165 @@ const Complaints = () => {
                   </div>
                 )}
               </div>
+
+              {selectedComplaint.resolution_notes && (
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <h4 className="font-semibold text-green-900 mb-2">ملاحظات المعالجة:</h4>
+                  <p className="text-green-800 whitespace-pre-wrap">{selectedComplaint.resolution_notes}</p>
+                  {selectedComplaint.resolved_at && (
+                    <p className="text-sm text-green-700 mt-2">
+                      تم الحل في: {new Date(selectedComplaint.resolved_at).toLocaleDateString('ar-SA')}
+                    </p>
+                  )}
+                </div>
+              )}
               
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setSelectedComplaint(null)}>
                   إغلاق
                 </Button>
                 {selectedComplaint.status !== "resolved" && selectedComplaint.status !== "closed" && (
-                  <Button onClick={() => {
-                    const newStatus = selectedComplaint.status === "pending" ? "in_progress" : "resolved";
-                    updateComplaintStatus(selectedComplaint.id, newStatus);
-                    setSelectedComplaint(null);
-                  }}>
-                    {selectedComplaint.status === "pending" ? "بدء المعالجة" : "تم الحل"}
-                  </Button>
+                  <>
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        setEditComplaintData(selectedComplaint);
+                        setIsEditingComplaint(true);
+                      }}
+                    >
+                      تعديل
+                    </Button>
+                    <Button onClick={() => {
+                      const newStatus = selectedComplaint.status === "pending" ? "in_progress" : "resolved";
+                      initiateStatusChange(selectedComplaint.id, newStatus);
+                      setSelectedComplaint(null);
+                    }}>
+                      {selectedComplaint.status === "pending" ? "بدء المعالجة" : "تم الحل"}
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Edit Complaint Dialog */}
+      {isEditingComplaint && editComplaintData && (
+        <Dialog open={isEditingComplaint} onOpenChange={() => setIsEditingComplaint(false)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>تعديل الشكوى</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-subject">عنوان الشكوى</Label>
+                <Input
+                  id="edit-subject"
+                  value={editComplaintData.subject || ""}
+                  onChange={(e) => setEditComplaintData({...editComplaintData, subject: e.target.value})}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-type">نوع الشكوى</Label>
+                <select
+                  id="edit-type"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2"
+                  value={editComplaintData.type || ""}
+                  onChange={(e) => setEditComplaintData({...editComplaintData, type: e.target.value})}
+                >
+                  <option value="academic">أكاديمي</option>
+                  <option value="administrative">إداري</option>
+                  <option value="technical">تقني</option>
+                  <option value="other">أخرى</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-category">فئة الشكوى</Label>
+                <Input
+                  id="edit-category"
+                  value={editComplaintData.complaint_category || ""}
+                  onChange={(e) => setEditComplaintData({...editComplaintData, complaint_category: e.target.value})}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-description">وصف الشكوى</Label>
+                <Textarea
+                  id="edit-description"
+                  rows={6}
+                  value={editComplaintData.description || ""}
+                  onChange={(e) => setEditComplaintData({...editComplaintData, description: e.target.value})}
+                />
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => {
+                  setIsEditingComplaint(false);
+                  setEditComplaintData({});
+                }}>
+                  إلغاء
+                </Button>
+                <Button onClick={handleEditComplaint}>
+                  حفظ التعديلات
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Resolution Notes Dialog */}
+      <Dialog open={showResolutionDialog} onOpenChange={setShowResolutionDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>إضافة ملاحظات المعالجة</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="resolution-notes">ملاحظات المعالجة</Label>
+              <Textarea
+                id="resolution-notes"
+                placeholder="اكتب هنا تفاصيل كيفية معالجة الشكوى والإجراءات المتخذة..."
+                rows={6}
+                value={resolutionNotes}
+                onChange={(e) => setResolutionNotes(e.target.value)}
+              />
+              <p className="text-sm text-muted-foreground mt-2">
+                يرجى توضيح الإجراءات المتخذة لحل الشكوى بشكل واضح ومفصل
+              </p>
+            </div>
+            
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => {
+                setShowResolutionDialog(false);
+                setResolutionNotes("");
+                setComplaintToResolve(null);
+              }}>
+                إلغاء
+              </Button>
+              <Button 
+                onClick={() => {
+                  if (complaintToResolve && resolutionNotes.trim()) {
+                    updateComplaintStatus(complaintToResolve.id, complaintToResolve.newStatus, resolutionNotes);
+                  } else {
+                    toast({
+                      title: "خطأ",
+                      description: "يرجى إدخال ملاحظات المعالجة",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+                disabled={!resolutionNotes.trim()}
+              >
+                تأكيد الحل
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
