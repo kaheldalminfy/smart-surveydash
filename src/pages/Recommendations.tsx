@@ -425,8 +425,9 @@ const Recommendations = () => {
                     <TableCell>{getPriorityBadge(rec.priority)}</TableCell>
                     <TableCell>{getStatusBadge(rec.status)}</TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(rec)}>
-                        <Edit className="h-4 w-4" />
+                      <Button variant="outline" size="sm" onClick={() => handleEdit(rec)}>
+                        <Edit className="h-4 w-4 ml-2" />
+                        تعديل
                       </Button>
                     </TableCell>
                   </TableRow>
