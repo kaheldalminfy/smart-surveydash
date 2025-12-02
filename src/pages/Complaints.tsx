@@ -105,13 +105,37 @@ const Complaints = () => {
   const loadComplaints = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      // Check user role
+      const { data: userRoles } = await supabase
+        .from("user_roles")
+        .select("role, program_id")
+        .eq("user_id", user.id);
+
+      const isAdmin = userRoles?.some(r => r.role === 'admin');
+      const isDean = userRoles?.some(r => r.role === 'dean');
+      const userProgramIds = userRoles?.map(r => r.program_id).filter(Boolean);
+
+      // Build query based on role
+      let query = supabase
         .from("complaints")
         .select(`
           *,
           programs (name)
-        `)
-        .order("created_at", { ascending: false });
+        `);
+
+      // Filter by program if not admin or dean
+      if (!isAdmin && !isDean && userProgramIds && userProgramIds.length > 0) {
+        query = query.in("program_id", userProgramIds);
+      }
+
+      const { data, error } = await query.order("created_at", { ascending: false });
 
       if (error) throw error;
       setComplaints(data || []);
