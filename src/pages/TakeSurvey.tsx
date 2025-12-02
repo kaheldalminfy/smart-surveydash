@@ -305,35 +305,56 @@ const TakeSurvey = () => {
   };
 
   const renderQuestionInput = (question: Question) => {
+    // استخدام question.id + order_index للتأكد من عدم التعارض
+    const uniqueKey = `${question.id}-${question.order_index}`;
     const value = responses[question.id];
 
     switch (question.type) {
       case "likert":
         const likertOptions = [
-          "غير موافق بشدة",
-          "غير موافق", 
-          "محايد",
-          "موافق",
-          "موافق بشدة"
+          { label: "غير موافق بشدة", value: "1" },
+          { label: "غير موافق", value: "2" },
+          { label: "محايد", value: "3" },
+          { label: "موافق", value: "4" },
+          { label: "موافق بشدة", value: "5" }
         ];
         
         return (
           <RadioGroup 
-            value={value} 
+            key={uniqueKey}
+            value={String(value) || ""} 
             onValueChange={(val) => handleResponseChange(question.id, val)}
             className="space-y-3"
           >
-            {likertOptions.map((option: string, index: number) => (
-              <div key={index} className="flex items-center space-x-2 space-x-reverse p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer">
-                <RadioGroupItem value={String(index + 1)} id={`${question.id}-${index}`} />
-                <Label 
-                  htmlFor={`${question.id}-${index}`} 
-                  className="flex-1 cursor-pointer font-medium"
+            {likertOptions.map((option, index) => {
+              const optionId = `q-${question.id}-opt-${index}-${question.order_index}`;
+              const isSelected = String(value) === option.value;
+              
+              return (
+                <div 
+                  key={optionId} 
+                  className={`flex items-center space-x-2 space-x-reverse p-4 border-2 rounded-lg transition-all cursor-pointer ${
+                    isSelected 
+                      ? 'border-primary bg-primary/5' 
+                      : 'border-border hover:border-primary/50 hover:bg-accent/30'
+                  }`}
+                  onClick={() => handleResponseChange(question.id, option.value)}
                 >
-                  {option}
-                </Label>
-              </div>
-            ))}
+                  <RadioGroupItem 
+                    value={option.value} 
+                    id={optionId}
+                    checked={isSelected}
+                  />
+                  <Label 
+                    htmlFor={optionId} 
+                    className="flex-1 cursor-pointer font-medium text-base"
+                  >
+                    {option.label}
+                  </Label>
+                  {isSelected && <CheckCircle2 className="h-5 w-5 text-primary" />}
+                </div>
+              );
+            })}
           </RadioGroup>
         );
 
@@ -342,64 +363,90 @@ const TakeSurvey = () => {
         
         return (
           <RadioGroup 
-            value={value} 
+            key={uniqueKey}
+            value={String(value) || ""} 
             onValueChange={(val) => handleResponseChange(question.id, val)}
             className="space-y-3"
           >
-            {mcqOptions.map((option: string, index: number) => (
-              <div key={index} className="flex items-center space-x-2 space-x-reverse p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer">
-                <RadioGroupItem value={option} id={`${question.id}-${index}`} />
-                <Label 
-                  htmlFor={`${question.id}-${index}`} 
-                  className="flex-1 cursor-pointer font-medium"
+            {mcqOptions.map((option: string, index: number) => {
+              const optionId = `q-${question.id}-opt-${index}-${question.order_index}`;
+              const isSelected = String(value) === option;
+              
+              return (
+                <div 
+                  key={optionId} 
+                  className={`flex items-center space-x-2 space-x-reverse p-4 border-2 rounded-lg transition-all cursor-pointer ${
+                    isSelected 
+                      ? 'border-primary bg-primary/5' 
+                      : 'border-border hover:border-primary/50 hover:bg-accent/30'
+                  }`}
+                  onClick={() => handleResponseChange(question.id, option)}
                 >
-                  {option}
-                </Label>
-              </div>
-            ))}
+                  <RadioGroupItem 
+                    value={option} 
+                    id={optionId}
+                    checked={isSelected}
+                  />
+                  <Label 
+                    htmlFor={optionId} 
+                    className="flex-1 cursor-pointer font-medium text-base"
+                  >
+                    {option}
+                  </Label>
+                  {isSelected && <CheckCircle2 className="h-5 w-5 text-primary" />}
+                </div>
+              );
+            })}
           </RadioGroup>
         );
 
       case "rating":
         return (
-          <div className="flex items-center gap-2">
-            {[1, 2, 3, 4, 5].map((rating) => (
-              <button
-                key={rating}
-                type="button"
-                onClick={() => handleResponseChange(question.id, rating)}
-                className={`p-2 rounded-lg transition-colors ${
-                  value >= rating 
-                    ? 'text-accent' 
-                    : 'text-muted-foreground hover:text-accent/70'
-                }`}
-              >
-                <Star className="h-6 w-6 fill-current" />
-              </button>
-            ))}
-            <span className="mr-2 text-sm text-muted-foreground">
-              {value ? `${value} من 5` : 'اختر التقييم'}
-            </span>
+          <div className="flex flex-col items-center gap-4 py-6">
+            <div className="flex items-center gap-3">
+              {[1, 2, 3, 4, 5].map((rating) => (
+                <button
+                  key={`rating-${question.id}-${rating}`}
+                  type="button"
+                  onClick={() => handleResponseChange(question.id, rating)}
+                  className={`p-3 rounded-xl transition-all transform hover:scale-110 ${
+                    value >= rating 
+                      ? 'text-accent scale-110' 
+                      : 'text-muted-foreground hover:text-accent/70'
+                  }`}
+                >
+                  <Star className="h-10 w-10 fill-current" />
+                </button>
+              ))}
+            </div>
+            <div className="text-center">
+              <span className="text-lg font-semibold text-primary">
+                {value ? `${value} من 5 نجوم` : 'اختر التقييم'}
+              </span>
+            </div>
           </div>
         );
 
       case "text":
         return (
           <Textarea
-            placeholder="اكتب إجابتك هنا..."
+            key={uniqueKey}
+            placeholder="اكتب إجابتك هنا بالتفصيل..."
             value={value || ""}
             onChange={(e) => handleResponseChange(question.id, e.target.value)}
-            rows={6}
-            className="resize-none"
+            rows={8}
+            className="resize-none text-base p-4 border-2 focus:border-primary"
           />
         );
 
       default:
         return (
           <Input
+            key={uniqueKey}
             placeholder="اكتب إجابتك هنا..."
             value={value || ""}
             onChange={(e) => handleResponseChange(question.id, e.target.value)}
+            className="text-base p-4 border-2 focus:border-primary"
           />
         );
     }
@@ -451,48 +498,72 @@ const TakeSurvey = () => {
   return (
     <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-4">
       <div className="w-full max-w-3xl">
+        {/* Survey Header - Fixed */}
+        <Card className="mb-6 bg-card/95 backdrop-blur shadow-elegant">
+          <CardHeader className="pb-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <CardTitle className="text-3xl mb-2">{survey.title}</CardTitle>
+                {survey.description && (
+                  <p className="text-muted-foreground text-base">{survey.description}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {survey.is_anonymous && (
+                  <Badge variant="secondary" className="text-xs">
+                    <CheckCircle2 className="h-3 w-3 ml-1" />
+                    استبيان مجهول
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+
+        {/* Progress Bar */}
         <div className="mb-6">
           <div className="flex justify-between items-center mb-2">
-            <h2 className="text-sm font-medium text-muted-foreground">
+            <h2 className="text-sm font-semibold text-foreground">
               السؤال {currentQuestionIndex + 1} من {questions.length}
             </h2>
-            <span className="text-sm font-medium text-primary">{Math.round(progress)}%</span>
+            <span className="text-sm font-semibold text-primary">{Math.round(progress)}%</span>
           </div>
-          <div className="h-2 bg-secondary rounded-full overflow-hidden">
+          <div className="h-3 bg-secondary rounded-full overflow-hidden shadow-inner">
             <div 
-              className="h-full bg-gradient-primary transition-all duration-300"
+              className="h-full bg-gradient-primary transition-all duration-500 ease-out"
               style={{ width: `${progress}%` }}
             />
           </div>
         </div>
 
-        <Card className={`shadow-elegant ${hasError ? 'border-red-500' : ''}`}>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle className="text-2xl mb-2">{survey.title}</CardTitle>
-                <p className="text-muted-foreground">{survey.description}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {currentQuestion?.is_required && (
-                  <Badge variant="destructive" className="text-xs">مطلوب</Badge>
-                )}
-                {survey.is_anonymous && (
-                  <Badge variant="outline" className="text-xs">مجهول</Badge>
-                )}
+        {/* Question Card */}
+        <Card className={`shadow-elegant transition-all ${hasError ? 'border-2 border-red-500 animate-pulse' : 'border'}`}>
+          <CardHeader className="border-b bg-accent/5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="outline" className="text-xs">
+                    سؤال {currentQuestionIndex + 1}
+                  </Badge>
+                  {currentQuestion?.is_required && (
+                    <Badge variant="destructive" className="text-xs">
+                      * مطلوب
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="min-h-[300px]">
-              <h3 className="text-lg font-semibold mb-4">
+          <CardContent className="space-y-6 py-8">
+            <div className="min-h-[350px]">
+              <h3 className="text-xl font-bold mb-6 text-foreground leading-relaxed">
                 {currentQuestion?.text}
               </h3>
 
               {currentQuestion?.help_text && (
-                <div className="flex items-start gap-2 mb-6 p-3 bg-blue-50 rounded-lg">
-                  <HelpCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <p className="text-sm text-blue-800">{currentQuestion.help_text}</p>
+                <div className="flex items-start gap-3 mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <HelpCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-blue-800 leading-relaxed">{currentQuestion.help_text}</p>
                 </div>
               )}
 
