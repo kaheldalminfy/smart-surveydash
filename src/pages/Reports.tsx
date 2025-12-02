@@ -14,6 +14,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Download, FileSpreadsheet, FileText, Sparkles, TrendingUp, ArrowRight, ArrowLeft, Save, Trash2, Edit as EditIcon } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +34,9 @@ const Reports = () => {
   const [reportStatus, setReportStatus] = useState("responding");
   const [collegeLogo, setCollegeLogo] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editedSummary, setEditedSummary] = useState("");
+  const [editedRecommendations, setEditedRecommendations] = useState("");
 
   useEffect(() => {
     loadReport();
@@ -58,6 +63,8 @@ const Reports = () => {
         setSemester(reportData.semester || "");
         setAcademicYear(reportData.academic_year || "");
         setReportStatus(reportData.status || "responding");
+        setEditedSummary(reportData.summary || "");
+        setEditedRecommendations(reportData.recommendations_text || "");
       }
     } catch (error) {
       console.error("Error loading report:", error);
@@ -126,6 +133,33 @@ const Reports = () => {
     });
 
     navigate("/surveys");
+  };
+
+  const handleSaveReportContent = async () => {
+    const { error } = await supabase
+      .from("reports")
+      .update({
+        summary: editedSummary,
+        recommendations_text: editedRecommendations,
+      })
+      .eq("id", report.id);
+
+    if (error) {
+      toast({
+        title: "خطأ",
+        description: "فشل في حفظ محتوى التقرير",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "تم الحفظ",
+      description: "تم حفظ محتوى التقرير بنجاح",
+    });
+
+    setEditDialogOpen(false);
+    loadReport();
   };
 
   const generateReport = async () => {
@@ -355,15 +389,31 @@ const Reports = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>ملخص تنفيذي من AI</CardTitle>
-            <CardDescription>تحليل آلي للنتائج والتوصيات</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>ملخص تنفيذي من AI</CardTitle>
+                <CardDescription>تحليل آلي للنتائج والتوصيات</CardDescription>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  setEditedSummary(report.summary || "");
+                  setEditedRecommendations(report.recommendations_text || "");
+                  setEditDialogOpen(true);
+                }}
+              >
+                <EditIcon className="h-4 w-4 ml-2" />
+                تعديل المحتوى
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {report.summary && (
               <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
                 <div className="flex items-start gap-3">
                   <Sparkles className="h-5 w-5 text-primary mt-0.5" />
-                  <div>
+                  <div className="flex-1">
                     <h3 className="font-semibold mb-2">الملخص التنفيذي:</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
                       {report.summary}
@@ -377,7 +427,7 @@ const Reports = () => {
               <div className="p-4 bg-accent/5 rounded-lg border border-accent/20">
                 <div className="flex items-start gap-3">
                   <FileText className="h-5 w-5 text-accent mt-0.5" />
-                  <div>
+                  <div className="flex-1">
                     <h3 className="font-semibold mb-2">التوصيات:</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
                       {report.recommendations_text}
@@ -441,6 +491,63 @@ const Reports = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit Report Content Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>تعديل محتوى التقرير</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="edit-summary">الملخص التنفيذي</Label>
+              <Textarea
+                id="edit-summary"
+                placeholder="اكتب الملخص التنفيذي للتقرير..."
+                rows={8}
+                value={editedSummary}
+                onChange={(e) => setEditedSummary(e.target.value)}
+                className="resize-none"
+              />
+              <p className="text-sm text-muted-foreground">
+                اكتب ملخصاً واضحاً ومختصراً للنتائج الرئيسية للاستبيان
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-recommendations">التوصيات</Label>
+              <Textarea
+                id="edit-recommendations"
+                placeholder="اكتب التوصيات المقترحة بناءً على نتائج الاستبيان..."
+                rows={8}
+                value={editedRecommendations}
+                onChange={(e) => setEditedRecommendations(e.target.value)}
+                className="resize-none"
+              />
+              <p className="text-sm text-muted-foreground">
+                اكتب توصيات قابلة للتنفيذ لتحسين الأداء بناءً على النتائج
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setEditDialogOpen(false);
+                  setEditedSummary(report.summary || "");
+                  setEditedRecommendations(report.recommendations_text || "");
+                }}
+              >
+                إلغاء
+              </Button>
+              <Button onClick={handleSaveReportContent}>
+                <Save className="h-4 w-4 ml-2" />
+                حفظ التعديلات
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
