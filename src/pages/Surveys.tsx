@@ -47,6 +47,7 @@ const Surveys = () => {
       .eq("user_id", user.id);
 
     const isAdmin = userRoles?.some(r => r.role === 'admin');
+    const isDean = userRoles?.some(r => r.role === 'dean');
     const userProgramIds = userRoles?.map(r => r.program_id).filter(Boolean);
 
     // Build query based on role
@@ -58,8 +59,8 @@ const Surveys = () => {
         responses(count)
       `);
 
-    // Filter by program if not admin
-    if (!isAdmin && userProgramIds && userProgramIds.length > 0) {
+    // Filter by program if not admin or dean
+    if (!isAdmin && !isDean && userProgramIds && userProgramIds.length > 0) {
       query = query.in("program_id", userProgramIds);
     }
 
