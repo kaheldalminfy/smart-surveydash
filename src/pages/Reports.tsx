@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download, FileSpreadsheet, FileText, Sparkles, TrendingUp, ArrowRight, ArrowLeft, Save } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Sparkles, TrendingUp, ArrowRight, ArrowLeft, Save, Trash2, Edit as EditIcon } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +31,7 @@ const Reports = () => {
   const [academicYear, setAcademicYear] = useState("");
   const [reportStatus, setReportStatus] = useState("responding");
   const [collegeLogo, setCollegeLogo] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     loadReport();
@@ -101,6 +103,29 @@ const Reports = () => {
     });
 
     loadReport();
+  };
+
+  const handleDeleteReport = async () => {
+    const { error } = await supabase
+      .from("reports")
+      .delete()
+      .eq("id", report.id);
+
+    if (error) {
+      toast({
+        title: "خطأ",
+        description: "فشل في حذف التقرير",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "تم الحذف",
+      description: "تم حذف التقرير بنجاح",
+    });
+
+    navigate("/surveys");
   };
 
   const generateReport = async () => {
@@ -188,7 +213,7 @@ const Reports = () => {
                 {survey?.title} - {survey?.programs?.name}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button
                 variant="ghost"
                 size="icon"
@@ -206,14 +231,21 @@ const Reports = () => {
                 onClick={() => exportToPDF(report, survey, stats, collegeLogo)}
               >
                 <Download className="h-4 w-4 ml-2" />
-                تنزيل PDF
+                PDF
               </Button>
               <Button 
                 variant="secondary" 
                 onClick={() => exportToExcel(report, survey, stats)}
               >
                 <FileSpreadsheet className="h-4 w-4 ml-2" />
-                تنزيل Excel
+                Excel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                <Trash2 className="h-4 w-4 ml-2" />
+                حذف التقرير
               </Button>
             </div>
           </div>
@@ -392,6 +424,23 @@ const Reports = () => {
           </Card>
         )}
       </main>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>تأكيد حذف التقرير</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد من حذف هذا التقرير؟ لا يمكن التراجع عن هذا الإجراء.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteReport}>
+              حذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
