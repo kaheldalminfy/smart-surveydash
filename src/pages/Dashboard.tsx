@@ -6,10 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { BarChart3, FileText, Plus, TrendingUp, Users, ClipboardList, AlertCircle, CheckCircle2, Archive, LogOut, BarChart, Home, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t, language } = useLanguage();
   const [stats, setStats] = useState({
     activeSurveys: 0,
     totalResponses: 0,
@@ -38,18 +41,15 @@ const Dashboard = () => {
   };
 
   const loadStats = async () => {
-    // Get active surveys count
     const { count: activeSurveys } = await supabase
       .from("surveys")
       .select("*", { count: "exact", head: true })
       .eq("status", "active");
 
-    // Get total responses count
     const { count: totalResponses } = await supabase
       .from("responses")
       .select("*", { count: "exact", head: true });
 
-    // Get reports count
     const { count: readyReports } = await supabase
       .from("reports")
       .select("*", { count: "exact", head: true });
@@ -81,18 +81,25 @@ const Dashboard = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast({
-      title: "تم تسجيل الخروج",
-      description: "نراك قريباً",
+      title: language === 'ar' ? "تم تسجيل الخروج" : "Logged out",
+      description: language === 'ar' ? "نراك قريباً" : "See you soon",
     });
     navigate("/");
   };
 
   const statsDisplay = [
-    { label: "الاستبيانات النشطة", value: stats.activeSurveys.toString(), icon: FileText, color: "text-primary" },
-    { label: "إجمالي الاستجابات", value: stats.totalResponses.toString(), icon: Users, color: "text-secondary" },
-    { label: "معدل الاستجابة", value: stats.responseRate, icon: TrendingUp, color: "text-accent" },
-    { label: "التقارير الجاهزة", value: stats.readyReports.toString(), icon: BarChart3, color: "text-muted-foreground" },
+    { label: t('dashboard.activeSurveys'), value: stats.activeSurveys.toString(), icon: FileText, color: "text-primary" },
+    { label: t('dashboard.totalResponses'), value: stats.totalResponses.toString(), icon: Users, color: "text-secondary" },
+    { label: t('dashboard.responseRate'), value: stats.responseRate, icon: TrendingUp, color: "text-accent" },
+    { label: t('dashboard.readyReports'), value: stats.readyReports.toString(), icon: BarChart3, color: "text-muted-foreground" },
   ];
+
+  const getSurveyStatusLabel = (status: string) => {
+    if (language === 'ar') {
+      return status === "active" ? "نشط" : status === "closed" ? "مغلق" : "مسودة";
+    }
+    return status === "active" ? "Active" : status === "closed" ? "Closed" : "Draft";
+  };
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
@@ -103,28 +110,29 @@ const Dashboard = () => {
               variant="ghost"
               size="icon"
               onClick={() => navigate("/")}
-              title="الصفحة الرئيسية"
+              title={t('nav.home')}
             >
               <Home className="h-5 w-5" />
             </Button>
             <ClipboardList className="h-8 w-8 text-primary" />
             <div>
-              <h1 className="text-2xl font-bold">لوحة التحكم</h1>
+              <h1 className="text-2xl font-bold">{t('dashboard.title')}</h1>
               <p className="text-sm text-muted-foreground">
-                {user?.full_name ? `مرحباً ${user.full_name}` : "منظومة الاستبيانات الذكية"}
+                {user?.full_name ? `${t('dashboard.welcomeUser')} ${user.full_name}` : t('dashboard.systemTitle')}
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <LanguageToggle />
             <Link to="/surveys/new">
               <Button variant="hero" size="lg">
                 <Plus className="h-5 w-5 ml-2" />
-                استبيان جديد
+                {t('dashboard.newSurvey')}
               </Button>
             </Link>
             <Button variant="outline" onClick={handleLogout}>
               <LogOut className="h-5 w-5 ml-2" />
-              تسجيل الخروج
+              {t('nav.logout')}
             </Button>
           </div>
         </div>
@@ -150,8 +158,8 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>الاستبيانات الأخيرة</CardTitle>
-              <CardDescription>الاستبيانات النشطة وحالة الاستجابات</CardDescription>
+              <CardTitle>{t('dashboard.recentSurveys')}</CardTitle>
+              <CardDescription>{t('dashboard.recentSurveysDesc')}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -161,79 +169,79 @@ const Dashboard = () => {
                       <div className="flex-1">
                         <h3 className="font-semibold mb-1">{survey.title}</h3>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <span>{survey.responses?.length || 0} استجابة</span>
+                          <span>{survey.responses?.length || 0} {t('dashboard.response')}</span>
                           <span>•</span>
                           <Badge variant={survey.status === "active" ? "default" : "secondary"}>
-                            {survey.status === "active" ? "نشط" : survey.status === "closed" ? "مغلق" : "مسودة"}
+                            {getSurveyStatusLabel(survey.status)}
                           </Badge>
                         </div>
                       </div>
                       <Link to={`/reports/${survey.id}`}>
-                        <Button variant="outline" size="sm">عرض التقرير</Button>
+                        <Button variant="outline" size="sm">{t('dashboard.viewReport')}</Button>
                       </Link>
                     </div>
                   ))
                 ) : (
-                  <p className="text-center text-muted-foreground py-8">لا توجد استبيانات حالياً</p>
+                  <p className="text-center text-muted-foreground py-8">{t('dashboard.noSurveys')}</p>
                 )}
               </div>
               <Link to="/surveys" className="block mt-4">
-                <Button variant="ghost" className="w-full">عرض جميع الاستبيانات</Button>
+                <Button variant="ghost" className="w-full">{t('dashboard.viewAllSurveys')}</Button>
               </Link>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>الإجراءات السريعة</CardTitle>
+              <CardTitle>{t('dashboard.quickActions')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <Link to="/surveys/new">
                 <Button variant="outline" className="w-full justify-start">
                   <Plus className="h-4 w-4 ml-2" />
-                  إنشاء استبيان جديد
+                  {t('dashboard.createSurvey')}
                 </Button>
               </Link>
               <Link to="/surveys">
                 <Button variant="outline" className="w-full justify-start">
                   <FileText className="h-4 w-4 ml-2" />
-                  إدارة الاستبيانات
+                  {t('dashboard.manageSurveys')}
                 </Button>
               </Link>
               <Link to="/complaints">
                 <Button variant="outline" className="w-full justify-start">
                   <AlertCircle className="h-4 w-4 ml-2" />
-                  إدارة الشكاوى
+                  {t('dashboard.manageComplaints')}
                 </Button>
               </Link>
               <Link to="/comparison">
                 <Button variant="outline" className="w-full justify-start">
                   <BarChart className="h-4 w-4 ml-2" />
-                  مقارنة البرامج
+                  {t('nav.comparison')}
                 </Button>
               </Link>
               <Link to="/recommendations">
                 <Button variant="outline" className="w-full justify-start">
                   <CheckCircle2 className="h-4 w-4 ml-2" />
-                  متابعة التوصيات
+                  {t('dashboard.followRecommendations')}
                 </Button>
               </Link>
               <Link to="/archives">
                 <Button variant="outline" className="w-full justify-start">
                   <Archive className="h-4 w-4 ml-2" />
-                  الأرشيف الفصلي
+                  {t('dashboard.semesterArchive')}
                 </Button>
               </Link>
               <Link to="/users">
                 <Button variant="outline" className="w-full justify-start">
                   <Users className="h-4 w-4 ml-2" />
-                  إدارة المستخدمين
+                  {t('dashboard.manageUsers')}
                 </Button>
               </Link>
               <Link to="/system-settings">
                 <Button variant="outline" className="w-full justify-start">
                   <Settings className="h-4 w-4 ml-2" />
-                  إعدادات النظام
+                  {t('dashboard.systemSettings')}
                 </Button>
               </Link>
             </CardContent>
