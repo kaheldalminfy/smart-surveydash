@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -26,33 +27,35 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/take/:id" element={<TakeSurvey />} />
-          <Route path="/survey-complete" element={<SurveyComplete />} />
-          <Route path="/submit-complaint" element={<SubmitComplaint />} />
-          <Route path="/complaint-submitted" element={<ComplaintSubmitted />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/surveys" element={<ProtectedRoute><Surveys /></ProtectedRoute>} />
-          <Route path="/surveys/new" element={<ProtectedRoute><SurveyDesigner /></ProtectedRoute>} />
-          <Route path="/surveys/edit/:id" element={<ProtectedRoute><SurveyDesigner /></ProtectedRoute>} />
-          <Route path="/reports/:id" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-          <Route path="/complaints" element={<ProtectedRoute><Complaints /></ProtectedRoute>} />
-          <Route path="/recommendations" element={<ProtectedRoute><Recommendations /></ProtectedRoute>} />
-          <Route path="/archives" element={<ProtectedRoute><Archives /></ProtectedRoute>} />
-          <Route path="/comparison" element={<ProtectedRoute><ProgramComparison /></ProtectedRoute>} />
-          <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
-          <Route path="/system-settings" element={<ProtectedRoute><SystemSettings /></ProtectedRoute>} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <LanguageProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/take/:id" element={<TakeSurvey />} />
+            <Route path="/survey-complete" element={<SurveyComplete />} />
+            <Route path="/submit-complaint" element={<SubmitComplaint />} />
+            <Route path="/complaint-submitted" element={<ComplaintSubmitted />} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/surveys" element={<ProtectedRoute><Surveys /></ProtectedRoute>} />
+            <Route path="/surveys/new" element={<ProtectedRoute><SurveyDesigner /></ProtectedRoute>} />
+            <Route path="/surveys/edit/:id" element={<ProtectedRoute><SurveyDesigner /></ProtectedRoute>} />
+            <Route path="/reports/:id" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+            <Route path="/complaints" element={<ProtectedRoute><Complaints /></ProtectedRoute>} />
+            <Route path="/recommendations" element={<ProtectedRoute><Recommendations /></ProtectedRoute>} />
+            <Route path="/archives" element={<ProtectedRoute><Archives /></ProtectedRoute>} />
+            <Route path="/comparison" element={<ProtectedRoute><ProgramComparison /></ProtectedRoute>} />
+            <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
+            <Route path="/system-settings" element={<ProtectedRoute><SystemSettings /></ProtectedRoute>} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </LanguageProvider>
   </QueryClientProvider>
 );
 
