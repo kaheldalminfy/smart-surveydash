@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download, FileSpreadsheet, FileText, Sparkles, TrendingUp, ArrowRight, ArrowLeft, Save, Trash2, Edit as EditIcon, ChevronDown, ChevronUp, BarChart3, Users } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Sparkles, TrendingUp, ArrowRight, ArrowLeft, Save, Trash2, Edit as EditIcon, ChevronDown, ChevronUp, BarChart3, Users, Filter } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from "recharts";
@@ -41,6 +41,10 @@ const Reports = () => {
   const [editedRecommendations, setEditedRecommendations] = useState("");
   const [detailedAnswers, setDetailedAnswers] = useState<any[]>([]);
   const [expandedQuestions, setExpandedQuestions] = useState<string[]>([]);
+  const [allQuestions, setAllQuestions] = useState<any[]>([]);
+  const [allResponses, setAllResponses] = useState<any[]>([]);
+  const [filterQuestion, setFilterQuestion] = useState<string>("");
+  const [filterValue, setFilterValue] = useState<string>("");
 
   useEffect(() => {
     loadReport();
@@ -109,87 +113,164 @@ const Reports = () => {
 
       if (rError) throw rError;
 
-      // Process data: for each question, get all answers with respondent info
-      const processedData = questions?.map((question) => {
-        const answersForQuestion = responses?.flatMap((response, index) => {
-          const answer = response.answers?.find((a: any) => a.question_id === question.id);
-          if (answer) {
-            return {
-              ...answer,
-              respondent_number: index + 1,
-              response_id: response.id,
-              submitted_at: response.submitted_at,
-            };
-          }
-          return [];
-        }).filter(Boolean) || [];
-
-        // Calculate distribution for likert/rating questions
-        let distribution: any[] = [];
-        if (question.type === 'likert' || question.type === 'rating') {
-          const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-          answersForQuestion.forEach((a: any) => {
-            if (a.numeric_value && counts[a.numeric_value] !== undefined) {
-              counts[a.numeric_value]++;
-            }
-          });
-          distribution = [
-            { name: 'غير موافق بشدة', value: counts[1], fill: '#ef4444' },
-            { name: 'غير موافق', value: counts[2], fill: '#f97316' },
-            { name: 'محايد', value: counts[3], fill: '#eab308' },
-            { name: 'موافق', value: counts[4], fill: '#22c55e' },
-            { name: 'موافق بشدة', value: counts[5], fill: '#16a34a' },
-          ];
-        }
-
-        // Calculate mean for likert/rating
-        let mean = 0;
-        let stdDev = 0;
-        if (question.type === 'likert' || question.type === 'rating') {
-          const numericValues = answersForQuestion
-            .filter((a: any) => a.numeric_value !== null)
-            .map((a: any) => a.numeric_value);
-          
-          if (numericValues.length > 0) {
-            mean = numericValues.reduce((sum: number, val: number) => sum + val, 0) / numericValues.length;
-            const variance = numericValues.reduce((sum: number, val: number) => sum + Math.pow(val - mean, 2), 0) / numericValues.length;
-            stdDev = Math.sqrt(variance);
-          }
-        }
-
-        // Count MCQ responses
-        let mcqDistribution: any[] = [];
-        if (question.type === 'mcq' && question.options) {
-          const options = Array.isArray(question.options) ? question.options : [];
-          const counts: Record<string, number> = {};
-          options.forEach((opt: string) => { counts[opt] = 0; });
-          answersForQuestion.forEach((a: any) => {
-            if (a.value && counts[a.value] !== undefined) {
-              counts[a.value]++;
-            }
-          });
-          mcqDistribution = options.map((opt: string, i: number) => ({
-            name: opt,
-            value: counts[opt],
-            fill: ['#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b'][i % 5],
-          }));
-        }
-
-        return {
-          ...question,
-          answers: answersForQuestion,
-          distribution,
-          mcqDistribution,
-          mean: mean.toFixed(2),
-          stdDev: stdDev.toFixed(2),
-          responseCount: answersForQuestion.length,
-        };
-      }) || [];
-
-      setDetailedAnswers(processedData);
+      setAllQuestions(questions || []);
+      setAllResponses(responses || []);
+      
+      processDataWithFilter(questions || [], responses || [], "", "");
     } catch (error) {
       console.error("Error loading detailed answers:", error);
     }
+  };
+
+  const processDataWithFilter = (questions: any[], responses: any[], filterQ: string, filterV: string) => {
+    // Filter responses based on selected question and value
+    let filteredResponses = responses;
+    
+    if (filterQ && filterV) {
+      filteredResponses = responses.filter(response => {
+        const answer = response.answers?.find((a: any) => a.question_id === filterQ);
+        return answer && (answer.value === filterV || String(answer.numeric_value) === filterV);
+      });
+    }
+
+    // Process data: for each question, get all answers with respondent info
+    const processedData = questions.map((question) => {
+      const answersForQuestion = filteredResponses.flatMap((response, index) => {
+        const answer = response.answers?.find((a: any) => a.question_id === question.id);
+        if (answer) {
+          return {
+            ...answer,
+            respondent_number: index + 1,
+            response_id: response.id,
+            submitted_at: response.submitted_at,
+          };
+        }
+        return [];
+      }).filter(Boolean);
+
+      // Calculate distribution for likert/rating questions
+      let distribution: any[] = [];
+      if (question.type === 'likert' || question.type === 'rating') {
+        const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+        answersForQuestion.forEach((a: any) => {
+          if (a.numeric_value && counts[a.numeric_value] !== undefined) {
+            counts[a.numeric_value]++;
+          }
+        });
+        distribution = [
+          { name: 'غير موافق بشدة', value: counts[1], fill: '#ef4444' },
+          { name: 'غير موافق', value: counts[2], fill: '#f97316' },
+          { name: 'محايد', value: counts[3], fill: '#eab308' },
+          { name: 'موافق', value: counts[4], fill: '#22c55e' },
+          { name: 'موافق بشدة', value: counts[5], fill: '#16a34a' },
+        ];
+      }
+
+      // Calculate mean for likert/rating
+      let mean = 0;
+      let stdDev = 0;
+      if (question.type === 'likert' || question.type === 'rating') {
+        const numericValues = answersForQuestion
+          .filter((a: any) => a.numeric_value !== null)
+          .map((a: any) => a.numeric_value);
+        
+        if (numericValues.length > 0) {
+          mean = numericValues.reduce((sum: number, val: number) => sum + val, 0) / numericValues.length;
+          const variance = numericValues.reduce((sum: number, val: number) => sum + Math.pow(val - mean, 2), 0) / numericValues.length;
+          stdDev = Math.sqrt(variance);
+        }
+      }
+
+      // Count MCQ responses
+      let mcqDistribution: any[] = [];
+      if (question.type === 'mcq' && question.options) {
+        const options = Array.isArray(question.options) ? question.options : [];
+        const counts: Record<string, number> = {};
+        options.forEach((opt: string) => { counts[opt] = 0; });
+        answersForQuestion.forEach((a: any) => {
+          if (a.value && counts[a.value] !== undefined) {
+            counts[a.value]++;
+          }
+        });
+        mcqDistribution = options.map((opt: string, i: number) => ({
+          name: opt,
+          value: counts[opt],
+          fill: ['#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b'][i % 5],
+        }));
+      }
+
+      // Count text responses
+      let textResponses: string[] = [];
+      if (question.type === 'text') {
+        textResponses = answersForQuestion
+          .filter((a: any) => a.value && a.value.trim())
+          .map((a: any) => a.value);
+      }
+
+      return {
+        ...question,
+        answers: answersForQuestion,
+        distribution,
+        mcqDistribution,
+        textResponses,
+        mean: mean.toFixed(2),
+        stdDev: stdDev.toFixed(2),
+        responseCount: answersForQuestion.length,
+      };
+    });
+
+    setDetailedAnswers(processedData);
+  };
+
+  // Get unique values for the selected filter question
+  const getFilterOptions = () => {
+    if (!filterQuestion) return [];
+    
+    const question = allQuestions.find(q => q.id === filterQuestion);
+    if (!question) return [];
+
+    // For MCQ questions, use the predefined options
+    if (question.type === 'mcq' && question.options) {
+      return Array.isArray(question.options) ? question.options : [];
+    }
+
+    // For text questions, get unique values from responses
+    if (question.type === 'text') {
+      const uniqueValues = new Set<string>();
+      allResponses.forEach(response => {
+        const answer = response.answers?.find((a: any) => a.question_id === filterQuestion);
+        if (answer?.value && answer.value.trim()) {
+          uniqueValues.add(answer.value.trim());
+        }
+      });
+      return Array.from(uniqueValues);
+    }
+
+    // For likert/rating, return numeric options
+    if (question.type === 'likert' || question.type === 'rating') {
+      return ['1', '2', '3', '4', '5'];
+    }
+
+    return [];
+  };
+
+  const applyFilter = () => {
+    processDataWithFilter(allQuestions, allResponses, filterQuestion, filterValue);
+  };
+
+  const clearFilter = () => {
+    setFilterQuestion("");
+    setFilterValue("");
+    processDataWithFilter(allQuestions, allResponses, "", "");
+  };
+
+  const getFilteredResponsesCount = () => {
+    if (!filterQuestion || !filterValue) return allResponses.length;
+    
+    return allResponses.filter(response => {
+      const answer = response.answers?.find((a: any) => a.question_id === filterQuestion);
+      return answer && (answer.value === filterValue || String(answer.numeric_value) === filterValue);
+    }).length;
   };
 
   const toggleQuestion = (questionId: string) => {
@@ -451,6 +532,104 @@ const Reports = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Filter Card */}
+        {allQuestions.length > 0 && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                فلتر التحليل حسب سؤال محدد
+              </CardTitle>
+              <CardDescription>
+                اختر سؤالاً وقيمة لتصفية التحليل (مثال: تحليل استجابات عضو هيئة تدريس معين)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>اختر السؤال للفلترة</Label>
+                  <Select 
+                    value={filterQuestion} 
+                    onValueChange={(val) => {
+                      setFilterQuestion(val);
+                      setFilterValue("");
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر سؤالاً..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allQuestions.map((q, i) => (
+                        <SelectItem key={q.id} value={q.id}>
+                          س{i + 1}: {q.text.substring(0, 50)}{q.text.length > 50 ? '...' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>اختر القيمة</Label>
+                  <Select 
+                    value={filterValue} 
+                    onValueChange={setFilterValue}
+                    disabled={!filterQuestion}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={filterQuestion ? "اختر قيمة..." : "اختر سؤالاً أولاً"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getFilterOptions().map((opt: string, i: number) => (
+                        <SelectItem key={i} value={opt}>
+                          {allQuestions.find(q => q.id === filterQuestion)?.type === 'likert' || 
+                           allQuestions.find(q => q.id === filterQuestion)?.type === 'rating'
+                            ? `${opt} - ${opt === '1' ? 'غير موافق بشدة' : opt === '2' ? 'غير موافق' : opt === '3' ? 'محايد' : opt === '4' ? 'موافق' : 'موافق بشدة'}`
+                            : opt
+                          }
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>&nbsp;</Label>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={applyFilter}
+                      disabled={!filterQuestion || !filterValue}
+                      className="flex-1"
+                    >
+                      تطبيق الفلتر
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={clearFilter}
+                      disabled={!filterQuestion && !filterValue}
+                    >
+                      مسح
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {filterQuestion && filterValue && (
+                <div className="mt-4 p-3 bg-card rounded-lg border flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="default">فلتر نشط</Badge>
+                    <span className="text-sm">
+                      {allQuestions.find(q => q.id === filterQuestion)?.text.substring(0, 40)}... = <strong>{filterValue}</strong>
+                    </span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {getFilteredResponsesCount()} من {allResponses.length} استجابة
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
