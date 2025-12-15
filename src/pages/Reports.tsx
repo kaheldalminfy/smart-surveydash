@@ -13,13 +13,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download, FileSpreadsheet, FileText, Sparkles, TrendingUp, ArrowRight, ArrowLeft, Save, Trash2, Edit as EditIcon } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Sparkles, TrendingUp, ArrowRight, ArrowLeft, Save, Trash2, Edit as EditIcon, ChevronDown, ChevronUp, BarChart3, Users } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { exportToPDF, exportToExcel } from "@/utils/exportReport";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const Reports = () => {
   const { id } = useParams();
@@ -37,10 +39,13 @@ const Reports = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editedSummary, setEditedSummary] = useState("");
   const [editedRecommendations, setEditedRecommendations] = useState("");
+  const [detailedAnswers, setDetailedAnswers] = useState<any[]>([]);
+  const [expandedQuestions, setExpandedQuestions] = useState<string[]>([]);
 
   useEffect(() => {
     loadReport();
     loadSettings();
+    if (id) loadDetailedAnswers();
   }, [id]);
 
   const loadReport = async () => {
@@ -83,6 +88,116 @@ const Reports = () => {
     if (data?.value) {
       setCollegeLogo(data.value);
     }
+  };
+
+  const loadDetailedAnswers = async () => {
+    try {
+      // Get all questions for this survey
+      const { data: questions, error: qError } = await supabase
+        .from("questions")
+        .select("*")
+        .eq("survey_id", id)
+        .order("order_index");
+
+      if (qError) throw qError;
+
+      // Get all responses and answers for this survey
+      const { data: responses, error: rError } = await supabase
+        .from("responses")
+        .select("*, answers(*)")
+        .eq("survey_id", id);
+
+      if (rError) throw rError;
+
+      // Process data: for each question, get all answers with respondent info
+      const processedData = questions?.map((question) => {
+        const answersForQuestion = responses?.flatMap((response, index) => {
+          const answer = response.answers?.find((a: any) => a.question_id === question.id);
+          if (answer) {
+            return {
+              ...answer,
+              respondent_number: index + 1,
+              response_id: response.id,
+              submitted_at: response.submitted_at,
+            };
+          }
+          return [];
+        }).filter(Boolean) || [];
+
+        // Calculate distribution for likert/rating questions
+        let distribution: any[] = [];
+        if (question.type === 'likert' || question.type === 'rating') {
+          const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+          answersForQuestion.forEach((a: any) => {
+            if (a.numeric_value && counts[a.numeric_value] !== undefined) {
+              counts[a.numeric_value]++;
+            }
+          });
+          distribution = [
+            { name: 'غير موافق بشدة', value: counts[1], fill: '#ef4444' },
+            { name: 'غير موافق', value: counts[2], fill: '#f97316' },
+            { name: 'محايد', value: counts[3], fill: '#eab308' },
+            { name: 'موافق', value: counts[4], fill: '#22c55e' },
+            { name: 'موافق بشدة', value: counts[5], fill: '#16a34a' },
+          ];
+        }
+
+        // Calculate mean for likert/rating
+        let mean = 0;
+        let stdDev = 0;
+        if (question.type === 'likert' || question.type === 'rating') {
+          const numericValues = answersForQuestion
+            .filter((a: any) => a.numeric_value !== null)
+            .map((a: any) => a.numeric_value);
+          
+          if (numericValues.length > 0) {
+            mean = numericValues.reduce((sum: number, val: number) => sum + val, 0) / numericValues.length;
+            const variance = numericValues.reduce((sum: number, val: number) => sum + Math.pow(val - mean, 2), 0) / numericValues.length;
+            stdDev = Math.sqrt(variance);
+          }
+        }
+
+        // Count MCQ responses
+        let mcqDistribution: any[] = [];
+        if (question.type === 'mcq' && question.options) {
+          const options = Array.isArray(question.options) ? question.options : [];
+          const counts: Record<string, number> = {};
+          options.forEach((opt: string) => { counts[opt] = 0; });
+          answersForQuestion.forEach((a: any) => {
+            if (a.value && counts[a.value] !== undefined) {
+              counts[a.value]++;
+            }
+          });
+          mcqDistribution = options.map((opt: string, i: number) => ({
+            name: opt,
+            value: counts[opt],
+            fill: ['#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b'][i % 5],
+          }));
+        }
+
+        return {
+          ...question,
+          answers: answersForQuestion,
+          distribution,
+          mcqDistribution,
+          mean: mean.toFixed(2),
+          stdDev: stdDev.toFixed(2),
+          responseCount: answersForQuestion.length,
+        };
+      }) || [];
+
+      setDetailedAnswers(processedData);
+    } catch (error) {
+      console.error("Error loading detailed answers:", error);
+    }
+  };
+
+  const toggleQuestion = (questionId: string) => {
+    setExpandedQuestions(prev => 
+      prev.includes(questionId) 
+        ? prev.filter(id => id !== questionId)
+        : [...prev, questionId]
+    );
   };
 
   const saveReportMetadata = async () => {
@@ -439,37 +554,273 @@ const Reports = () => {
           </CardContent>
         </Card>
 
-        {questionsStats.length > 0 && (
+        {/* Questions Overview Chart */}
+        {detailedAnswers.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>تفاصيل النتائج حسب الأسئلة</CardTitle>
-              <CardDescription>إحصائيات تفصيلية لكل سؤال</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                متوسط كل سؤال
+              </CardTitle>
+              <CardDescription>مقارنة متوسطات الأسئلة (للأسئلة من نوع ليكرت والتقييم)</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {questionsStats.map((item: any, index: number) => (
-                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/5 transition-colors">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="secondary">سؤال {index + 1}</Badge>
-                        <Badge variant="outline">{item.type}</Badge>
-                      </div>
-                      <h4 className="font-medium mb-2">{item.question_text}</h4>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span>عدد الإجابات: <Badge variant="outline">{item.response_count}</Badge></span>
-                        {item.mean && <span>المتوسط: <Badge variant="outline">{item.mean}</Badge></span>}
-                        {item.std_dev && <span>الانحراف: <Badge variant="outline">{item.std_dev}</Badge></span>}
-                      </div>
-                    </div>
-                    {item.mean && (
-                      <div className="text-right">
-                        <div className="text-3xl font-bold text-primary">{item.mean}</div>
-                        <p className="text-xs text-muted-foreground">من 5.0</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={detailedAnswers
+                      .filter(q => q.type === 'likert' || q.type === 'rating')
+                      .map((q, i) => ({
+                        name: `س${i + 1}`,
+                        fullName: q.text,
+                        mean: parseFloat(q.mean) || 0,
+                        responses: q.responseCount,
+                      }))}
+                    layout="vertical"
+                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" domain={[0, 5]} />
+                    <YAxis type="category" dataKey="name" width={40} />
+                    <Tooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-card p-3 rounded-lg border shadow-lg max-w-xs">
+                              <p className="font-medium text-sm mb-1">{data.fullName}</p>
+                              <p className="text-primary font-bold">المتوسط: {data.mean.toFixed(2)}</p>
+                              <p className="text-muted-foreground text-xs">عدد الاستجابات: {data.responses}</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Bar 
+                      dataKey="mean" 
+                      fill="hsl(var(--primary))"
+                      radius={[0, 4, 4, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Detailed Questions with Responses */}
+        {detailedAnswers.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                تفاصيل الاستجابات لكل سؤال
+              </CardTitle>
+              <CardDescription>اضغط على أي سؤال لعرض جميع الاستجابات الفردية</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {detailedAnswers.map((question, index) => (
+                <Collapsible 
+                  key={question.id} 
+                  open={expandedQuestions.includes(question.id)}
+                  onOpenChange={() => toggleQuestion(question.id)}
+                >
+                  <div className="border rounded-lg overflow-hidden">
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex items-center justify-between p-4 hover:bg-accent/5 transition-colors">
+                        <div className="flex-1 text-right">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant="secondary">سؤال {index + 1}</Badge>
+                            <Badge variant="outline">
+                              {question.type === 'likert' ? 'مقياس ليكرت' : 
+                               question.type === 'rating' ? 'تقييم' :
+                               question.type === 'mcq' ? 'اختيار متعدد' : 'نص حر'}
+                            </Badge>
+                            <Badge variant="default">{question.responseCount} استجابة</Badge>
+                          </div>
+                          <h4 className="font-medium text-right">{question.text}</h4>
+                          {(question.type === 'likert' || question.type === 'rating') && parseFloat(question.mean) > 0 && (
+                            <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                              <span>المتوسط: <span className="font-bold text-primary">{question.mean}</span></span>
+                              <span>الانحراف المعياري: <span className="font-bold">{question.stdDev}</span></span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {(question.type === 'likert' || question.type === 'rating') && parseFloat(question.mean) > 0 && (
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-primary">{question.mean}</div>
+                              <p className="text-xs text-muted-foreground">من 5.0</p>
+                            </div>
+                          )}
+                          {expandedQuestions.includes(question.id) ? (
+                            <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                          )}
+                        </div>
+                      </div>
+                    </CollapsibleTrigger>
+                    
+                    <CollapsibleContent>
+                      <div className="border-t bg-muted/20 p-4 space-y-4">
+                        {/* Distribution Chart for Likert/Rating */}
+                        {(question.type === 'likert' || question.type === 'rating') && question.distribution.length > 0 && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <h5 className="font-medium mb-3">توزيع الاستجابات</h5>
+                              <div className="h-48">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <BarChart data={question.distribution}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                                    <YAxis />
+                                    <Tooltip />
+                                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                      {question.distribution.map((entry: any, i: number) => (
+                                        <Cell key={`cell-${i}`} fill={entry.fill} />
+                                      ))}
+                                    </Bar>
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </div>
+                            <div>
+                              <h5 className="font-medium mb-3">النسب المئوية</h5>
+                              <div className="h-48">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <PieChart>
+                                    <Pie
+                                      data={question.distribution.filter((d: any) => d.value > 0)}
+                                      cx="50%"
+                                      cy="50%"
+                                      innerRadius={40}
+                                      outerRadius={70}
+                                      paddingAngle={2}
+                                      dataKey="value"
+                                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                                      labelLine={false}
+                                    >
+                                      {question.distribution.map((entry: any, i: number) => (
+                                        <Cell key={`cell-${i}`} fill={entry.fill} />
+                                      ))}
+                                    </Pie>
+                                    <Tooltip />
+                                  </PieChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* MCQ Distribution */}
+                        {question.type === 'mcq' && question.mcqDistribution.length > 0 && (
+                          <div>
+                            <h5 className="font-medium mb-3">توزيع الاختيارات</h5>
+                            <div className="h-48">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={question.mcqDistribution} layout="vertical">
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis type="number" />
+                                  <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 11 }} />
+                                  <Tooltip />
+                                  <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                                    {question.mcqDistribution.map((entry: any, i: number) => (
+                                      <Cell key={`cell-${i}`} fill={entry.fill} />
+                                    ))}
+                                  </Bar>
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Individual Responses Table */}
+                        <div>
+                          <h5 className="font-medium mb-3 flex items-center gap-2">
+                            <Users className="h-4 w-4" />
+                            جميع الاستجابات ({question.answers.length})
+                          </h5>
+                          {question.answers.length > 0 ? (
+                            <div className="border rounded-lg overflow-hidden">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="text-right w-20">المستجيب</TableHead>
+                                    <TableHead className="text-right">الإجابة</TableHead>
+                                    {(question.type === 'likert' || question.type === 'rating') && (
+                                      <TableHead className="text-right w-24">القيمة</TableHead>
+                                    )}
+                                    <TableHead className="text-right w-40">تاريخ الاستجابة</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {question.answers.map((answer: any) => (
+                                    <TableRow key={answer.id}>
+                                      <TableCell className="font-medium">
+                                        <Badge variant="outline">#{answer.respondent_number}</Badge>
+                                      </TableCell>
+                                      <TableCell>
+                                        {question.type === 'likert' || question.type === 'rating' ? (
+                                          <div className="flex items-center gap-2">
+                                            <div className="flex">
+                                              {[1, 2, 3, 4, 5].map((star) => (
+                                                <span
+                                                  key={star}
+                                                  className={`text-lg ${
+                                                    star <= (answer.numeric_value || 0)
+                                                      ? 'text-yellow-500'
+                                                      : 'text-gray-300'
+                                                  }`}
+                                                >
+                                                  ★
+                                                </span>
+                                              ))}
+                                            </div>
+                                            <span className="text-sm text-muted-foreground">
+                                              ({answer.numeric_value === 1 ? 'غير موافق بشدة' :
+                                                answer.numeric_value === 2 ? 'غير موافق' :
+                                                answer.numeric_value === 3 ? 'محايد' :
+                                                answer.numeric_value === 4 ? 'موافق' :
+                                                answer.numeric_value === 5 ? 'موافق بشدة' : '-'})
+                                            </span>
+                                          </div>
+                                        ) : (
+                                          <span className="text-sm">{answer.value || '-'}</span>
+                                        )}
+                                      </TableCell>
+                                      {(question.type === 'likert' || question.type === 'rating') && (
+                                        <TableCell>
+                                          <Badge 
+                                            variant={
+                                              answer.numeric_value >= 4 ? 'default' :
+                                              answer.numeric_value === 3 ? 'secondary' : 'destructive'
+                                            }
+                                          >
+                                            {answer.numeric_value}/5
+                                          </Badge>
+                                        </TableCell>
+                                      )}
+                                      <TableCell className="text-sm text-muted-foreground">
+                                        {answer.submitted_at 
+                                          ? new Date(answer.submitted_at).toLocaleString('ar-SA')
+                                          : '-'}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          ) : (
+                            <p className="text-muted-foreground text-center py-4">لا توجد استجابات لهذا السؤال</p>
+                          )}
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </div>
+                </Collapsible>
+              ))}
             </CardContent>
           </Card>
         )}
