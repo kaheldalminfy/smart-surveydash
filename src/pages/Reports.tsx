@@ -48,16 +48,29 @@ const Reports = () => {
   const [filterQuestion, setFilterQuestion] = useState<string>("");
   const [filterValues, setFilterValues] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'dashboard' | 'list'>('dashboard');
-  const [dateFrom, setDateFrom] = useState<string>("");
-  const [dateTo, setDateTo] = useState<string>("");
+  const [filterAcademicYear, setFilterAcademicYear] = useState<string>("");
+  const [filterSemester, setFilterSemester] = useState<string>("");
   const [filterQuestionType, setFilterQuestionType] = useState<string>("all");
   const [showFilteredReport, setShowFilteredReport] = useState(false);
+  const [academicCalendar, setAcademicCalendar] = useState<any[]>([]);
 
   useEffect(() => {
     loadReport();
     loadSettings();
+    loadAcademicCalendar();
     if (id) loadDetailedAnswers();
   }, [id]);
+
+  const loadAcademicCalendar = async () => {
+    const { data } = await supabase
+      .from("academic_calendar")
+      .select("*")
+      .order("start_date", { ascending: false });
+    
+    if (data) {
+      setAcademicCalendar(data);
+    }
+  };
 
   const loadReport = async () => {
     try {
@@ -134,8 +147,8 @@ const Reports = () => {
     responses: any[], 
     filterQ: string, 
     filterVals: string[],
-    fromDate?: string,
-    toDate?: string,
+    academicYearFilter?: string,
+    semesterFilter?: string,
     questionType?: string
   ) => {
     // Filter responses based on selected question and values (multiple selection)
@@ -149,19 +162,26 @@ const Reports = () => {
       });
     }
 
-    // Filter by date range
-    if (fromDate) {
-      const from = new Date(fromDate);
-      filteredResponses = filteredResponses.filter(response => 
-        new Date(response.submitted_at) >= from
-      );
-    }
-    if (toDate) {
-      const to = new Date(toDate);
-      to.setHours(23, 59, 59, 999);
-      filteredResponses = filteredResponses.filter(response => 
-        new Date(response.submitted_at) <= to
-      );
+    // Filter by academic year and semester
+    if (academicYearFilter || semesterFilter) {
+      // Find matching calendar entries
+      const matchingCalendars = academicCalendar.filter(cal => {
+        const yearMatch = !academicYearFilter || cal.academic_year === academicYearFilter;
+        const semesterMatch = !semesterFilter || cal.semester === semesterFilter;
+        return yearMatch && semesterMatch;
+      });
+      
+      if (matchingCalendars.length > 0) {
+        filteredResponses = filteredResponses.filter(response => {
+          const responseDate = new Date(response.submitted_at);
+          return matchingCalendars.some(cal => {
+            const startDate = new Date(cal.start_date);
+            const endDate = new Date(cal.end_date);
+            endDate.setHours(23, 59, 59, 999);
+            return responseDate >= startDate && responseDate <= endDate;
+          });
+        });
+      }
     }
 
     // Filter questions by type
@@ -305,8 +325,8 @@ const Reports = () => {
       allResponses, 
       filterQuestion, 
       filterValues,
-      dateFrom,
-      dateTo,
+      filterAcademicYear,
+      filterSemester,
       filterQuestionType
     );
     setShowFilteredReport(true);
@@ -315,15 +335,15 @@ const Reports = () => {
   const clearFilter = () => {
     setFilterQuestion("");
     setFilterValues([]);
-    setDateFrom("");
-    setDateTo("");
+    setFilterAcademicYear("");
+    setFilterSemester("");
     setFilterQuestionType("all");
     setShowFilteredReport(false);
     processDataWithFilter(allQuestions, allResponses, "", [], "", "", "all");
   };
 
   const hasActiveFilters = () => {
-    return filterQuestion || filterValues.length > 0 || dateFrom || dateTo || filterQuestionType !== 'all';
+    return filterQuestion || filterValues.length > 0 || filterAcademicYear || filterSemester || filterQuestionType !== 'all';
   };
 
   const getSelectedQuestionLabel = () => {
@@ -346,22 +366,39 @@ const Reports = () => {
       });
     }
 
-    // Filter by date range
-    if (dateFrom) {
-      const from = new Date(dateFrom);
-      filtered = filtered.filter(response => 
-        new Date(response.submitted_at) >= from
-      );
-    }
-    if (dateTo) {
-      const to = new Date(dateTo);
-      to.setHours(23, 59, 59, 999);
-      filtered = filtered.filter(response => 
-        new Date(response.submitted_at) <= to
-      );
+    // Filter by academic year and semester
+    if (filterAcademicYear || filterSemester) {
+      const matchingCalendars = academicCalendar.filter(cal => {
+        const yearMatch = !filterAcademicYear || cal.academic_year === filterAcademicYear;
+        const semesterMatch = !filterSemester || cal.semester === filterSemester;
+        return yearMatch && semesterMatch;
+      });
+      
+      if (matchingCalendars.length > 0) {
+        filtered = filtered.filter(response => {
+          const responseDate = new Date(response.submitted_at);
+          return matchingCalendars.some(cal => {
+            const startDate = new Date(cal.start_date);
+            const endDate = new Date(cal.end_date);
+            endDate.setHours(23, 59, 59, 999);
+            return responseDate >= startDate && responseDate <= endDate;
+          });
+        });
+      }
     }
 
     return filtered.length;
+  };
+
+  // Get unique academic years and semesters
+  const getUniqueAcademicYears = () => {
+    const years = new Set(academicCalendar.map(cal => cal.academic_year));
+    return Array.from(years);
+  };
+
+  const getUniqueSemesters = () => {
+    const semesters = new Set(academicCalendar.map(cal => cal.semester));
+    return Array.from(semesters);
   };
 
   // Toggle value selection for multi-select filter
@@ -735,25 +772,35 @@ const Reports = () => {
                 </div>
               </div>
 
-              {/* Row 2: Date and Question Type filters */}
+              {/* Row 2: Academic Year, Semester, and Question Type filters */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">تاريخ الاستجابة (من)</Label>
-                  <Input
-                    type="date"
-                    value={dateFrom}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                    className="text-sm"
-                  />
+                  <Label className="text-xs text-muted-foreground">السنة الأكاديمية</Label>
+                  <Select value={filterAcademicYear} onValueChange={setFilterAcademicYear}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر السنة الأكاديمية" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">جميع السنوات</SelectItem>
+                      {getUniqueAcademicYears().map((year) => (
+                        <SelectItem key={year} value={year}>{year}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">تاريخ الاستجابة (إلى)</Label>
-                  <Input
-                    type="date"
-                    value={dateTo}
-                    onChange={(e) => setDateTo(e.target.value)}
-                    className="text-sm"
-                  />
+                  <Label className="text-xs text-muted-foreground">الفصل الدراسي</Label>
+                  <Select value={filterSemester} onValueChange={setFilterSemester}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر الفصل الدراسي" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">جميع الفصول</SelectItem>
+                      {getUniqueSemesters().map((semester) => (
+                        <SelectItem key={semester} value={semester}>{semester}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">نوع السؤال</Label>
@@ -805,14 +852,14 @@ const Reports = () => {
                         {getSelectedQuestionLabel()} = {filterValues.join(' | ')}
                       </Badge>
                     )}
-                    {dateFrom && (
+                    {filterAcademicYear && (
                       <Badge variant="outline" className="text-xs">
-                        من: {dateFrom}
+                        السنة: {filterAcademicYear}
                       </Badge>
                     )}
-                    {dateTo && (
+                    {filterSemester && (
                       <Badge variant="outline" className="text-xs">
-                        إلى: {dateTo}
+                        الفصل: {filterSemester}
                       </Badge>
                     )}
                     {filterQuestionType !== 'all' && (
