@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { 
   Plus, 
   Search, 
@@ -19,7 +21,10 @@ import {
   Eye,
   QrCode,
   Copy,
-  ArrowLeft
+  ArrowLeft,
+  Trash2,
+  Building2,
+  XCircle
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -50,14 +55,20 @@ interface Complaint {
   resolved_by?: string;
 }
 
+interface Program {
+  id: string;
+  name: string;
+}
+
 const Complaints = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
-  const [programs, setPrograms] = useState<any[]>([]);
+  const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedProgram, setSelectedProgram] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [showNewComplaintDialog, setShowNewComplaintDialog] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [qrCodeData, setQrCodeData] = useState<string>("");
@@ -110,14 +121,12 @@ const Complaints = () => {
   const loadComplaints = async () => {
     setLoading(true);
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setLoading(false);
         return;
       }
 
-      // Check user role
       const { data: userRoles } = await supabase
         .from("user_roles")
         .select("role, program_id")
@@ -127,7 +136,6 @@ const Complaints = () => {
       const isDean = userRoles?.some(r => r.role === 'dean');
       const userProgramIds = userRoles?.map(r => r.program_id).filter(Boolean);
 
-      // Build query based on role
       let query = supabase
         .from("complaints")
         .select(`
@@ -135,7 +143,6 @@ const Complaints = () => {
           programs (name)
         `);
 
-      // Filter by program if not admin or dean
       if (!isAdmin && !isDean && userProgramIds && userProgramIds.length > 0) {
         query = query.in("program_id", userProgramIds);
       }
@@ -175,8 +182,10 @@ const Complaints = () => {
       if (!user) throw new Error("المستخدم غير مسجل الدخول");
 
       const { error } = await supabase.from("complaints").insert({
-        ...newComplaint,
-        submitted_by: user.id,
+        subject: newComplaint.title,
+        description: newComplaint.description,
+        type: newComplaint.category,
+        program_id: newComplaint.program_id || null,
         status: "pending",
       });
 
@@ -200,6 +209,30 @@ const Complaints = () => {
       toast({
         title: "خطأ",
         description: error.message || "فشل في إرسال الشكوى",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteComplaint = async (complaintId: string) => {
+    try {
+      const { error } = await supabase
+        .from("complaints")
+        .delete()
+        .eq("id", complaintId);
+
+      if (error) throw error;
+
+      toast({
+        title: "تم الحذف",
+        description: "تم حذف الشكوى بنجاح",
+      });
+
+      loadComplaints();
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: "فشل في حذف الشكوى",
         variant: "destructive",
       });
     }
@@ -294,7 +327,7 @@ const Complaints = () => {
       pending: { label: "قيد المراجعة", variant: "secondary" as const, icon: Clock },
       in_progress: { label: "قيد المعالجة", variant: "default" as const, icon: MessageSquare },
       resolved: { label: "تم الحل", variant: "default" as const, icon: CheckCircle },
-      closed: { label: "مغلقة", variant: "outline" as const, icon: CheckCircle },
+      closed: { label: "مغلقة", variant: "outline" as const, icon: XCircle },
     };
     
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
@@ -303,23 +336,6 @@ const Complaints = () => {
     return (
       <Badge variant={config.variant} className="flex items-center gap-1">
         <Icon className="h-3 w-3" />
-        {config.label}
-      </Badge>
-    );
-  };
-
-  const getPriorityBadge = (priority: string) => {
-    const priorityConfig = {
-      low: { label: "منخفضة", variant: "outline" as const, color: "text-green-600" },
-      medium: { label: "متوسطة", variant: "secondary" as const, color: "text-yellow-600" },
-      high: { label: "عالية", variant: "destructive" as const, color: "text-red-600" },
-      urgent: { label: "عاجلة", variant: "destructive" as const, color: "text-red-800" },
-    };
-    
-    const config = priorityConfig[priority as keyof typeof priorityConfig] || priorityConfig.medium;
-    
-    return (
-      <Badge variant={config.variant} className={config.color}>
         {config.label}
       </Badge>
     );
@@ -336,24 +352,165 @@ const Complaints = () => {
     return categories[category as keyof typeof categories] || category;
   };
 
-  const filteredComplaints = complaints.filter(complaint => {
-    const matchesSearch = complaint.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         complaint.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || complaint.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  });
-
-  const getComplaintStats = () => {
-    const total = complaints.length;
-    const pending = complaints.filter(c => c.status === "pending").length;
-    const inProgress = complaints.filter(c => c.status === "in_progress").length;
-    const resolved = complaints.filter(c => c.status === "resolved").length;
-    
-    return { total, pending, inProgress, resolved };
+  // Filter complaints based on program and status
+  const getFilteredComplaints = () => {
+    return complaints.filter(complaint => {
+      const matchesSearch = complaint.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           complaint.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesProgram = selectedProgram === "all" || complaint.program_id === selectedProgram;
+      const matchesStatus = selectedStatus === "all" || complaint.status === selectedStatus;
+      
+      return matchesSearch && matchesProgram && matchesStatus;
+    });
   };
 
-  const stats = getComplaintStats();
+  // Get complaints grouped by program
+  const getComplaintsByProgram = (programId: string | null) => {
+    return complaints.filter(c => c.program_id === programId);
+  };
+
+  // Get stats for a specific program
+  const getProgramStats = (programId: string | null) => {
+    const programComplaints = programId === null 
+      ? complaints.filter(c => !c.program_id)
+      : complaints.filter(c => c.program_id === programId);
+    
+    return {
+      total: programComplaints.length,
+      pending: programComplaints.filter(c => c.status === "pending").length,
+      inProgress: programComplaints.filter(c => c.status === "in_progress").length,
+      resolved: programComplaints.filter(c => c.status === "resolved").length,
+      closed: programComplaints.filter(c => c.status === "closed").length,
+    };
+  };
+
+  // Get overall stats
+  const getOverallStats = () => {
+    return {
+      total: complaints.length,
+      pending: complaints.filter(c => c.status === "pending").length,
+      inProgress: complaints.filter(c => c.status === "in_progress").length,
+      resolved: complaints.filter(c => c.status === "resolved").length,
+    };
+  };
+
+  const stats = getOverallStats();
+  const filteredComplaints = getFilteredComplaints();
+
+  // Get unique programs that have complaints
+  const programsWithComplaints = programs.filter(p => 
+    complaints.some(c => c.program_id === p.id)
+  );
+
+  const renderComplaintCard = (complaint: Complaint) => (
+    <Card key={complaint.id} className="hover:shadow-md transition-shadow">
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-2 flex-wrap">
+              <h3 className="text-lg font-semibold">{complaint.subject}</h3>
+              {getStatusBadge(complaint.status)}
+              <Badge variant="outline">{getCategoryLabel(complaint.type)}</Badge>
+            </div>
+            
+            <p className="text-muted-foreground mb-3 line-clamp-2">
+              {complaint.description}
+            </p>
+            
+            <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
+              <div className="flex items-center gap-1">
+                <User className="h-4 w-4" />
+                <span>{complaint.student_name || complaint.student_email || "غير محدد"}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Calendar className="h-4 w-4" />
+                <span>{new Date(complaint.created_at).toLocaleDateString('ar-SA')}</span>
+              </div>
+              {complaint.programs && (
+                <div className="flex items-center gap-1">
+                  <Building2 className="h-4 w-4" />
+                  <span>{complaint.programs.name}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedComplaint(complaint)}
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            
+            {complaint.status === "pending" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => initiateStatusChange(complaint.id, "in_progress")}
+              >
+                بدء المعالجة
+              </Button>
+            )}
+            
+            {complaint.status === "in_progress" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => initiateStatusChange(complaint.id, "resolved")}
+              >
+                تم الحل
+              </Button>
+            )}
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>هل أنت متأكد من حذف هذه الشكوى؟</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    سيتم حذف الشكوى نهائياً ولا يمكن استرجاعها.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={() => deleteComplaint(complaint.id)}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    حذف
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderStatusSection = (status: string, label: string, icon: React.ReactNode, complaintsToShow: Complaint[]) => {
+    const statusComplaints = complaintsToShow.filter(c => c.status === status);
+    if (statusComplaints.length === 0) return null;
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 text-lg font-semibold">
+          {icon}
+          <span>{label}</span>
+          <Badge variant="secondary">{statusComplaints.length}</Badge>
+        </div>
+        <div className="space-y-3">
+          {statusComplaints.map(renderComplaintCard)}
+        </div>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -421,36 +578,21 @@ const Complaints = () => {
                 </div>
                 
                 <div>
-                  <Label htmlFor="priority">الأولوية</Label>
+                  <Label htmlFor="program">البرنامج</Label>
                   <select
-                    id="priority"
+                    id="program"
                     className="w-full rounded-md border border-input bg-background px-3 py-2"
-                    value={newComplaint.priority}
-                    onChange={(e) => setNewComplaint({...newComplaint, priority: e.target.value})}
+                    value={newComplaint.program_id}
+                    onChange={(e) => setNewComplaint({...newComplaint, program_id: e.target.value})}
                   >
-                    <option value="low">منخفضة</option>
-                    <option value="medium">متوسطة</option>
-                    <option value="high">عالية</option>
-                    <option value="urgent">عاجلة</option>
+                    <option value="">اختر البرنامج</option>
+                    {programs.map((program) => (
+                      <option key={program.id} value={program.id}>
+                        {program.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
-              </div>
-
-              <div>
-                <Label htmlFor="program">البرنامج (اختياري)</Label>
-                <select
-                  id="program"
-                  className="w-full rounded-md border border-input bg-background px-3 py-2"
-                  value={newComplaint.program_id}
-                  onChange={(e) => setNewComplaint({...newComplaint, program_id: e.target.value})}
-                >
-                  <option value="">اختر البرنامج</option>
-                  {programs.map((program) => (
-                    <option key={program.id} value={program.id}>
-                      {program.name}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               <div>
@@ -575,133 +717,209 @@ const Complaints = () => {
                 <Copy className="h-4 w-4 ml-2" />
                 نسخ الرابط
               </Button>
-              <div className="text-sm text-muted-foreground space-y-1">
-                <p>💡 <strong>نصائح:</strong></p>
-                <ul className="mr-6 space-y-1">
-                  <li>• اطبع رمز QR وضعه في أماكن مرئية بالكلية</li>
-                  <li>• شارك الرابط عبر البريد الإلكتروني أو الواتساب</li>
-                  <li>• الرابط لا يتطلب تسجيل دخول</li>
-                </ul>
-              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-wrap gap-4">
-            <div className="flex-1 min-w-64">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="البحث في الشكاوى..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            
-            <select
-              className="rounded-md border border-input bg-background px-3 py-2"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="all">جميع الحالات</option>
-              <option value="pending">قيد المراجعة</option>
-              <option value="in_progress">قيد المعالجة</option>
-              <option value="resolved">تم الحل</option>
-              <option value="closed">مغلقة</option>
-            </select>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Program Tabs */}
+      <Tabs defaultValue="all" className="space-y-4">
+        <TabsList className="flex flex-wrap h-auto gap-2 bg-muted p-2">
+          <TabsTrigger value="all" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            جميع الشكاوى
+            <Badge variant="secondary" className="mr-1">{complaints.length}</Badge>
+          </TabsTrigger>
+          {programsWithComplaints.map(program => {
+            const programStats = getProgramStats(program.id);
+            return (
+              <TabsTrigger key={program.id} value={program.id} className="flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                {program.name}
+                <Badge variant="secondary" className="mr-1">{programStats.total}</Badge>
+              </TabsTrigger>
+            );
+          })}
+          {complaints.some(c => !c.program_id) && (
+            <TabsTrigger value="no-program" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              بدون برنامج
+              <Badge variant="secondary" className="mr-1">
+                {complaints.filter(c => !c.program_id).length}
+              </Badge>
+            </TabsTrigger>
+          )}
+        </TabsList>
 
-      {/* Complaints List */}
-      <div className="space-y-4">
-        {filteredComplaints.map((complaint) => (
-          <Card key={complaint.id} className="hover:shadow-md transition-shadow">
+        {/* All Complaints Tab */}
+        <TabsContent value="all" className="space-y-4">
+          {/* Filters */}
+          <Card>
             <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold">{complaint.subject}</h3>
-                    {getStatusBadge(complaint.status)}
-                    <Badge variant="outline">{getCategoryLabel(complaint.type)}</Badge>
-                  </div>
-                  
-                  <p className="text-muted-foreground mb-3 line-clamp-2">
-                    {complaint.description}
-                  </p>
-                  
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <User className="h-4 w-4" />
-                      <span>{complaint.student_name || complaint.student_email || "غير محدد"}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Calendar className="h-4 w-4" />
-                      <span>{new Date(complaint.created_at).toLocaleDateString('ar-SA')}</span>
-                    </div>
-                    {complaint.programs && (
-                      <div className="flex items-center gap-1">
-                        <FileText className="h-4 w-4" />
-                        <span>{complaint.programs.name}</span>
-                      </div>
-                    )}
+              <div className="flex flex-wrap gap-4">
+                <div className="flex-1 min-w-64">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="البحث في الشكاوى..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedComplaint(complaint)}
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  
-                  {complaint.status === "pending" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => initiateStatusChange(complaint.id, "in_progress")}
-                    >
-                      بدء المعالجة
-                    </Button>
-                  )}
-                  
-                  {complaint.status === "in_progress" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => initiateStatusChange(complaint.id, "resolved")}
-                    >
-                      تم الحل
-                    </Button>
-                  )}
-                </div>
+                <select
+                  className="rounded-md border border-input bg-background px-3 py-2"
+                  value={selectedProgram}
+                  onChange={(e) => setSelectedProgram(e.target.value)}
+                >
+                  <option value="all">جميع البرامج</option>
+                  {programs.map((program) => (
+                    <option key={program.id} value={program.id}>
+                      {program.name}
+                    </option>
+                  ))}
+                </select>
+                
+                <select
+                  className="rounded-md border border-input bg-background px-3 py-2"
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                >
+                  <option value="all">جميع الحالات</option>
+                  <option value="pending">قيد المراجعة</option>
+                  <option value="in_progress">قيد المعالجة</option>
+                  <option value="resolved">تم الحل</option>
+                  <option value="closed">مغلقة</option>
+                </select>
               </div>
             </CardContent>
           </Card>
-        ))}
 
-        {filteredComplaints.length === 0 && (
-          <Card>
-            <CardContent className="text-center py-12">
-              <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">لا توجد شكاوى</h3>
-              <p className="text-muted-foreground">
-                {searchTerm || statusFilter !== "all"
-                  ? "لا توجد شكاوى تطابق معايير البحث"
-                  : "لم يتم تقديم أي شكاوى بعد"}
-              </p>
-            </CardContent>
-          </Card>
+          {/* Status-grouped complaints */}
+          <div className="space-y-6">
+            {renderStatusSection("pending", "قيد المراجعة", <Clock className="h-5 w-5 text-yellow-600" />, filteredComplaints)}
+            {renderStatusSection("in_progress", "قيد المعالجة", <MessageSquare className="h-5 w-5 text-orange-600" />, filteredComplaints)}
+            {renderStatusSection("resolved", "تم الحل", <CheckCircle className="h-5 w-5 text-green-600" />, filteredComplaints)}
+            {renderStatusSection("closed", "مغلقة", <XCircle className="h-5 w-5 text-gray-600" />, filteredComplaints)}
+          </div>
+
+          {filteredComplaints.length === 0 && (
+            <Card>
+              <CardContent className="text-center py-12">
+                <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">لا توجد شكاوى</h3>
+                <p className="text-muted-foreground">
+                  {searchTerm || selectedStatus !== "all" || selectedProgram !== "all"
+                    ? "لا توجد شكاوى تطابق معايير البحث"
+                    : "لم يتم تقديم أي شكاوى بعد"}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Program-specific tabs */}
+        {programsWithComplaints.map(program => {
+          const programComplaints = getComplaintsByProgram(program.id);
+          const programStats = getProgramStats(program.id);
+          
+          return (
+            <TabsContent key={program.id} value={program.id} className="space-y-4">
+              {/* Program Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card className="bg-yellow-50 border-yellow-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-yellow-600" />
+                      <div>
+                        <p className="text-sm text-yellow-700">قيد المراجعة</p>
+                        <p className="text-xl font-bold text-yellow-900">{programStats.pending}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-orange-50 border-orange-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-5 w-5 text-orange-600" />
+                      <div>
+                        <p className="text-sm text-orange-700">قيد المعالجة</p>
+                        <p className="text-xl font-bold text-orange-900">{programStats.inProgress}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-green-50 border-green-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      <div>
+                        <p className="text-sm text-green-700">تم الحل</p>
+                        <p className="text-xl font-bold text-green-900">{programStats.resolved}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gray-50 border-gray-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2">
+                      <XCircle className="h-5 w-5 text-gray-600" />
+                      <div>
+                        <p className="text-sm text-gray-700">مغلقة</p>
+                        <p className="text-xl font-bold text-gray-900">{programStats.closed}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Status Tabs within program */}
+              <Tabs defaultValue="all-status" className="space-y-4">
+                <TabsList>
+                  <TabsTrigger value="all-status">الكل ({programComplaints.length})</TabsTrigger>
+                  <TabsTrigger value="pending">قيد المراجعة ({programStats.pending})</TabsTrigger>
+                  <TabsTrigger value="in_progress">قيد المعالجة ({programStats.inProgress})</TabsTrigger>
+                  <TabsTrigger value="resolved">تم الحل ({programStats.resolved})</TabsTrigger>
+                  <TabsTrigger value="closed">مغلقة ({programStats.closed})</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="all-status" className="space-y-4">
+                  {programComplaints.map(renderComplaintCard)}
+                  {programComplaints.length === 0 && (
+                    <Card>
+                      <CardContent className="text-center py-8">
+                        <p className="text-muted-foreground">لا توجد شكاوى</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+
+                {["pending", "in_progress", "resolved", "closed"].map(status => (
+                  <TabsContent key={status} value={status} className="space-y-4">
+                    {programComplaints.filter(c => c.status === status).map(renderComplaintCard)}
+                    {programComplaints.filter(c => c.status === status).length === 0 && (
+                      <Card>
+                        <CardContent className="text-center py-8">
+                          <p className="text-muted-foreground">لا توجد شكاوى بهذه الحالة</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </TabsContent>
+                ))}
+              </Tabs>
+            </TabsContent>
+          );
+        })}
+
+        {/* No Program Tab */}
+        {complaints.some(c => !c.program_id) && (
+          <TabsContent value="no-program" className="space-y-4">
+            {complaints.filter(c => !c.program_id).map(renderComplaintCard)}
+          </TabsContent>
         )}
-      </div>
+      </Tabs>
 
       {/* Complaint Details Dialog */}
       {selectedComplaint && !isEditingComplaint && (
@@ -714,7 +932,7 @@ const Complaints = () => {
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-6">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 {getStatusBadge(selectedComplaint.status)}
                 <Badge variant="outline">{getCategoryLabel(selectedComplaint.type)}</Badge>
                 {selectedComplaint.complainant_type && (
@@ -746,37 +964,45 @@ const Complaints = () => {
                   <span className="font-medium">تاريخ التقديم:</span>
                   <p>{new Date(selectedComplaint.created_at).toLocaleDateString('ar-SA')}</p>
                 </div>
-                <div>
-                  <span className="font-medium">آخر تحديث:</span>
-                  <p>{selectedComplaint.updated_at ? new Date(selectedComplaint.updated_at).toLocaleDateString('ar-SA') : "لا يوجد"}</p>
-                </div>
-                {selectedComplaint.semester && (
-                  <div>
-                    <span className="font-medium">الفصل الدراسي:</span>
-                    <p>{selectedComplaint.semester}</p>
-                  </div>
-                )}
-                {selectedComplaint.academic_year && (
-                  <div>
-                    <span className="font-medium">السنة الأكاديمية:</span>
-                    <p>{selectedComplaint.academic_year}</p>
-                  </div>
-                )}
               </div>
 
               {selectedComplaint.resolution_notes && (
                 <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                   <h4 className="font-semibold text-green-900 mb-2">ملاحظات المعالجة:</h4>
                   <p className="text-green-800 whitespace-pre-wrap">{selectedComplaint.resolution_notes}</p>
-                  {selectedComplaint.resolved_at && (
-                    <p className="text-sm text-green-700 mt-2">
-                      تم الحل في: {new Date(selectedComplaint.resolved_at).toLocaleDateString('ar-SA')}
-                    </p>
-                  )}
                 </div>
               )}
               
               <div className="flex justify-end gap-2">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" className="text-destructive">
+                      <Trash2 className="h-4 w-4 ml-2" />
+                      حذف
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>هل أنت متأكد من حذف هذه الشكوى؟</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        سيتم حذف الشكوى نهائياً ولا يمكن استرجاعها.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={() => {
+                          deleteComplaint(selectedComplaint.id);
+                          setSelectedComplaint(null);
+                        }}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        حذف
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                
                 <Button variant="outline" onClick={() => setSelectedComplaint(null)}>
                   إغلاق
                 </Button>
@@ -837,15 +1063,6 @@ const Complaints = () => {
                   <option value="other">أخرى</option>
                 </select>
               </div>
-
-              <div>
-                <Label htmlFor="edit-category">فئة الشكوى</Label>
-                <Input
-                  id="edit-category"
-                  value={editComplaintData.complaint_category || ""}
-                  onChange={(e) => setEditComplaintData({...editComplaintData, complaint_category: e.target.value})}
-                />
-              </div>
               
               <div>
                 <Label htmlFor="edit-description">وصف الشكوى</Label>
@@ -889,9 +1106,6 @@ const Complaints = () => {
                 value={resolutionNotes}
                 onChange={(e) => setResolutionNotes(e.target.value)}
               />
-              <p className="text-sm text-muted-foreground mt-2">
-                يرجى توضيح الإجراءات المتخذة لحل الشكوى بشكل واضح ومفصل
-              </p>
             </div>
             
             <div className="flex justify-end gap-2">
@@ -906,17 +1120,11 @@ const Complaints = () => {
                 onClick={() => {
                   if (complaintToResolve && resolutionNotes.trim()) {
                     updateComplaintStatus(complaintToResolve.id, complaintToResolve.newStatus, resolutionNotes);
-                  } else {
-                    toast({
-                      title: "خطأ",
-                      description: "يرجى إدخال ملاحظات المعالجة",
-                      variant: "destructive",
-                    });
                   }
                 }}
                 disabled={!resolutionNotes.trim()}
               >
-                تأكيد الحل
+                حفظ وتحديث الحالة
               </Button>
             </div>
           </div>
