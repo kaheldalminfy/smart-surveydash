@@ -945,6 +945,12 @@ const Complaints = () => {
           const programComplaints = getComplaintsByProgram(program.id);
           const programStats = getProgramStats(program.id);
           
+          // Group complaints by complainant type
+          const studentComplaints = programComplaints.filter(c => c.complainant_type === 'طالب' || c.complainant_type === 'student');
+          const facultyComplaints = programComplaints.filter(c => c.complainant_type === 'عضو هيئة تدريس' || c.complainant_type === 'faculty');
+          const employeeComplaints = programComplaints.filter(c => c.complainant_type === 'موظف' || c.complainant_type === 'employee');
+          const otherComplaints = programComplaints.filter(c => !c.complainant_type || !['طالب', 'student', 'عضو هيئة تدريس', 'faculty', 'موظف', 'employee'].includes(c.complainant_type));
+          
           return (
             <TabsContent key={program.id} value={program.id} className="space-y-4">
               {/* Program Stats */}
@@ -984,38 +990,241 @@ const Complaints = () => {
                 </Card>
               </div>
 
-              {/* Status Tabs within program */}
-              <Tabs defaultValue="all-status" className="space-y-4">
-                <TabsList>
-                  <TabsTrigger value="all-status">الكل ({programComplaints.length})</TabsTrigger>
-                  <TabsTrigger value="pending">جديدة ({programStats.pending})</TabsTrigger>
-                  <TabsTrigger value="in_progress">قيد الإجراء ({programStats.inProgress})</TabsTrigger>
-                  <TabsTrigger value="resolved">تم الحل ({programStats.resolved})</TabsTrigger>
+              {/* Complainant Type Tabs */}
+              <Tabs defaultValue="all-complainants" className="space-y-4">
+                <TabsList className="flex flex-wrap h-auto gap-2 bg-muted p-2">
+                  <TabsTrigger value="all-complainants" className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    الكل
+                    <Badge variant="secondary">{programComplaints.length}</Badge>
+                  </TabsTrigger>
+                  <TabsTrigger value="students" className="flex items-center gap-2">
+                    🎓 طلاب
+                    <Badge variant="secondary">{studentComplaints.length}</Badge>
+                  </TabsTrigger>
+                  <TabsTrigger value="faculty" className="flex items-center gap-2">
+                    👨‍🏫 أعضاء هيئة التدريس
+                    <Badge variant="secondary">{facultyComplaints.length}</Badge>
+                  </TabsTrigger>
+                  <TabsTrigger value="employees" className="flex items-center gap-2">
+                    👔 موظفين
+                    <Badge variant="secondary">{employeeComplaints.length}</Badge>
+                  </TabsTrigger>
+                  {otherComplaints.length > 0 && (
+                    <TabsTrigger value="other" className="flex items-center gap-2">
+                      📋 أخرى
+                      <Badge variant="secondary">{otherComplaints.length}</Badge>
+                    </TabsTrigger>
+                  )}
                 </TabsList>
 
-                <TabsContent value="all-status" className="space-y-4">
-                  {programComplaints.map(renderComplaintCard)}
-                  {programComplaints.length === 0 && (
-                    <Card>
-                      <CardContent className="text-center py-8">
-                        <p className="text-muted-foreground">لا توجد شكاوى</p>
-                      </CardContent>
-                    </Card>
-                  )}
+                {/* All Complainants Tab */}
+                <TabsContent value="all-complainants" className="space-y-4">
+                  <Tabs defaultValue="all-status" className="space-y-4">
+                    <TabsList>
+                      <TabsTrigger value="all-status">الكل ({programComplaints.length})</TabsTrigger>
+                      <TabsTrigger value="pending">جديدة ({programComplaints.filter(c => c.status === 'pending').length})</TabsTrigger>
+                      <TabsTrigger value="in_progress">قيد الإجراء ({programComplaints.filter(c => c.status === 'in_progress').length})</TabsTrigger>
+                      <TabsTrigger value="resolved">تم الحل ({programComplaints.filter(c => c.status === 'resolved').length})</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="all-status" className="space-y-4">
+                      {programComplaints.map(renderComplaintCard)}
+                      {programComplaints.length === 0 && (
+                        <Card>
+                          <CardContent className="text-center py-8">
+                            <p className="text-muted-foreground">لا توجد شكاوى</p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+
+                    {["pending", "in_progress", "resolved"].map(status => (
+                      <TabsContent key={status} value={status} className="space-y-4">
+                        {programComplaints.filter(c => c.status === status).map(renderComplaintCard)}
+                        {programComplaints.filter(c => c.status === status).length === 0 && (
+                          <Card>
+                            <CardContent className="text-center py-8">
+                              <p className="text-muted-foreground">لا توجد شكاوى بهذه الحالة</p>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </TabsContent>
+                    ))}
+                  </Tabs>
                 </TabsContent>
 
-                {["pending", "in_progress", "resolved"].map(status => (
-                  <TabsContent key={status} value={status} className="space-y-4">
-                    {programComplaints.filter(c => c.status === status).map(renderComplaintCard)}
-                    {programComplaints.filter(c => c.status === status).length === 0 && (
-                      <Card>
-                        <CardContent className="text-center py-8">
-                          <p className="text-muted-foreground">لا توجد شكاوى بهذه الحالة</p>
-                        </CardContent>
-                      </Card>
-                    )}
+                {/* Students Tab */}
+                <TabsContent value="students" className="space-y-4">
+                  <Card className="mb-4">
+                    <CardContent className="p-4">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="البحث في شكاوى الطلاب..."
+                          className="pl-10"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Tabs defaultValue="all-status" className="space-y-4">
+                    <TabsList>
+                      <TabsTrigger value="all-status">الكل ({studentComplaints.length})</TabsTrigger>
+                      <TabsTrigger value="pending">جديدة ({studentComplaints.filter(c => c.status === 'pending').length})</TabsTrigger>
+                      <TabsTrigger value="in_progress">قيد الإجراء ({studentComplaints.filter(c => c.status === 'in_progress').length})</TabsTrigger>
+                      <TabsTrigger value="resolved">تم الحل ({studentComplaints.filter(c => c.status === 'resolved').length})</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="all-status" className="space-y-4">
+                      {studentComplaints.map(renderComplaintCard)}
+                      {studentComplaints.length === 0 && (
+                        <Card>
+                          <CardContent className="text-center py-8">
+                            <p className="text-muted-foreground">لا توجد شكاوى من الطلاب</p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+
+                    {["pending", "in_progress", "resolved"].map(status => (
+                      <TabsContent key={status} value={status} className="space-y-4">
+                        {studentComplaints.filter(c => c.status === status).map(renderComplaintCard)}
+                        {studentComplaints.filter(c => c.status === status).length === 0 && (
+                          <Card>
+                            <CardContent className="text-center py-8">
+                              <p className="text-muted-foreground">لا توجد شكاوى بهذه الحالة</p>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </TabsContent>
+                    ))}
+                  </Tabs>
+                </TabsContent>
+
+                {/* Faculty Tab */}
+                <TabsContent value="faculty" className="space-y-4">
+                  <Card className="mb-4">
+                    <CardContent className="p-4">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="البحث في شكاوى أعضاء هيئة التدريس..."
+                          className="pl-10"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Tabs defaultValue="all-status" className="space-y-4">
+                    <TabsList>
+                      <TabsTrigger value="all-status">الكل ({facultyComplaints.length})</TabsTrigger>
+                      <TabsTrigger value="pending">جديدة ({facultyComplaints.filter(c => c.status === 'pending').length})</TabsTrigger>
+                      <TabsTrigger value="in_progress">قيد الإجراء ({facultyComplaints.filter(c => c.status === 'in_progress').length})</TabsTrigger>
+                      <TabsTrigger value="resolved">تم الحل ({facultyComplaints.filter(c => c.status === 'resolved').length})</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="all-status" className="space-y-4">
+                      {facultyComplaints.map(renderComplaintCard)}
+                      {facultyComplaints.length === 0 && (
+                        <Card>
+                          <CardContent className="text-center py-8">
+                            <p className="text-muted-foreground">لا توجد شكاوى من أعضاء هيئة التدريس</p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+
+                    {["pending", "in_progress", "resolved"].map(status => (
+                      <TabsContent key={status} value={status} className="space-y-4">
+                        {facultyComplaints.filter(c => c.status === status).map(renderComplaintCard)}
+                        {facultyComplaints.filter(c => c.status === status).length === 0 && (
+                          <Card>
+                            <CardContent className="text-center py-8">
+                              <p className="text-muted-foreground">لا توجد شكاوى بهذه الحالة</p>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </TabsContent>
+                    ))}
+                  </Tabs>
+                </TabsContent>
+
+                {/* Employees Tab */}
+                <TabsContent value="employees" className="space-y-4">
+                  <Card className="mb-4">
+                    <CardContent className="p-4">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="البحث في شكاوى الموظفين..."
+                          className="pl-10"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Tabs defaultValue="all-status" className="space-y-4">
+                    <TabsList>
+                      <TabsTrigger value="all-status">الكل ({employeeComplaints.length})</TabsTrigger>
+                      <TabsTrigger value="pending">جديدة ({employeeComplaints.filter(c => c.status === 'pending').length})</TabsTrigger>
+                      <TabsTrigger value="in_progress">قيد الإجراء ({employeeComplaints.filter(c => c.status === 'in_progress').length})</TabsTrigger>
+                      <TabsTrigger value="resolved">تم الحل ({employeeComplaints.filter(c => c.status === 'resolved').length})</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="all-status" className="space-y-4">
+                      {employeeComplaints.map(renderComplaintCard)}
+                      {employeeComplaints.length === 0 && (
+                        <Card>
+                          <CardContent className="text-center py-8">
+                            <p className="text-muted-foreground">لا توجد شكاوى من الموظفين</p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+
+                    {["pending", "in_progress", "resolved"].map(status => (
+                      <TabsContent key={status} value={status} className="space-y-4">
+                        {employeeComplaints.filter(c => c.status === status).map(renderComplaintCard)}
+                        {employeeComplaints.filter(c => c.status === status).length === 0 && (
+                          <Card>
+                            <CardContent className="text-center py-8">
+                              <p className="text-muted-foreground">لا توجد شكاوى بهذه الحالة</p>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </TabsContent>
+                    ))}
+                  </Tabs>
+                </TabsContent>
+
+                {/* Other Tab */}
+                {otherComplaints.length > 0 && (
+                  <TabsContent value="other" className="space-y-4">
+                    <Tabs defaultValue="all-status" className="space-y-4">
+                      <TabsList>
+                        <TabsTrigger value="all-status">الكل ({otherComplaints.length})</TabsTrigger>
+                        <TabsTrigger value="pending">جديدة ({otherComplaints.filter(c => c.status === 'pending').length})</TabsTrigger>
+                        <TabsTrigger value="in_progress">قيد الإجراء ({otherComplaints.filter(c => c.status === 'in_progress').length})</TabsTrigger>
+                        <TabsTrigger value="resolved">تم الحل ({otherComplaints.filter(c => c.status === 'resolved').length})</TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="all-status" className="space-y-4">
+                        {otherComplaints.map(renderComplaintCard)}
+                      </TabsContent>
+
+                      {["pending", "in_progress", "resolved"].map(status => (
+                        <TabsContent key={status} value={status} className="space-y-4">
+                          {otherComplaints.filter(c => c.status === status).map(renderComplaintCard)}
+                          {otherComplaints.filter(c => c.status === status).length === 0 && (
+                            <Card>
+                              <CardContent className="text-center py-8">
+                                <p className="text-muted-foreground">لا توجد شكاوى بهذه الحالة</p>
+                              </CardContent>
+                            </Card>
+                          )}
+                        </TabsContent>
+                      ))}
+                    </Tabs>
                   </TabsContent>
-                ))}
+                )}
               </Tabs>
             </TabsContent>
           );
