@@ -196,17 +196,23 @@ const Reports = () => {
       // توزيع MCQ
       let mcqDistribution: any[] = [];
       if (question.type === 'mcq' && question.options) {
-        const options = Array.isArray(question.options) ? question.options : [];
+        const rawOptions = question.options;
+        const options = Array.isArray(rawOptions) 
+          ? rawOptions 
+          : (rawOptions?.choices && Array.isArray(rawOptions.choices)) 
+            ? rawOptions.choices 
+            : [];
         const counts: Record<string, number> = {};
-        options.forEach((opt: string) => { counts[opt] = 0; });
+        options.forEach((opt: string) => { counts[String(opt).trim()] = 0; });
         answersForQuestion.forEach((a: any) => {
-          if (a.value && counts[a.value] !== undefined) {
-            counts[a.value]++;
+          const answerValue = String(a.value || '').trim();
+          if (answerValue && counts[answerValue] !== undefined) {
+            counts[answerValue]++;
           }
         });
         mcqDistribution = options.map((opt: string, i: number) => ({
-          name: opt,
-          value: counts[opt],
+          name: String(opt).trim(),
+          value: counts[String(opt).trim()],
           fill: MCQ_COLORS[i % MCQ_COLORS.length],
         }));
       }
