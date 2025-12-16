@@ -23,8 +23,10 @@ import {
   Copy,
   ArrowLeft,
   Trash2,
-  Building2
+  Building2,
+  BarChart3
 } from "lucide-react";
+import ComplaintsStatistics from "@/components/ComplaintsStatistics";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -81,6 +83,7 @@ const Complaints = () => {
   const [isProgramManager, setIsProgramManager] = useState(false);
   const [isCoordinator, setIsCoordinator] = useState(false);
   const [userProgramIds, setUserProgramIds] = useState<string[]>([]);
+  const [showStatistics, setShowStatistics] = useState(false);
   const [newComplaint, setNewComplaint] = useState({
     title: "",
     description: "",
@@ -576,16 +579,22 @@ const Complaints = () => {
             )}
           </div>
         </div>
-        {/* New Complaint button only for admin and coordinator */}
-        {canManage && (
-          <Dialog open={showNewComplaintDialog} onOpenChange={setShowNewComplaintDialog}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 ml-2" />
-                شكوى جديدة
-              </Button>
-            </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+        <div className="flex gap-2">
+          {/* Statistics button for all roles */}
+          <Button variant="outline" onClick={() => setShowStatistics(true)}>
+            <BarChart3 className="h-4 w-4 ml-2" />
+            التقارير الإحصائية
+          </Button>
+          {/* New Complaint button only for admin and coordinator */}
+          {canManage && (
+            <Dialog open={showNewComplaintDialog} onOpenChange={setShowNewComplaintDialog}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 ml-2" />
+                  شكوى جديدة
+                </Button>
+              </DialogTrigger>
+            <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>تقديم شكوى جديدة</DialogTitle>
             </DialogHeader>
@@ -657,7 +666,8 @@ const Complaints = () => {
             </div>
           </DialogContent>
         </Dialog>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Stats */}
@@ -1179,6 +1189,12 @@ const Complaints = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Complaints Statistics Modal */}
+      <ComplaintsStatistics 
+        isOpen={showStatistics} 
+        onClose={() => setShowStatistics(false)} 
+      />
     </div>
   );
 };
