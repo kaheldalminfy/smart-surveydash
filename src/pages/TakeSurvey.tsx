@@ -257,22 +257,33 @@ const TakeSurvey = () => {
       }
 
       // Create answer records using the generated response ID
-      const answersData = questions.map(question => {
+      // Filter out section questions - they don't need answers
+      const questionsWithAnswers = questions.filter(q => q.type !== 'section');
+      
+      const answersData = questionsWithAnswers.map(question => {
         const responseValue = responses[question.id];
         return {
-          response_id: responseId,  // استخدام الـ ID المُولد محلياً
+          response_id: responseId,
           question_id: question.id,
-          value: responseValue ? String(responseValue) : null,
-          numeric_value: !isNaN(Number(responseValue)) ? Number(responseValue) : null,
+          value: responseValue !== undefined && responseValue !== null ? String(responseValue) : null,
+          numeric_value: responseValue !== undefined && responseValue !== null && !isNaN(Number(responseValue)) ? Number(responseValue) : null,
         };
-      });
+      }).filter(answer => answer.value !== null || answer.numeric_value !== null);
 
+      console.log("Questions with answers count:", questionsWithAnswers.length);
       console.log("Inserting answers:", answersData);
+      console.log("Answers count:", answersData.length);
 
-      const { error: answersError } = await supabase
+      if (answersData.length === 0) {
+        console.warn("No answers to insert!");
+      }
+
+      const { data: insertedAnswers, error: answersError } = await supabase
         .from("answers")
-        .insert(answersData);
+        .insert(answersData)
+        .select();
 
+      console.log("Inserted answers:", insertedAnswers);
       console.log("Answers error:", answersError);
 
       if (answersError) {
