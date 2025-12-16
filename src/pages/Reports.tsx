@@ -46,13 +46,12 @@ const Reports = () => {
   const [allQuestions, setAllQuestions] = useState<any[]>([]);
   const [allResponses, setAllResponses] = useState<any[]>([]);
   const [filterQuestion, setFilterQuestion] = useState<string>("");
-  const [filterValue, setFilterValue] = useState<string>("");
+  const [filterValues, setFilterValues] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'dashboard' | 'list'>('dashboard');
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
-  const [meanRangeFrom, setMeanRangeFrom] = useState<string>("");
-  const [meanRangeTo, setMeanRangeTo] = useState<string>("");
   const [filterQuestionType, setFilterQuestionType] = useState<string>("all");
+  const [showFilteredReport, setShowFilteredReport] = useState(false);
 
   useEffect(() => {
     loadReport();
@@ -124,7 +123,7 @@ const Reports = () => {
       setAllQuestions(questions || []);
       setAllResponses(responses || []);
       
-      processDataWithFilter(questions || [], responses || [], "", "");
+      processDataWithFilter(questions || [], responses || [], "", []);
     } catch (error) {
       console.error("Error loading detailed answers:", error);
     }
@@ -134,19 +133,19 @@ const Reports = () => {
     questions: any[], 
     responses: any[], 
     filterQ: string, 
-    filterV: string,
+    filterVals: string[],
     fromDate?: string,
     toDate?: string,
     questionType?: string
   ) => {
-    // Filter responses based on selected question and value
+    // Filter responses based on selected question and values (multiple selection)
     let filteredResponses = responses;
     
-    // Filter by question value
-    if (filterQ && filterV) {
+    // Filter by question values (multiple)
+    if (filterQ && filterVals.length > 0) {
       filteredResponses = filteredResponses.filter(response => {
         const answer = response.answers?.find((a: any) => a.question_id === filterQ);
-        return answer && (answer.value === filterV || String(answer.numeric_value) === filterV);
+        return answer && (filterVals.includes(answer.value) || filterVals.includes(String(answer.numeric_value)));
       });
     }
 
@@ -257,24 +256,7 @@ const Reports = () => {
       };
     });
 
-    // Filter by mean range (for likert/rating questions only)
-    let finalData = processedData;
-    if (meanRangeFrom || meanRangeTo) {
-      finalData = processedData.map(q => {
-        if (q.type === 'likert' || q.type === 'rating') {
-          const meanVal = parseFloat(q.mean);
-          const fromVal = meanRangeFrom ? parseFloat(meanRangeFrom) : 0;
-          const toVal = meanRangeTo ? parseFloat(meanRangeTo) : 5;
-          if (meanVal >= fromVal && meanVal <= toVal) {
-            return q;
-          }
-          return { ...q, hidden: true };
-        }
-        return q;
-      }).filter(q => !q.hidden);
-    }
-
-    setDetailedAnswers(finalData);
+    setDetailedAnswers(processedData);
   };
 
   // Get unique values for the selected filter question
@@ -322,27 +304,26 @@ const Reports = () => {
       allQuestions, 
       allResponses, 
       filterQuestion, 
-      filterValue,
+      filterValues,
       dateFrom,
       dateTo,
       filterQuestionType
     );
+    setShowFilteredReport(true);
   };
 
   const clearFilter = () => {
     setFilterQuestion("");
-    setFilterValue("");
+    setFilterValues([]);
     setDateFrom("");
     setDateTo("");
-    setMeanRangeFrom("");
-    setMeanRangeTo("");
     setFilterQuestionType("all");
-    processDataWithFilter(allQuestions, allResponses, "", "", "", "", "all");
+    setShowFilteredReport(false);
+    processDataWithFilter(allQuestions, allResponses, "", [], "", "", "all");
   };
 
   const hasActiveFilters = () => {
-    return filterQuestion || filterValue || dateFrom || dateTo || 
-           meanRangeFrom || meanRangeTo || filterQuestionType !== 'all';
+    return filterQuestion || filterValues.length > 0 || dateFrom || dateTo || filterQuestionType !== 'all';
   };
 
   const getSelectedQuestionLabel = () => {
@@ -357,11 +338,11 @@ const Reports = () => {
   const getFilteredResponsesCount = () => {
     let filtered = allResponses;
     
-    // Filter by question value
-    if (filterQuestion && filterValue) {
+    // Filter by question values (multiple)
+    if (filterQuestion && filterValues.length > 0) {
       filtered = filtered.filter(response => {
         const answer = response.answers?.find((a: any) => a.question_id === filterQuestion);
-        return answer && (answer.value === filterValue || String(answer.numeric_value) === filterValue);
+        return answer && (filterValues.includes(answer.value) || filterValues.includes(String(answer.numeric_value)));
       });
     }
 
@@ -381,6 +362,15 @@ const Reports = () => {
     }
 
     return filtered.length;
+  };
+
+  // Toggle value selection for multi-select filter
+  const toggleFilterValue = (value: string) => {
+    setFilterValues(prev => 
+      prev.includes(value) 
+        ? prev.filter(v => v !== value)
+        : [...prev, value]
+    );
   };
 
   const toggleQuestion = (questionId: string) => {
@@ -662,7 +652,7 @@ const Reports = () => {
                       value={filterQuestion} 
                       onValueChange={(val) => {
                         setFilterQuestion(val);
-                        setFilterValue("");
+                        setFilterValues([]);
                       }}
                     >
                       <SelectTrigger>
@@ -684,45 +674,63 @@ const Reports = () => {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">اختر القيمة</Label>
-                    <Select 
-                      value={filterValue} 
-                      onValueChange={setFilterValue}
-                      disabled={!filterQuestion}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={filterQuestion ? "اختر قيمة من خيارات السؤال..." : "اختر سؤالاً أولاً"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {getFilterOptions().map((opt: string, i: number) => {
-                          const selectedQuestion = allQuestions.find(q => q.id === filterQuestion);
-                          const isLikertOrRating = selectedQuestion?.type === 'likert' || selectedQuestion?.type === 'rating';
-                          
-                          return (
-                            <SelectItem key={i} value={opt}>
-                              {isLikertOrRating ? (
-                                <div className="flex items-center gap-2">
-                                  <Badge variant={
-                                    opt === '5' || opt === '4' ? 'default' : 
-                                    opt === '3' ? 'secondary' : 'destructive'
-                                  } className="text-xs">
-                                    {opt}/5
-                                  </Badge>
-                                  <span>
-                                    {opt === '1' ? 'غير موافق بشدة' : 
-                                     opt === '2' ? 'غير موافق' : 
-                                     opt === '3' ? 'محايد' : 
-                                     opt === '4' ? 'موافق' : 'موافق بشدة'}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span>{opt}</span>
-                              )}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
+                    <Label className="text-xs text-muted-foreground">اختر القيم (يمكنك اختيار أكثر من قيمة)</Label>
+                    <div className={`border rounded-lg p-3 max-h-48 overflow-y-auto ${!filterQuestion ? 'opacity-50 pointer-events-none' : ''}`}>
+                      {!filterQuestion ? (
+                        <p className="text-sm text-muted-foreground text-center">اختر سؤالاً أولاً</p>
+                      ) : getFilterOptions().length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center">لا توجد خيارات متاحة</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {getFilterOptions().map((opt: string, i: number) => {
+                            const selectedQuestion = allQuestions.find(q => q.id === filterQuestion);
+                            const isLikertOrRating = selectedQuestion?.type === 'likert' || selectedQuestion?.type === 'rating';
+                            const isSelected = filterValues.includes(opt);
+                            
+                            return (
+                              <label 
+                                key={i} 
+                                className={`flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors ${isSelected ? 'bg-primary/10 border border-primary' : 'hover:bg-muted'}`}
+                                onClick={() => toggleFilterValue(opt)}
+                              >
+                                <input 
+                                  type="checkbox" 
+                                  checked={isSelected}
+                                  onChange={() => {}}
+                                  className="w-4 h-4 rounded border-primary text-primary focus:ring-primary"
+                                />
+                                {isLikertOrRating ? (
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant={
+                                      opt === '5' || opt === '4' ? 'default' : 
+                                      opt === '3' ? 'secondary' : 'destructive'
+                                    } className="text-xs">
+                                      {opt}/5
+                                    </Badge>
+                                    <span className="text-sm">
+                                      {opt === '1' ? 'غير موافق بشدة' : 
+                                       opt === '2' ? 'غير موافق' : 
+                                       opt === '3' ? 'محايد' : 
+                                       opt === '4' ? 'موافق' : 'موافق بشدة'}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-sm">{opt}</span>
+                                )}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    {filterValues.length > 0 && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="secondary">{filterValues.length} قيمة محددة</Badge>
+                        <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setFilterValues([])}>
+                          مسح الاختيار
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -764,53 +772,24 @@ const Reports = () => {
                 </div>
               </div>
 
-              {/* Row 3: Mean range filter */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">نطاق المتوسط (من)</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="5"
-                    step="0.1"
-                    placeholder="1.0"
-                    value={meanRangeFrom}
-                    onChange={(e) => setMeanRangeFrom(e.target.value)}
-                    className="text-sm"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">نطاق المتوسط (إلى)</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="5"
-                    step="0.1"
-                    placeholder="5.0"
-                    value={meanRangeTo}
-                    onChange={(e) => setMeanRangeTo(e.target.value)}
-                    className="text-sm"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">&nbsp;</Label>
-                  <div className="flex gap-2">
-                    <Button 
-                      onClick={applyFilter}
-                      className="flex-1"
-                    >
-                      <Filter className="h-4 w-4 ml-2" />
-                      تطبيق الفلاتر
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      onClick={clearFilter}
-                      disabled={!hasActiveFilters()}
-                    >
-                      مسح الكل
-                    </Button>
-                  </div>
-                </div>
+              {/* Buttons Row */}
+              <div className="flex gap-3 pt-4 border-t">
+                <Button 
+                  onClick={applyFilter}
+                  className="flex-1"
+                  size="lg"
+                >
+                  <Filter className="h-4 w-4 ml-2" />
+                  تطبيق الفلاتر وعرض التقرير
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={clearFilter}
+                  disabled={!hasActiveFilters()}
+                  size="lg"
+                >
+                  مسح الكل
+                </Button>
               </div>
 
               {/* Active filters summary */}
@@ -821,9 +800,9 @@ const Reports = () => {
                     <Badge variant="secondary">{getFilteredResponsesCount()} من {allResponses.length} استجابة</Badge>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {filterQuestion && filterValue && (
+                    {filterQuestion && filterValues.length > 0 && (
                       <Badge variant="default" className="text-xs">
-                        {getSelectedQuestionLabel()} = {filterValue}
+                        {getSelectedQuestionLabel()} = {filterValues.join(' | ')}
                       </Badge>
                     )}
                     {dateFrom && (
@@ -843,14 +822,215 @@ const Reports = () => {
                               filterQuestionType === 'mcq' ? 'اختيار متعدد' : 'نص حر'}
                       </Badge>
                     )}
-                    {(meanRangeFrom || meanRangeTo) && (
-                      <Badge variant="outline" className="text-xs">
-                        المتوسط: {meanRangeFrom || '1'} - {meanRangeTo || '5'}
-                      </Badge>
-                    )}
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Filtered Report with Bar Charts */}
+        {showFilteredReport && hasActiveFilters() && (
+          <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-background">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <BarChart3 className="h-6 w-6 text-primary" />
+                    تقرير التحليل المفلتر
+                  </CardTitle>
+                  <CardDescription className="mt-2">
+                    نتائج التحليل بناءً على الفلاتر المحددة - {getFilteredResponsesCount()} استجابة
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-center p-4 bg-primary/10 rounded-lg">
+                    <div className="text-3xl font-bold text-primary">
+                      {(() => {
+                        const numericQuestions = detailedAnswers.filter(q => 
+                          (q.type === 'likert' || q.type === 'rating' || q.type === 'mcq') && parseFloat(q.mean) > 0
+                        );
+                        if (numericQuestions.length === 0) return 'N/A';
+                        const avg = numericQuestions.reduce((sum, q) => sum + parseFloat(q.mean), 0) / numericQuestions.length;
+                        return avg.toFixed(2);
+                      })()}
+                    </div>
+                    <div className="text-xs text-muted-foreground">المتوسط العام</div>
+                  </div>
+                  <div className="text-center p-4 bg-secondary/50 rounded-lg">
+                    <div className="text-3xl font-bold">{getFilteredResponsesCount()}</div>
+                    <div className="text-xs text-muted-foreground">استجابة</div>
+                  </div>
+                  <div className="text-center p-4 bg-accent/30 rounded-lg">
+                    <div className="text-3xl font-bold">
+                      {((getFilteredResponsesCount() / allResponses.length) * 100).toFixed(1)}%
+                    </div>
+                    <div className="text-xs text-muted-foreground">نسبة الاستجابة</div>
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Overall Mean Bar Chart */}
+              <div className="bg-card rounded-lg p-4 border">
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  متوسط كل سؤال
+                </h3>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart 
+                      data={detailedAnswers
+                        .filter(q => (q.type === 'likert' || q.type === 'rating' || q.type === 'mcq') && q.responseCount > 0)
+                        .map((q, i) => ({
+                          name: `س${i + 1}`,
+                          fullName: q.text.substring(0, 50) + (q.text.length > 50 ? '...' : ''),
+                          mean: parseFloat(q.mean),
+                          responses: q.responseCount,
+                        }))}
+                      layout="vertical"
+                      margin={{ top: 10, right: 30, left: 100, bottom: 10 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                      <XAxis type="number" domain={[0, 5]} tickCount={6} />
+                      <YAxis 
+                        type="category" 
+                        dataKey="fullName" 
+                        width={90}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <Tooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-popover p-3 rounded-lg shadow-lg border">
+                                <p className="font-semibold text-sm">{data.fullName}</p>
+                                <p className="text-primary font-bold">المتوسط: {data.mean.toFixed(2)}</p>
+                                <p className="text-muted-foreground text-xs">عدد الاستجابات: {data.responses}</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Bar 
+                        dataKey="mean" 
+                        radius={[0, 4, 4, 0]}
+                      >
+                        {detailedAnswers
+                          .filter(q => (q.type === 'likert' || q.type === 'rating' || q.type === 'mcq') && q.responseCount > 0)
+                          .map((_, index) => {
+                            const mean = parseFloat(detailedAnswers.filter(q => 
+                              (q.type === 'likert' || q.type === 'rating' || q.type === 'mcq') && q.responseCount > 0
+                            )[index]?.mean || '0');
+                            let color = '#22c55e';
+                            if (mean < 2.5) color = '#ef4444';
+                            else if (mean < 3.5) color = '#f59e0b';
+                            else if (mean < 4) color = '#84cc16';
+                            return <Cell key={`cell-${index}`} fill={color} />;
+                          })}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Questions Summary Table */}
+              <div className="bg-card rounded-lg p-4 border">
+                <h3 className="font-semibold mb-4">ملخص تفصيلي للأسئلة</h3>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-right">#</TableHead>
+                        <TableHead className="text-right">السؤال</TableHead>
+                        <TableHead className="text-center">النوع</TableHead>
+                        <TableHead className="text-center">الاستجابات</TableHead>
+                        <TableHead className="text-center">المتوسط</TableHead>
+                        <TableHead className="text-center">التقييم</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {detailedAnswers.map((q, i) => {
+                        const mean = parseFloat(q.mean);
+                        let status = { label: 'ممتاز', color: 'bg-green-500' };
+                        if (q.type === 'text') {
+                          status = { label: 'نصي', color: 'bg-blue-500' };
+                        } else if (mean === 0 || q.responseCount === 0) {
+                          status = { label: 'لا توجد بيانات', color: 'bg-gray-400' };
+                        } else if (mean < 2.5) {
+                          status = { label: 'ضعيف', color: 'bg-red-500' };
+                        } else if (mean < 3.5) {
+                          status = { label: 'متوسط', color: 'bg-yellow-500' };
+                        } else if (mean < 4) {
+                          status = { label: 'جيد', color: 'bg-lime-500' };
+                        }
+                        
+                        return (
+                          <TableRow key={q.id}>
+                            <TableCell className="font-medium">{i + 1}</TableCell>
+                            <TableCell className="max-w-xs truncate" title={q.text}>{q.text}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="outline" className="text-xs">
+                                {q.type === 'mcq' ? 'اختيار' : q.type === 'likert' ? 'ليكرت' : q.type === 'rating' ? 'تقييم' : 'نص'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center font-semibold">{q.responseCount}</TableCell>
+                            <TableCell className="text-center">
+                              {q.type !== 'text' && q.responseCount > 0 ? (
+                                <span className="font-bold text-primary">{q.mean}</span>
+                              ) : '-'}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge className={`${status.color} text-white text-xs`}>
+                                {status.label}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              {/* Individual Question Charts */}
+              <div className="space-y-4">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  تفاصيل توزيع الإجابات لكل سؤال
+                </h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {detailedAnswers
+                    .filter(q => q.type !== 'text' && q.responseCount > 0)
+                    .slice(0, 6)
+                    .map((q, i) => (
+                      <Card key={q.id} className="p-4">
+                        <h4 className="text-sm font-medium mb-3 line-clamp-2">{i + 1}. {q.text}</h4>
+                        <div className="flex items-center gap-4 mb-3">
+                          <Badge variant="secondary">المتوسط: {q.mean}</Badge>
+                          <Badge variant="outline">{q.responseCount} استجابة</Badge>
+                        </div>
+                        <div className="h-32">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={q.type === 'mcq' ? q.mcqDistribution : q.distribution}>
+                              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                              <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                              <YAxis allowDecimals={false} />
+                              <Tooltip />
+                              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                {(q.type === 'mcq' ? q.mcqDistribution : q.distribution).map((entry: any, index: number) => (
+                                  <Cell key={`cell-${index}`} fill={entry.fill} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </Card>
+                    ))}
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
