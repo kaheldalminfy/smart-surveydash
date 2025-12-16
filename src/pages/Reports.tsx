@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download, FileSpreadsheet, FileText, Sparkles, TrendingUp, ArrowRight, Save, Trash2, Edit as EditIcon, ChevronDown, ChevronUp, BarChart3, Users, Filter, LayoutDashboard, List } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Sparkles, TrendingUp, ArrowRight, Save, Trash2, Edit as EditIcon, ChevronDown, ChevronUp, BarChart3, Users, Filter, LayoutDashboard, List, Calendar } from "lucide-react";
 import ReportDashboard from "@/components/ReportDashboard";
 import DashboardButton from "@/components/DashboardButton";
 import { Textarea } from "@/components/ui/textarea";
@@ -48,6 +48,11 @@ const Reports = () => {
   const [filterQuestion, setFilterQuestion] = useState<string>("");
   const [filterValue, setFilterValue] = useState<string>("");
   const [viewMode, setViewMode] = useState<'dashboard' | 'list'>('dashboard');
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
+  const [meanRangeFrom, setMeanRangeFrom] = useState<string>("");
+  const [meanRangeTo, setMeanRangeTo] = useState<string>("");
+  const [filterQuestionType, setFilterQuestionType] = useState<string>("all");
 
   useEffect(() => {
     loadReport();
@@ -125,19 +130,49 @@ const Reports = () => {
     }
   };
 
-  const processDataWithFilter = (questions: any[], responses: any[], filterQ: string, filterV: string) => {
+  const processDataWithFilter = (
+    questions: any[], 
+    responses: any[], 
+    filterQ: string, 
+    filterV: string,
+    fromDate?: string,
+    toDate?: string,
+    questionType?: string
+  ) => {
     // Filter responses based on selected question and value
     let filteredResponses = responses;
     
+    // Filter by question value
     if (filterQ && filterV) {
-      filteredResponses = responses.filter(response => {
+      filteredResponses = filteredResponses.filter(response => {
         const answer = response.answers?.find((a: any) => a.question_id === filterQ);
         return answer && (answer.value === filterV || String(answer.numeric_value) === filterV);
       });
     }
 
+    // Filter by date range
+    if (fromDate) {
+      const from = new Date(fromDate);
+      filteredResponses = filteredResponses.filter(response => 
+        new Date(response.submitted_at) >= from
+      );
+    }
+    if (toDate) {
+      const to = new Date(toDate);
+      to.setHours(23, 59, 59, 999);
+      filteredResponses = filteredResponses.filter(response => 
+        new Date(response.submitted_at) <= to
+      );
+    }
+
+    // Filter questions by type
+    let filteredQuestions = questions;
+    if (questionType && questionType !== 'all') {
+      filteredQuestions = questions.filter(q => q.type === questionType);
+    }
+
     // Process data: for each question, get all answers with respondent info
-    const processedData = questions.map((question) => {
+    const processedData = filteredQuestions.map((question) => {
       const answersForQuestion = filteredResponses.flatMap((response, index) => {
         const answer = response.answers?.find((a: any) => a.question_id === question.id);
         if (answer) {
@@ -222,7 +257,24 @@ const Reports = () => {
       };
     });
 
-    setDetailedAnswers(processedData);
+    // Filter by mean range (for likert/rating questions only)
+    let finalData = processedData;
+    if (meanRangeFrom || meanRangeTo) {
+      finalData = processedData.map(q => {
+        if (q.type === 'likert' || q.type === 'rating') {
+          const meanVal = parseFloat(q.mean);
+          const fromVal = meanRangeFrom ? parseFloat(meanRangeFrom) : 0;
+          const toVal = meanRangeTo ? parseFloat(meanRangeTo) : 5;
+          if (meanVal >= fromVal && meanVal <= toVal) {
+            return q;
+          }
+          return { ...q, hidden: true };
+        }
+        return q;
+      }).filter(q => !q.hidden);
+    }
+
+    setDetailedAnswers(finalData);
   };
 
   // Get unique values for the selected filter question
@@ -258,22 +310,69 @@ const Reports = () => {
   };
 
   const applyFilter = () => {
-    processDataWithFilter(allQuestions, allResponses, filterQuestion, filterValue);
+    processDataWithFilter(
+      allQuestions, 
+      allResponses, 
+      filterQuestion, 
+      filterValue,
+      dateFrom,
+      dateTo,
+      filterQuestionType
+    );
   };
 
   const clearFilter = () => {
     setFilterQuestion("");
     setFilterValue("");
-    processDataWithFilter(allQuestions, allResponses, "", "");
+    setDateFrom("");
+    setDateTo("");
+    setMeanRangeFrom("");
+    setMeanRangeTo("");
+    setFilterQuestionType("all");
+    processDataWithFilter(allQuestions, allResponses, "", "", "", "", "all");
+  };
+
+  const hasActiveFilters = () => {
+    return filterQuestion || filterValue || dateFrom || dateTo || 
+           meanRangeFrom || meanRangeTo || filterQuestionType !== 'all';
+  };
+
+  const getSelectedQuestionLabel = () => {
+    const question = allQuestions.find(q => q.id === filterQuestion);
+    if (!question) return '';
+    const typeLabel = question.type === 'mcq' ? 'اختيار متعدد' : 
+                     question.type === 'likert' ? 'مقياس ليكرت' :
+                     question.type === 'rating' ? 'تقييم' : 'نص حر';
+    return `${question.text.substring(0, 30)}... (${typeLabel})`;
   };
 
   const getFilteredResponsesCount = () => {
-    if (!filterQuestion || !filterValue) return allResponses.length;
+    let filtered = allResponses;
     
-    return allResponses.filter(response => {
-      const answer = response.answers?.find((a: any) => a.question_id === filterQuestion);
-      return answer && (answer.value === filterValue || String(answer.numeric_value) === filterValue);
-    }).length;
+    // Filter by question value
+    if (filterQuestion && filterValue) {
+      filtered = filtered.filter(response => {
+        const answer = response.answers?.find((a: any) => a.question_id === filterQuestion);
+        return answer && (answer.value === filterValue || String(answer.numeric_value) === filterValue);
+      });
+    }
+
+    // Filter by date range
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      filtered = filtered.filter(response => 
+        new Date(response.submitted_at) >= from
+      );
+    }
+    if (dateTo) {
+      const to = new Date(dateTo);
+      to.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(response => 
+        new Date(response.submitted_at) <= to
+      );
+    }
+
+    return filtered.length;
   };
 
   const toggleQuestion = (questionId: string) => {
@@ -535,91 +634,212 @@ const Reports = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Filter className="h-5 w-5" />
-                فلتر التحليل حسب سؤال محدد
+                فلاتر التحليل المتقدمة
               </CardTitle>
               <CardDescription>
-                اختر سؤالاً وقيمة لتصفية التحليل (مثال: تحليل استجابات عضو هيئة تدريس معين)
+                استخدم الفلاتر لتحليل البيانات بشكل أدق حسب السؤال أو التاريخ أو نوع السؤال
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>اختر السؤال للفلترة</Label>
-                  <Select 
-                    value={filterQuestion} 
-                    onValueChange={(val) => {
-                      setFilterQuestion(val);
-                      setFilterValue("");
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="اختر سؤالاً..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allQuestions.map((q, i) => (
-                        <SelectItem key={q.id} value={q.id}>
-                          س{i + 1}: {q.text.substring(0, 50)}{q.text.length > 50 ? '...' : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            <CardContent className="space-y-6">
+              {/* Row 1: Question-based filter */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  فلترة حسب استجابة سؤال محدد
+                </Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">اختر السؤال</Label>
+                    <Select 
+                      value={filterQuestion} 
+                      onValueChange={(val) => {
+                        setFilterQuestion(val);
+                        setFilterValue("");
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="اختر سؤالاً للفلترة..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allQuestions.map((q, i) => (
+                          <SelectItem key={q.id} value={q.id}>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                {q.type === 'mcq' ? 'اختيار' : q.type === 'likert' ? 'ليكرت' : q.type === 'rating' ? 'تقييم' : 'نص'}
+                              </Badge>
+                              <span>س{i + 1}: {q.text.substring(0, 40)}{q.text.length > 40 ? '...' : ''}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">اختر القيمة</Label>
+                    <Select 
+                      value={filterValue} 
+                      onValueChange={setFilterValue}
+                      disabled={!filterQuestion}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={filterQuestion ? "اختر قيمة من خيارات السؤال..." : "اختر سؤالاً أولاً"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getFilterOptions().map((opt: string, i: number) => {
+                          const selectedQuestion = allQuestions.find(q => q.id === filterQuestion);
+                          const isLikertOrRating = selectedQuestion?.type === 'likert' || selectedQuestion?.type === 'rating';
+                          
+                          return (
+                            <SelectItem key={i} value={opt}>
+                              {isLikertOrRating ? (
+                                <div className="flex items-center gap-2">
+                                  <Badge variant={
+                                    opt === '5' || opt === '4' ? 'default' : 
+                                    opt === '3' ? 'secondary' : 'destructive'
+                                  } className="text-xs">
+                                    {opt}/5
+                                  </Badge>
+                                  <span>
+                                    {opt === '1' ? 'غير موافق بشدة' : 
+                                     opt === '2' ? 'غير موافق' : 
+                                     opt === '3' ? 'محايد' : 
+                                     opt === '4' ? 'موافق' : 'موافق بشدة'}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span>{opt}</span>
+                              )}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                
-                <div className="space-y-2">
-                  <Label>اختر القيمة</Label>
-                  <Select 
-                    value={filterValue} 
-                    onValueChange={setFilterValue}
-                    disabled={!filterQuestion}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={filterQuestion ? "اختر قيمة..." : "اختر سؤالاً أولاً"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getFilterOptions().map((opt: string, i: number) => (
-                        <SelectItem key={i} value={opt}>
-                          {allQuestions.find(q => q.id === filterQuestion)?.type === 'likert' || 
-                           allQuestions.find(q => q.id === filterQuestion)?.type === 'rating'
-                            ? `${opt} - ${opt === '1' ? 'غير موافق بشدة' : opt === '2' ? 'غير موافق' : opt === '3' ? 'محايد' : opt === '4' ? 'موافق' : 'موافق بشدة'}`
-                            : opt
-                          }
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              </div>
 
+              {/* Row 2: Date and Question Type filters */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
                 <div className="space-y-2">
-                  <Label>&nbsp;</Label>
+                  <Label className="text-xs text-muted-foreground">تاريخ الاستجابة (من)</Label>
+                  <Input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="text-sm"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">تاريخ الاستجابة (إلى)</Label>
+                  <Input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="text-sm"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">نوع السؤال</Label>
+                  <Select value={filterQuestionType} onValueChange={setFilterQuestionType}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">جميع الأنواع</SelectItem>
+                      <SelectItem value="likert">مقياس ليكرت</SelectItem>
+                      <SelectItem value="rating">تقييم</SelectItem>
+                      <SelectItem value="mcq">اختيار متعدد</SelectItem>
+                      <SelectItem value="text">نص حر</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Row 3: Mean range filter */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">نطاق المتوسط (من)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="5"
+                    step="0.1"
+                    placeholder="1.0"
+                    value={meanRangeFrom}
+                    onChange={(e) => setMeanRangeFrom(e.target.value)}
+                    className="text-sm"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">نطاق المتوسط (إلى)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="5"
+                    step="0.1"
+                    placeholder="5.0"
+                    value={meanRangeTo}
+                    onChange={(e) => setMeanRangeTo(e.target.value)}
+                    className="text-sm"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">&nbsp;</Label>
                   <div className="flex gap-2">
                     <Button 
                       onClick={applyFilter}
-                      disabled={!filterQuestion || !filterValue}
                       className="flex-1"
                     >
-                      تطبيق الفلتر
+                      <Filter className="h-4 w-4 ml-2" />
+                      تطبيق الفلاتر
                     </Button>
                     <Button 
                       variant="outline"
                       onClick={clearFilter}
-                      disabled={!filterQuestion && !filterValue}
+                      disabled={!hasActiveFilters()}
                     >
-                      مسح
+                      مسح الكل
                     </Button>
                   </div>
                 </div>
               </div>
 
-              {filterQuestion && filterValue && (
-                <div className="mt-4 p-3 bg-card rounded-lg border flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="default">فلتر نشط</Badge>
-                    <span className="text-sm">
-                      {allQuestions.find(q => q.id === filterQuestion)?.text.substring(0, 40)}... = <strong>{filterValue}</strong>
-                    </span>
+              {/* Active filters summary */}
+              {hasActiveFilters() && (
+                <div className="mt-4 p-4 bg-card rounded-lg border space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">الفلاتر النشطة:</span>
+                    <Badge variant="secondary">{getFilteredResponsesCount()} من {allResponses.length} استجابة</Badge>
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    {getFilteredResponsesCount()} من {allResponses.length} استجابة
+                  <div className="flex flex-wrap gap-2">
+                    {filterQuestion && filterValue && (
+                      <Badge variant="default" className="text-xs">
+                        {getSelectedQuestionLabel()} = {filterValue}
+                      </Badge>
+                    )}
+                    {dateFrom && (
+                      <Badge variant="outline" className="text-xs">
+                        من: {dateFrom}
+                      </Badge>
+                    )}
+                    {dateTo && (
+                      <Badge variant="outline" className="text-xs">
+                        إلى: {dateTo}
+                      </Badge>
+                    )}
+                    {filterQuestionType !== 'all' && (
+                      <Badge variant="outline" className="text-xs">
+                        نوع: {filterQuestionType === 'likert' ? 'مقياس ليكرت' : 
+                              filterQuestionType === 'rating' ? 'تقييم' :
+                              filterQuestionType === 'mcq' ? 'اختيار متعدد' : 'نص حر'}
+                      </Badge>
+                    )}
+                    {(meanRangeFrom || meanRangeTo) && (
+                      <Badge variant="outline" className="text-xs">
+                        المتوسط: {meanRangeFrom || '1'} - {meanRangeTo || '5'}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               )}
