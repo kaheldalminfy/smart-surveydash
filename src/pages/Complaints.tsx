@@ -79,6 +79,8 @@ const Complaints = () => {
   const [complaintToResolve, setComplaintToResolve] = useState<{id: string, newStatus: string} | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isDean, setIsDean] = useState(false);
+  const [isProgramManager, setIsProgramManager] = useState(false);
+  const [isCoordinator, setIsCoordinator] = useState(false);
   const [userProgramIds, setUserProgramIds] = useState<string[]>([]);
   const [newComplaint, setNewComplaint] = useState({
     title: "",
@@ -137,11 +139,15 @@ const Complaints = () => {
 
       const adminStatus = userRoles?.some(r => r.role === 'admin') || false;
       const deanStatus = userRoles?.some(r => r.role === 'dean') || false;
+      const programManagerStatus = userRoles?.some(r => r.role === 'program_manager') || false;
+      const coordinatorStatus = userRoles?.some(r => r.role === 'coordinator') || false;
       const programIds = userRoles?.map(r => r.program_id).filter(Boolean) as string[] || [];
 
       // Set user role states
       setIsAdmin(adminStatus);
       setIsDean(deanStatus);
+      setIsProgramManager(programManagerStatus);
+      setIsCoordinator(coordinatorStatus);
       setUserProgramIds(programIds);
 
       let query = supabase
@@ -151,7 +157,9 @@ const Complaints = () => {
           programs (name)
         `);
 
-      // Filter by program if not admin or dean (coordinators only see their programs)
+      // Filter by program:
+      // - Admin and Dean see all programs
+      // - Program Manager and Coordinator see only their programs
       if (!adminStatus && !deanStatus && programIds.length > 0) {
         query = query.in("program_id", programIds);
       }
@@ -406,6 +414,9 @@ const Complaints = () => {
   const stats = getOverallStats();
   const filteredComplaints = getFilteredComplaints();
 
+  // Check if user can manage complaints (only admin and coordinator can manage)
+  const canManage = isAdmin || isCoordinator;
+
   // Get unique programs that have complaints
   const programsWithComplaints = programs.filter(p => 
     complaints.some(c => c.program_id === p.id)
@@ -453,50 +464,55 @@ const Complaints = () => {
               <Eye className="h-4 w-4" />
             </Button>
             
-            {complaint.status === "pending" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => initiateStatusChange(complaint.id, "in_progress")}
-              >
-                بدء المعالجة
-              </Button>
-            )}
-            
-            {complaint.status === "in_progress" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => initiateStatusChange(complaint.id, "resolved")}
-              >
-                تم الحل
-              </Button>
-            )}
-
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>هل أنت متأكد من حذف هذه الشكوى؟</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    سيتم حذف الشكوى نهائياً ولا يمكن استرجاعها.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={() => deleteComplaint(complaint.id)}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            {/* Action buttons only for admin and coordinator */}
+            {canManage && (
+              <>
+                {complaint.status === "pending" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => initiateStatusChange(complaint.id, "in_progress")}
                   >
-                    حذف
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+                    بدء المعالجة
+                  </Button>
+                )}
+                
+                {complaint.status === "in_progress" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => initiateStatusChange(complaint.id, "resolved")}
+                  >
+                    تم الحل
+                  </Button>
+                )}
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>هل أنت متأكد من حذف هذه الشكوى؟</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        سيتم حذف الشكوى نهائياً ولا يمكن استرجاعها.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={() => deleteComplaint(complaint.id)}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        حذف
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
+            )}
           </div>
         </div>
       </CardContent>
@@ -547,22 +563,32 @@ const Complaints = () => {
               <h1 className="text-3xl font-bold">إدارة الشكاوى</h1>
               {isAdmin && <Badge variant="default" className="bg-purple-600">مدير النظام</Badge>}
               {isDean && !isAdmin && <Badge variant="default" className="bg-blue-600">العميد</Badge>}
-              {!isAdmin && !isDean && <Badge variant="secondary">منسق البرنامج</Badge>}
+              {isProgramManager && !isAdmin && !isDean && <Badge variant="default" className="bg-green-600">مدير البرنامج</Badge>}
+              {isCoordinator && !isAdmin && !isDean && !isProgramManager && <Badge variant="secondary">منسق البرنامج</Badge>}
             </div>
             <p className="text-muted-foreground">
               {isAdmin || isDean 
-                ? "متابعة ومعالجة جميع شكاوى الطلاب والموظفين" 
-                : "متابعة ومعالجة شكاوى برنامجك"}
+                ? "عرض جميع شكاوى الطلاب والموظفين" 
+                : isProgramManager
+                  ? "عرض شكاوى برنامجك (للعرض فقط)"
+                  : "متابعة ومعالجة شكاوى برنامجك"}
             </p>
+            {(isDean || isProgramManager) && !isAdmin && !isCoordinator && (
+              <p className="text-sm text-amber-600 mt-1">
+                ⚠️ صلاحية العرض فقط - لا يمكنك التعديل أو الرد
+              </p>
+            )}
           </div>
         </div>
-        <Dialog open={showNewComplaintDialog} onOpenChange={setShowNewComplaintDialog}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 ml-2" />
-              شكوى جديدة
-            </Button>
-          </DialogTrigger>
+        {/* New Complaint button only for admin and coordinator */}
+        {canManage && (
+          <Dialog open={showNewComplaintDialog} onOpenChange={setShowNewComplaintDialog}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 ml-2" />
+                شكوى جديدة
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>تقديم شكوى جديدة</DialogTitle>
@@ -635,6 +661,7 @@ const Complaints = () => {
             </div>
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       {/* Stats */}
@@ -1001,39 +1028,42 @@ const Complaints = () => {
               )}
               
               <div className="flex justify-end gap-2">
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="outline" className="text-destructive">
-                      <Trash2 className="h-4 w-4 ml-2" />
-                      حذف
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>هل أنت متأكد من حذف هذه الشكوى؟</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        سيتم حذف الشكوى نهائياً ولا يمكن استرجاعها.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                      <AlertDialogAction 
-                        onClick={() => {
-                          deleteComplaint(selectedComplaint.id);
-                          setSelectedComplaint(null);
-                        }}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
+                {/* Action buttons only for admin and coordinator */}
+                {canManage && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" className="text-destructive">
+                        <Trash2 className="h-4 w-4 ml-2" />
                         حذف
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>هل أنت متأكد من حذف هذه الشكوى؟</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          سيتم حذف الشكوى نهائياً ولا يمكن استرجاعها.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={() => {
+                            deleteComplaint(selectedComplaint.id);
+                            setSelectedComplaint(null);
+                          }}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          حذف
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
                 
                 <Button variant="outline" onClick={() => setSelectedComplaint(null)}>
                   إغلاق
                 </Button>
-                {selectedComplaint.status !== "resolved" && selectedComplaint.status !== "closed" && (
+                {canManage && selectedComplaint.status !== "resolved" && selectedComplaint.status !== "closed" && (
                   <>
                     <Button 
                       variant="outline"
