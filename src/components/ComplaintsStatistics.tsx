@@ -34,7 +34,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
     inProgress: 0,
     resolved: 0,
     byType: [] as { name: string; value: number; fill: string }[],
-    byCategory: [] as { name: string; value: number; fill: string }[],
+    byComplainantType: [] as { name: string; value: number; fill: string }[],
     byStatus: [] as { name: string; value: number; fill: string }[],
     byMonth: [] as { name: string; count: number }[],
   });
@@ -90,11 +90,10 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
       other: "أخرى",
     };
 
-    const categoryLabels: Record<string, string> = {
-      faculty: "أعضاء هيئة التدريس",
-      curriculum: "المناهج",
-      facilities: "المرافق",
-      services: "الخدمات",
+    const complainantTypeLabels: Record<string, string> = {
+      student: "طالب",
+      faculty: "عضو هيئة تدريس",
+      employee: "موظف",
       other: "أخرى",
     };
 
@@ -117,18 +116,18 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
       fill: typeColors[i % typeColors.length],
     }));
 
-    // By category
-    const categoryCounts: Record<string, number> = {};
+    // By complainant type
+    const complainantTypeCounts: Record<string, number> = {};
     filtered.forEach(c => {
-      const category = c.complaint_category || "other";
-      categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+      const complainantType = c.complainant_type || "other";
+      complainantTypeCounts[complainantType] = (complainantTypeCounts[complainantType] || 0) + 1;
     });
 
-    const categoryColors = ["#22c55e", "#ef4444", "#3b82f6", "#f59e0b", "#8b5cf6"];
-    const byCategory = Object.entries(categoryCounts).map(([key, value], i) => ({
-      name: categoryLabels[key] || key,
+    const complainantTypeColors = ["#3b82f6", "#8b5cf6", "#22c55e", "#6b7280"];
+    const byComplainantType = Object.entries(complainantTypeCounts).map(([key, value], i) => ({
+      name: complainantTypeLabels[key] || key,
       value,
-      fill: categoryColors[i % categoryColors.length],
+      fill: complainantTypeColors[i % complainantTypeColors.length],
     }));
 
     // By status
@@ -170,7 +169,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
       inProgress,
       resolved,
       byType,
-      byCategory,
+      byComplainantType,
       byStatus,
       byMonth,
     });
@@ -499,33 +498,29 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
                     </CardContent>
                   </Card>
 
-                  {/* Type Distribution */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">توزيع الشكاوى حسب النوع</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {stats.byType.length > 0 ? (
+                  {/* Complainant Type Distribution */}
+                  {stats.byComplainantType.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">توزيع الشكاوى حسب مقدم الشكوى</CardTitle>
+                      </CardHeader>
+                      <CardContent>
                         <ResponsiveContainer width="100%" height={300}>
-                          <BarChart data={stats.byType} layout="vertical">
+                          <BarChart data={stats.byComplainantType} layout="vertical">
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis type="number" />
-                            <YAxis dataKey="name" type="category" width={100} />
+                            <YAxis dataKey="name" type="category" width={120} />
                             <Tooltip />
                             <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                              {stats.byType.map((entry, index) => (
+                              {stats.byComplainantType.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={entry.fill} />
                               ))}
                             </Bar>
                           </BarChart>
                         </ResponsiveContainer>
-                      ) : (
-                        <div className="flex items-center justify-center h-[300px] text-muted-foreground">
-                          لا توجد بيانات
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {/* Monthly Trend */}
                   <Card className="lg:col-span-2">
@@ -545,35 +540,6 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
                     </CardContent>
                   </Card>
 
-                  {/* Category Distribution */}
-                  {stats.byCategory.length > 0 && (
-                    <Card className="lg:col-span-2">
-                      <CardHeader>
-                        <CardTitle className="text-lg">توزيع الشكاوى حسب التصنيف</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <PieChart>
-                            <Pie
-                              data={stats.byCategory}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={false}
-                              label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                              outerRadius={100}
-                              dataKey="value"
-                            >
-                              {stats.byCategory.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.fill} />
-                              ))}
-                            </Pie>
-                            <Tooltip />
-                            <Legend />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-                  )}
                 </div>
               </>
             )}
