@@ -397,8 +397,7 @@ const Reports = () => {
   };
 
   const getUniqueSemesters = () => {
-    const semesters = new Set(academicCalendar.map(cal => cal.semester));
-    return Array.from(semesters);
+    return ['خريف', 'ربيع', 'صيفي'];
   };
 
   // Toggle value selection for multi-select filter

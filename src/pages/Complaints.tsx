@@ -422,7 +422,7 @@ const Complaints = () => {
   });
   
   // Static semester options
-  const semesterOptions = ["فصل الخريف", "فصل الربيع"];
+  const semesterOptions = ["خريف", "ربيع", "صيفي"];
 
   // Get complaints grouped by program
   const getComplaintsByProgram = (programId: string | null) => {

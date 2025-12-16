@@ -261,7 +261,7 @@ const SubmitComplaint = () => {
                         <SelectContent>
                           <SelectItem value="خريف">{t('complaints.fall')}</SelectItem>
                           <SelectItem value="ربيع">{t('complaints.spring')}</SelectItem>
-                          <SelectItem value="صيف">{t('complaints.summer')}</SelectItem>
+                          <SelectItem value="صيفي">{t('complaints.summer')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
