@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { loadArabicFont } from './arabicFont';
 
 export const exportToPDF = async (report: any, survey: any, stats: any, logoUrl?: string) => {
   const doc = new jsPDF({
@@ -9,7 +10,18 @@ export const exportToPDF = async (report: any, survey: any, stats: any, logoUrl?
     format: 'a4',
   });
 
-  // Add Arabic font support
+  // Load and add Arabic font
+  try {
+    const arabicFontBase64 = await loadArabicFont();
+    if (arabicFontBase64) {
+      doc.addFileToVFS('Amiri-Regular.ttf', arabicFontBase64);
+      doc.addFont('Amiri-Regular.ttf', 'Amiri', 'normal');
+      doc.setFont('Amiri');
+    }
+  } catch (error) {
+    console.error('Error setting Arabic font:', error);
+  }
+
   doc.setLanguage('ar');
   
   let yPos = 20;
@@ -30,6 +42,7 @@ export const exportToPDF = async (report: any, survey: any, stats: any, logoUrl?
   doc.setFillColor(66, 139, 202);
   doc.rect(15, yPos - 5, 180, 30, 'F');
   
+  doc.setFont('Amiri', 'normal');
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(22);
   doc.text('تقرير الاستبيان', 105, yPos + 5, { align: 'center' });
@@ -58,8 +71,8 @@ export const exportToPDF = async (report: any, survey: any, stats: any, logoUrl?
   doc.rect(15, yPos, 180, 10, 'F');
   
   doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('📊 الإحصائيات الرئيسية', 20, yPos + 7);
+  doc.setFont('Amiri', 'normal');
+  doc.text('الإحصائيات الرئيسية', 20, yPos + 7);
   yPos += 12;
   
   const statsData = [
@@ -74,7 +87,7 @@ export const exportToPDF = async (report: any, survey: any, stats: any, logoUrl?
     head: [['المؤشر', 'القيمة']],
     body: statsData,
     styles: { 
-      font: 'helvetica', 
+      font: 'Amiri', 
       halign: 'right',
       fontSize: 11,
       cellPadding: 5
@@ -95,11 +108,11 @@ export const exportToPDF = async (report: any, survey: any, stats: any, logoUrl?
   doc.rect(15, yPos - 3, 180, 10, 'F');
   
   doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('📝 الملخص التنفيذي', 20, yPos + 4);
+  doc.setFont('Amiri', 'normal');
+  doc.text('الملخص التنفيذي', 20, yPos + 4);
   yPos += 12;
   
-  doc.setFont('helvetica', 'normal');
+  doc.setFont('Amiri', 'normal');
   doc.setFontSize(11);
   const summaryText = report.summary || 'لا يوجد ملخص متاح حالياً. يرجى مراجعة التفاصيل أدناه.';
   const summaryLines = doc.splitTextToSize(summaryText, 170);
@@ -123,11 +136,11 @@ export const exportToPDF = async (report: any, survey: any, stats: any, logoUrl?
   doc.rect(15, yPos - 3, 180, 10, 'F');
   
   doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('💡 التوصيات والمقترحات', 20, yPos + 4);
+  doc.setFont('Amiri', 'normal');
+  doc.text('التوصيات والمقترحات', 20, yPos + 4);
   yPos += 12;
   
-  doc.setFont('helvetica', 'normal');
+  doc.setFont('Amiri', 'normal');
   doc.setFontSize(11);
   const recommendationText = report.recommendations_text || 'لا توجد توصيات محددة حالياً. سيتم تحديث هذا القسم بناءً على تحليل النتائج.';
   const recommendationLines = doc.splitTextToSize(recommendationText, 170);
@@ -154,8 +167,8 @@ export const exportToPDF = async (report: any, survey: any, stats: any, logoUrl?
     doc.rect(15, yPos - 3, 180, 10, 'F');
     
     doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('📋 تفاصيل الأسئلة والتقييمات', 20, yPos + 4);
+    doc.setFont('Amiri', 'normal');
+    doc.text('تفاصيل الأسئلة والتقييمات', 20, yPos + 4);
     yPos += 12;
     
     const questionData = stats.questionStats.map((q: any, index: number) => [
@@ -170,7 +183,7 @@ export const exportToPDF = async (report: any, survey: any, stats: any, logoUrl?
       head: [['السؤال', 'المتوسط', 'الانحراف المعياري', 'عدد الإجابات']],
       body: questionData,
       styles: { 
-        font: 'helvetica', 
+        font: 'Amiri', 
         halign: 'right', 
         fontSize: 10,
         cellPadding: 4
@@ -195,6 +208,7 @@ export const exportToPDF = async (report: any, survey: any, stats: any, logoUrl?
   const pageCount = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
+    doc.setFont('Amiri', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(128, 128, 128);
     doc.text(
