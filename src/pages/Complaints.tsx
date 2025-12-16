@@ -23,8 +23,7 @@ import {
   Copy,
   ArrowLeft,
   Trash2,
-  Building2,
-  XCircle
+  Building2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -264,7 +263,7 @@ const Complaints = () => {
       
       if (notes) {
         updateData.resolution_notes = notes;
-        if (newStatus === 'resolved' || newStatus === 'closed') {
+        if (newStatus === 'resolved') {
           updateData.resolved_at = new Date().toISOString();
           const { data: { user } } = await supabase.auth.getUser();
           if (user) updateData.resolved_by = user.id;
@@ -331,7 +330,7 @@ const Complaints = () => {
   };
 
   const initiateStatusChange = (complaintId: string, newStatus: string) => {
-    if (newStatus === 'resolved' || newStatus === 'closed') {
+    if (newStatus === 'resolved') {
       setComplaintToResolve({ id: complaintId, newStatus });
       setShowResolutionDialog(true);
     } else {
@@ -341,22 +340,28 @@ const Complaints = () => {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      pending: { label: "قيد المراجعة", variant: "secondary" as const, icon: Clock },
-      in_progress: { label: "قيد المعالجة", variant: "default" as const, icon: MessageSquare },
-      resolved: { label: "تم الحل", variant: "default" as const, icon: CheckCircle },
-      closed: { label: "مغلقة", variant: "outline" as const, icon: XCircle },
+      pending: { label: "جديدة", variant: "secondary" as const, icon: Clock, className: "bg-blue-100 text-blue-800 border-blue-200" },
+      in_progress: { label: "قيد الإجراء", variant: "default" as const, icon: MessageSquare, className: "bg-orange-100 text-orange-800 border-orange-200" },
+      resolved: { label: "تم الحل", variant: "default" as const, icon: CheckCircle, className: "bg-green-100 text-green-800 border-green-200" },
     };
     
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
     const Icon = config.icon;
     
     return (
-      <Badge variant={config.variant} className="flex items-center gap-1">
+      <Badge variant={config.variant} className={`flex items-center gap-1 ${config.className}`}>
         <Icon className="h-3 w-3" />
         {config.label}
       </Badge>
     );
   };
+
+  // Status options for dropdown
+  const statusOptions = [
+    { value: "pending", label: "جديدة" },
+    { value: "in_progress", label: "قيد الإجراء" },
+    { value: "resolved", label: "تم الحل" },
+  ];
 
   const getCategoryLabel = (category: string) => {
     const categories = {
@@ -397,7 +402,6 @@ const Complaints = () => {
       pending: programComplaints.filter(c => c.status === "pending").length,
       inProgress: programComplaints.filter(c => c.status === "in_progress").length,
       resolved: programComplaints.filter(c => c.status === "resolved").length,
-      closed: programComplaints.filter(c => c.status === "closed").length,
     };
   };
 
@@ -464,28 +468,20 @@ const Complaints = () => {
               <Eye className="h-4 w-4" />
             </Button>
             
-            {/* Action buttons only for admin and coordinator */}
+            {/* Status dropdown only for admin and coordinator */}
             {canManage && (
               <>
-                {complaint.status === "pending" && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => initiateStatusChange(complaint.id, "in_progress")}
-                  >
-                    بدء المعالجة
-                  </Button>
-                )}
-                
-                {complaint.status === "in_progress" && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => initiateStatusChange(complaint.id, "resolved")}
-                  >
-                    تم الحل
-                  </Button>
-                )}
+                <select
+                  className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+                  value={complaint.status}
+                  onChange={(e) => initiateStatusChange(complaint.id, e.target.value)}
+                >
+                  {statusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
 
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -682,10 +678,10 @@ const Complaints = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">قيد المراجعة</p>
+                <p className="text-sm font-medium text-muted-foreground">جديدة</p>
                 <p className="text-2xl font-bold">{stats.pending}</p>
               </div>
-              <Clock className="h-8 w-8 text-yellow-600" />
+              <Clock className="h-8 w-8 text-blue-600" />
             </div>
           </CardContent>
         </Card>
@@ -694,7 +690,7 @@ const Complaints = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">قيد المعالجة</p>
+                <p className="text-sm font-medium text-muted-foreground">قيد الإجراء</p>
                 <p className="text-2xl font-bold">{stats.inProgress}</p>
               </div>
               <MessageSquare className="h-8 w-8 text-orange-600" />
@@ -841,10 +837,9 @@ const Complaints = () => {
                     onChange={(e) => setSelectedStatus(e.target.value)}
                   >
                     <option value="all">جميع الحالات</option>
-                    <option value="pending">قيد المراجعة</option>
-                    <option value="in_progress">قيد المعالجة</option>
+                    <option value="pending">جديدة</option>
+                    <option value="in_progress">قيد الإجراء</option>
                     <option value="resolved">تم الحل</option>
-                    <option value="closed">مغلقة</option>
                   </select>
                 </div>
               </CardContent>
@@ -852,10 +847,9 @@ const Complaints = () => {
 
             {/* Status-grouped complaints */}
             <div className="space-y-6">
-              {renderStatusSection("pending", "قيد المراجعة", <Clock className="h-5 w-5 text-yellow-600" />, filteredComplaints)}
-              {renderStatusSection("in_progress", "قيد المعالجة", <MessageSquare className="h-5 w-5 text-orange-600" />, filteredComplaints)}
+              {renderStatusSection("pending", "جديدة", <Clock className="h-5 w-5 text-blue-600" />, filteredComplaints)}
+              {renderStatusSection("in_progress", "قيد الإجراء", <MessageSquare className="h-5 w-5 text-orange-600" />, filteredComplaints)}
               {renderStatusSection("resolved", "تم الحل", <CheckCircle className="h-5 w-5 text-green-600" />, filteredComplaints)}
-              {renderStatusSection("closed", "مغلقة", <XCircle className="h-5 w-5 text-gray-600" />, filteredComplaints)}
             </div>
 
             {filteredComplaints.length === 0 && (
@@ -882,14 +876,14 @@ const Complaints = () => {
           return (
             <TabsContent key={program.id} value={program.id} className="space-y-4">
               {/* Program Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card className="bg-yellow-50 border-yellow-200">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="bg-blue-50 border-blue-200">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2">
-                      <Clock className="h-5 w-5 text-yellow-600" />
+                      <Clock className="h-5 w-5 text-blue-600" />
                       <div>
-                        <p className="text-sm text-yellow-700">قيد المراجعة</p>
-                        <p className="text-xl font-bold text-yellow-900">{programStats.pending}</p>
+                        <p className="text-sm text-blue-700">جديدة</p>
+                        <p className="text-xl font-bold text-blue-900">{programStats.pending}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -899,7 +893,7 @@ const Complaints = () => {
                     <div className="flex items-center gap-2">
                       <MessageSquare className="h-5 w-5 text-orange-600" />
                       <div>
-                        <p className="text-sm text-orange-700">قيد المعالجة</p>
+                        <p className="text-sm text-orange-700">قيد الإجراء</p>
                         <p className="text-xl font-bold text-orange-900">{programStats.inProgress}</p>
                       </div>
                     </div>
@@ -916,27 +910,15 @@ const Complaints = () => {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="bg-gray-50 border-gray-200">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2">
-                      <XCircle className="h-5 w-5 text-gray-600" />
-                      <div>
-                        <p className="text-sm text-gray-700">مغلقة</p>
-                        <p className="text-xl font-bold text-gray-900">{programStats.closed}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
               </div>
 
               {/* Status Tabs within program */}
               <Tabs defaultValue="all-status" className="space-y-4">
                 <TabsList>
                   <TabsTrigger value="all-status">الكل ({programComplaints.length})</TabsTrigger>
-                  <TabsTrigger value="pending">قيد المراجعة ({programStats.pending})</TabsTrigger>
-                  <TabsTrigger value="in_progress">قيد المعالجة ({programStats.inProgress})</TabsTrigger>
+                  <TabsTrigger value="pending">جديدة ({programStats.pending})</TabsTrigger>
+                  <TabsTrigger value="in_progress">قيد الإجراء ({programStats.inProgress})</TabsTrigger>
                   <TabsTrigger value="resolved">تم الحل ({programStats.resolved})</TabsTrigger>
-                  <TabsTrigger value="closed">مغلقة ({programStats.closed})</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="all-status" className="space-y-4">
@@ -950,7 +932,7 @@ const Complaints = () => {
                   )}
                 </TabsContent>
 
-                {["pending", "in_progress", "resolved", "closed"].map(status => (
+                {["pending", "in_progress", "resolved"].map(status => (
                   <TabsContent key={status} value={status} className="space-y-4">
                     {programComplaints.filter(c => c.status === status).map(renderComplaintCard)}
                     {programComplaints.filter(c => c.status === status).length === 0 && (
@@ -1063,7 +1045,7 @@ const Complaints = () => {
                 <Button variant="outline" onClick={() => setSelectedComplaint(null)}>
                   إغلاق
                 </Button>
-                {canManage && selectedComplaint.status !== "resolved" && selectedComplaint.status !== "closed" && (
+                {canManage && (
                   <>
                     <Button 
                       variant="outline"
@@ -1074,13 +1056,23 @@ const Complaints = () => {
                     >
                       تعديل
                     </Button>
-                    <Button onClick={() => {
-                      const newStatus = selectedComplaint.status === "pending" ? "in_progress" : "resolved";
-                      initiateStatusChange(selectedComplaint.id, newStatus);
-                      setSelectedComplaint(null);
-                    }}>
-                      {selectedComplaint.status === "pending" ? "بدء المعالجة" : "تم الحل"}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm">الحالة:</Label>
+                      <select
+                        className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+                        value={selectedComplaint.status}
+                        onChange={(e) => {
+                          initiateStatusChange(selectedComplaint.id, e.target.value);
+                          setSelectedComplaint(null);
+                        }}
+                      >
+                        {statusOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </>
                 )}
               </div>
