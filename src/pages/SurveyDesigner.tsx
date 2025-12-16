@@ -83,8 +83,7 @@ const SurveyDesigner = () => {
   };
 
   const getUniqueSemesters = () => {
-    const semesters = new Set(academicCalendar.map(cal => cal.semester));
-    return Array.from(semesters);
+    return ['خريف', 'ربيع', 'صيفي'];
   };
 
   const loadSurvey = async () => {
