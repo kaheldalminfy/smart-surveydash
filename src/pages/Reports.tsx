@@ -13,7 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download, FileSpreadsheet, FileText, Sparkles, TrendingUp, ArrowRight, Save, Trash2, Edit as EditIcon, ChevronDown, ChevronUp, BarChart3, Users, Filter } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Sparkles, TrendingUp, ArrowRight, Save, Trash2, Edit as EditIcon, ChevronDown, ChevronUp, BarChart3, Users, Filter, LayoutDashboard, List } from "lucide-react";
+import ReportDashboard from "@/components/ReportDashboard";
 import DashboardButton from "@/components/DashboardButton";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -46,6 +47,7 @@ const Reports = () => {
   const [allResponses, setAllResponses] = useState<any[]>([]);
   const [filterQuestion, setFilterQuestion] = useState<string>("");
   const [filterValue, setFilterValue] = useState<string>("");
+  const [viewMode, setViewMode] = useState<'dashboard' | 'list'>('dashboard');
 
   useEffect(() => {
     loadReport();
@@ -727,8 +729,41 @@ const Reports = () => {
           </CardContent>
         </Card>
 
-        {/* Questions Overview Chart */}
-        {detailedAnswers.length > 0 && (
+        {/* View Mode Toggle */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">تحليل الاستجابات</h2>
+          <div className="flex gap-2">
+            <Button
+              variant={viewMode === 'dashboard' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('dashboard')}
+            >
+              <LayoutDashboard className="h-4 w-4 ml-2" />
+              عرض داش بورد
+            </Button>
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('list')}
+            >
+              <List className="h-4 w-4 ml-2" />
+              عرض قائمة
+            </Button>
+          </div>
+        </div>
+
+        {/* Dashboard View */}
+        {viewMode === 'dashboard' && detailedAnswers.length > 0 && (
+          <ReportDashboard
+            detailedAnswers={detailedAnswers}
+            totalResponses={totalResponses}
+            surveyTitle={survey?.title || ''}
+            programName={survey?.programs?.name || ''}
+          />
+        )}
+
+        {/* List View - Questions Overview Chart */}
+        {viewMode === 'list' && detailedAnswers.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -782,8 +817,8 @@ const Reports = () => {
           </Card>
         )}
 
-        {/* Detailed Questions with Responses */}
-        {detailedAnswers.length > 0 && (
+        {/* List View - Detailed Questions with Responses */}
+        {viewMode === 'list' && detailedAnswers.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
