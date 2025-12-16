@@ -284,9 +284,17 @@ const Reports = () => {
     const question = allQuestions.find(q => q.id === filterQuestion);
     if (!question) return [];
 
-    // For MCQ questions, use the predefined options
+    // For MCQ questions, use the predefined options from choices array
     if (question.type === 'mcq' && question.options) {
-      return Array.isArray(question.options) ? question.options : [];
+      // Handle nested structure: options.choices or direct array
+      const options = question.options;
+      if (Array.isArray(options)) {
+        return options;
+      }
+      if (options.choices && Array.isArray(options.choices)) {
+        return options.choices.map((choice: string) => choice.trim());
+      }
+      return [];
     }
 
     // For text questions, get unique values from responses
