@@ -412,13 +412,15 @@ const Complaints = () => {
     });
   };
 
-  // Get unique academic years from calendar
-  const academicYears = [...new Set(academicCalendar.map(c => c.academic_year))];
+  // Generate academic years (current year + 100 years ahead)
+  const currentYear = new Date().getFullYear();
+  const academicYears = Array.from({ length: 101 }, (_, i) => {
+    const startYear = currentYear + i;
+    return `${startYear}-${startYear + 1}`;
+  });
   
-  // Get semesters for selected academic year
-  const semestersForYear = selectedAcademicYear === "all" 
-    ? [...new Set(academicCalendar.map(c => c.semester))]
-    : academicCalendar.filter(c => c.academic_year === selectedAcademicYear).map(c => c.semester);
+  // Static semester options
+  const semesterOptions = ["فصل الخريف", "فصل الربيع"];
 
   // Get complaints grouped by program
   const getComplaintsByProgram = (programId: string | null) => {
@@ -905,7 +907,7 @@ const Complaints = () => {
                     onChange={(e) => setSelectedSemester(e.target.value)}
                   >
                     <option value="all">جميع الفصول</option>
-                    {semestersForYear.map((semester) => (
+                    {semesterOptions.map((semester) => (
                       <option key={semester} value={semester}>
                         {semester}
                       </option>
