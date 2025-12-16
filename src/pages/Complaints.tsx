@@ -87,6 +87,8 @@ const Complaints = () => {
   const [isCoordinator, setIsCoordinator] = useState(false);
   const [userProgramIds, setUserProgramIds] = useState<string[]>([]);
   const [showStatistics, setShowStatistics] = useState(false);
+  const [activeStatusView, setActiveStatusView] = useState<string | null>(null);
+  const [activeStatusContext, setActiveStatusContext] = useState<{type: 'all' | 'program', programId?: string} | null>(null);
   const [newComplaint, setNewComplaint] = useState({
     title: "",
     description: "",
@@ -569,6 +571,219 @@ const Complaints = () => {
     );
   };
 
+  // Helper function to get status info
+  const getStatusInfo = (status: string) => {
+    const statusMap: { [key: string]: { label: string; icon: React.ReactNode; color: string; bgColor: string; borderColor: string } } = {
+      all: { label: "إجمالي الشكاوى", icon: <FileText className="h-8 w-8" />, color: "text-blue-600", bgColor: "bg-blue-50 hover:bg-blue-100", borderColor: "border-blue-200" },
+      pending: { label: "جديدة", icon: <Clock className="h-8 w-8" />, color: "text-blue-600", bgColor: "bg-blue-50 hover:bg-blue-100", borderColor: "border-blue-200" },
+      in_progress: { label: "قيد الإجراء", icon: <MessageSquare className="h-8 w-8" />, color: "text-orange-600", bgColor: "bg-orange-50 hover:bg-orange-100", borderColor: "border-orange-200" },
+      resolved: { label: "تم الحل", icon: <CheckCircle className="h-8 w-8" />, color: "text-green-600", bgColor: "bg-green-50 hover:bg-green-100", borderColor: "border-green-200" },
+    };
+    return statusMap[status] || statusMap.all;
+  };
+
+  // Render clickable stats cards
+  const renderClickableStats = (complaintsData: Complaint[], context: {type: 'all' | 'program', programId?: string}) => {
+    const statsData = {
+      total: complaintsData.length,
+      pending: complaintsData.filter(c => c.status === "pending").length,
+      inProgress: complaintsData.filter(c => c.status === "in_progress").length,
+      resolved: complaintsData.filter(c => c.status === "resolved").length,
+    };
+
+    const handleStatClick = (status: string) => {
+      setActiveStatusView(status);
+      setActiveStatusContext(context);
+    };
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card 
+          className={`cursor-pointer transition-all ${getStatusInfo('all').bgColor} ${getStatusInfo('all').borderColor} border-2 ${activeStatusView === 'all' && activeStatusContext?.type === context.type && activeStatusContext?.programId === context.programId ? 'ring-2 ring-primary' : ''}`}
+          onClick={() => handleStatClick('all')}
+        >
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">إجمالي الشكاوى</p>
+                <p className="text-2xl font-bold">{statsData.total}</p>
+              </div>
+              <div className={getStatusInfo('all').color}>{getStatusInfo('all').icon}</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className={`cursor-pointer transition-all ${getStatusInfo('pending').bgColor} ${getStatusInfo('pending').borderColor} border-2 ${activeStatusView === 'pending' && activeStatusContext?.type === context.type && activeStatusContext?.programId === context.programId ? 'ring-2 ring-primary' : ''}`}
+          onClick={() => handleStatClick('pending')}
+        >
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">جديدة</p>
+                <p className="text-2xl font-bold">{statsData.pending}</p>
+              </div>
+              <div className={getStatusInfo('pending').color}>{getStatusInfo('pending').icon}</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className={`cursor-pointer transition-all ${getStatusInfo('in_progress').bgColor} ${getStatusInfo('in_progress').borderColor} border-2 ${activeStatusView === 'in_progress' && activeStatusContext?.type === context.type && activeStatusContext?.programId === context.programId ? 'ring-2 ring-primary' : ''}`}
+          onClick={() => handleStatClick('in_progress')}
+        >
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">قيد الإجراء</p>
+                <p className="text-2xl font-bold">{statsData.inProgress}</p>
+              </div>
+              <div className={getStatusInfo('in_progress').color}>{getStatusInfo('in_progress').icon}</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className={`cursor-pointer transition-all ${getStatusInfo('resolved').bgColor} ${getStatusInfo('resolved').borderColor} border-2 ${activeStatusView === 'resolved' && activeStatusContext?.type === context.type && activeStatusContext?.programId === context.programId ? 'ring-2 ring-primary' : ''}`}
+          onClick={() => handleStatClick('resolved')}
+        >
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">تم الحل</p>
+                <p className="text-2xl font-bold">{statsData.resolved}</p>
+              </div>
+              <div className={getStatusInfo('resolved').color}>{getStatusInfo('resolved').icon}</div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
+  // Render status dashboard with complainant type categorization
+  const renderStatusDashboard = (complaintsData: Complaint[], status: string) => {
+    const filteredByStatus = status === 'all' ? complaintsData : complaintsData.filter(c => c.status === status);
+    const statusInfo = getStatusInfo(status);
+    
+    // Group by complainant type
+    const studentComplaints = filteredByStatus.filter(c => c.complainant_type === 'طالب' || c.complainant_type === 'student');
+    const facultyComplaints = filteredByStatus.filter(c => c.complainant_type === 'عضو هيئة تدريس' || c.complainant_type === 'faculty');
+    const employeeComplaints = filteredByStatus.filter(c => c.complainant_type === 'موظف' || c.complainant_type === 'employee');
+    const otherComplaints = filteredByStatus.filter(c => !c.complainant_type || !['طالب', 'student', 'عضو هيئة تدريس', 'faculty', 'موظف', 'employee'].includes(c.complainant_type));
+
+    return (
+      <Card className="mt-4">
+        <CardHeader className={`${statusInfo.bgColor} ${statusInfo.borderColor} border-b`}>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-3">
+              <div className={statusInfo.color}>{statusInfo.icon}</div>
+              <span>{statusInfo.label}</span>
+              <Badge variant="secondary" className="text-lg px-3 py-1">{filteredByStatus.length}</Badge>
+            </CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => setActiveStatusView(null)}>
+              إغلاق ✕
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6">
+          {/* Search */}
+          <div className="mb-6">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="البحث في الشكاوى..." className="pl-10" />
+            </div>
+          </div>
+
+          {/* Complainant Type Tabs */}
+          <Tabs defaultValue="all-types" className="space-y-4">
+            <TabsList className="flex flex-wrap h-auto gap-2 bg-muted p-2">
+              <TabsTrigger value="all-types" className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                الكل
+                <Badge variant="secondary">{filteredByStatus.length}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="students" className="flex items-center gap-2">
+                🎓 طلاب
+                <Badge variant="secondary">{studentComplaints.length}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="faculty" className="flex items-center gap-2">
+                👨‍🏫 أعضاء هيئة التدريس
+                <Badge variant="secondary">{facultyComplaints.length}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="employees" className="flex items-center gap-2">
+                👔 موظفين
+                <Badge variant="secondary">{employeeComplaints.length}</Badge>
+              </TabsTrigger>
+              {otherComplaints.length > 0 && (
+                <TabsTrigger value="other" className="flex items-center gap-2">
+                  📋 أخرى
+                  <Badge variant="secondary">{otherComplaints.length}</Badge>
+                </TabsTrigger>
+              )}
+            </TabsList>
+
+            <TabsContent value="all-types" className="space-y-4">
+              {filteredByStatus.length > 0 ? (
+                <div className="grid gap-4">
+                  {filteredByStatus.map(renderComplaintCard)}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  لا توجد شكاوى
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="students" className="space-y-4">
+              {studentComplaints.length > 0 ? (
+                <div className="grid gap-4">
+                  {studentComplaints.map(renderComplaintCard)}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  لا توجد شكاوى من الطلاب
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="faculty" className="space-y-4">
+              {facultyComplaints.length > 0 ? (
+                <div className="grid gap-4">
+                  {facultyComplaints.map(renderComplaintCard)}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  لا توجد شكاوى من أعضاء هيئة التدريس
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="employees" className="space-y-4">
+              {employeeComplaints.length > 0 ? (
+                <div className="grid gap-4">
+                  {employeeComplaints.map(renderComplaintCard)}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  لا توجد شكاوى من الموظفين
+                </div>
+              )}
+            </TabsContent>
+
+            {otherComplaints.length > 0 && (
+              <TabsContent value="other" className="space-y-4">
+                <div className="grid gap-4">
+                  {otherComplaints.map(renderComplaintCard)}
+                </div>
+              </TabsContent>
+            )}
+          </Tabs>
+        </CardContent>
+      </Card>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -703,56 +918,13 @@ const Complaints = () => {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">إجمالي الشكاوى</p>
-                <p className="text-2xl font-bold">{stats.total}</p>
-              </div>
-              <FileText className="h-8 w-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
+      {/* Global Stats - Clickable */}
+      {renderClickableStats(complaints, { type: 'all' })}
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">جديدة</p>
-                <p className="text-2xl font-bold">{stats.pending}</p>
-              </div>
-              <Clock className="h-8 w-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">قيد الإجراء</p>
-                <p className="text-2xl font-bold">{stats.inProgress}</p>
-              </div>
-              <MessageSquare className="h-8 w-8 text-orange-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">تم الحل</p>
-                <p className="text-2xl font-bold">{stats.resolved}</p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Status Dashboard - Shows when a stat is clicked for "all" context */}
+      {activeStatusView && activeStatusContext?.type === 'all' && (
+        renderStatusDashboard(complaints, activeStatusView)
+      )}
 
       {/* QR Code Section */}
       <Card className="bg-gradient-to-br from-primary/5 to-secondary/5 border-primary/20">
@@ -943,289 +1115,42 @@ const Complaints = () => {
         {/* Program-specific tabs */}
         {(isAdmin || isDean ? programsWithComplaints : programsWithComplaints.filter(p => userProgramIds.includes(p.id))).map(program => {
           const programComplaints = getComplaintsByProgram(program.id);
-          const programStats = getProgramStats(program.id);
-          
-          // Group complaints by complainant type
-          const studentComplaints = programComplaints.filter(c => c.complainant_type === 'طالب' || c.complainant_type === 'student');
-          const facultyComplaints = programComplaints.filter(c => c.complainant_type === 'عضو هيئة تدريس' || c.complainant_type === 'faculty');
-          const employeeComplaints = programComplaints.filter(c => c.complainant_type === 'موظف' || c.complainant_type === 'employee');
-          const otherComplaints = programComplaints.filter(c => !c.complainant_type || !['طالب', 'student', 'عضو هيئة تدريس', 'faculty', 'موظف', 'employee'].includes(c.complainant_type));
           
           return (
             <TabsContent key={program.id} value={program.id} className="space-y-4">
-              {/* Program Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-blue-50 border-blue-200">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-5 w-5 text-blue-600" />
-                      <div>
-                        <p className="text-sm text-blue-700">جديدة</p>
-                        <p className="text-xl font-bold text-blue-900">{programStats.pending}</p>
+              {/* Program Stats - Clickable */}
+              {renderClickableStats(programComplaints, { type: 'program', programId: program.id })}
+
+              {/* Status Dashboard - Shows when a stat is clicked for this program */}
+              {activeStatusView && activeStatusContext?.type === 'program' && activeStatusContext?.programId === program.id && (
+                renderStatusDashboard(programComplaints, activeStatusView)
+              )}
+
+              {/* Default view when no stat is clicked */}
+              {!(activeStatusView && activeStatusContext?.type === 'program' && activeStatusContext?.programId === program.id) && (
+                <Card className="mt-4">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Building2 className="h-5 w-5" />
+                      شكاوى برنامج {program.name}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground mb-4">
+                      انقر على أي من الأيقونات أعلاه لعرض الشكاوى حسب الحالة مع تصنيفها حسب نوع مقدم الشكوى
+                    </p>
+                    {programComplaints.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        لا توجد شكاوى في هذا البرنامج
                       </div>
-                    </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        إجمالي الشكاوى: {programComplaints.length}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
-                <Card className="bg-orange-50 border-orange-200">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2">
-                      <MessageSquare className="h-5 w-5 text-orange-600" />
-                      <div>
-                        <p className="text-sm text-orange-700">قيد الإجراء</p>
-                        <p className="text-xl font-bold text-orange-900">{programStats.inProgress}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-green-50 border-green-200">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                      <div>
-                        <p className="text-sm text-green-700">تم الحل</p>
-                        <p className="text-xl font-bold text-green-900">{programStats.resolved}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Complainant Type Tabs */}
-              <Tabs defaultValue="all-complainants" className="space-y-4">
-                <TabsList className="flex flex-wrap h-auto gap-2 bg-muted p-2">
-                  <TabsTrigger value="all-complainants" className="flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    الكل
-                    <Badge variant="secondary">{programComplaints.length}</Badge>
-                  </TabsTrigger>
-                  <TabsTrigger value="students" className="flex items-center gap-2">
-                    🎓 طلاب
-                    <Badge variant="secondary">{studentComplaints.length}</Badge>
-                  </TabsTrigger>
-                  <TabsTrigger value="faculty" className="flex items-center gap-2">
-                    👨‍🏫 أعضاء هيئة التدريس
-                    <Badge variant="secondary">{facultyComplaints.length}</Badge>
-                  </TabsTrigger>
-                  <TabsTrigger value="employees" className="flex items-center gap-2">
-                    👔 موظفين
-                    <Badge variant="secondary">{employeeComplaints.length}</Badge>
-                  </TabsTrigger>
-                  {otherComplaints.length > 0 && (
-                    <TabsTrigger value="other" className="flex items-center gap-2">
-                      📋 أخرى
-                      <Badge variant="secondary">{otherComplaints.length}</Badge>
-                    </TabsTrigger>
-                  )}
-                </TabsList>
-
-                {/* All Complainants Tab */}
-                <TabsContent value="all-complainants" className="space-y-4">
-                  <Tabs defaultValue="all-status" className="space-y-4">
-                    <TabsList>
-                      <TabsTrigger value="all-status">الكل ({programComplaints.length})</TabsTrigger>
-                      <TabsTrigger value="pending">جديدة ({programComplaints.filter(c => c.status === 'pending').length})</TabsTrigger>
-                      <TabsTrigger value="in_progress">قيد الإجراء ({programComplaints.filter(c => c.status === 'in_progress').length})</TabsTrigger>
-                      <TabsTrigger value="resolved">تم الحل ({programComplaints.filter(c => c.status === 'resolved').length})</TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="all-status" className="space-y-4">
-                      {programComplaints.map(renderComplaintCard)}
-                      {programComplaints.length === 0 && (
-                        <Card>
-                          <CardContent className="text-center py-8">
-                            <p className="text-muted-foreground">لا توجد شكاوى</p>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </TabsContent>
-
-                    {["pending", "in_progress", "resolved"].map(status => (
-                      <TabsContent key={status} value={status} className="space-y-4">
-                        {programComplaints.filter(c => c.status === status).map(renderComplaintCard)}
-                        {programComplaints.filter(c => c.status === status).length === 0 && (
-                          <Card>
-                            <CardContent className="text-center py-8">
-                              <p className="text-muted-foreground">لا توجد شكاوى بهذه الحالة</p>
-                            </CardContent>
-                          </Card>
-                        )}
-                      </TabsContent>
-                    ))}
-                  </Tabs>
-                </TabsContent>
-
-                {/* Students Tab */}
-                <TabsContent value="students" className="space-y-4">
-                  <Card className="mb-4">
-                    <CardContent className="p-4">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="البحث في شكاوى الطلاب..."
-                          className="pl-10"
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Tabs defaultValue="all-status" className="space-y-4">
-                    <TabsList>
-                      <TabsTrigger value="all-status">الكل ({studentComplaints.length})</TabsTrigger>
-                      <TabsTrigger value="pending">جديدة ({studentComplaints.filter(c => c.status === 'pending').length})</TabsTrigger>
-                      <TabsTrigger value="in_progress">قيد الإجراء ({studentComplaints.filter(c => c.status === 'in_progress').length})</TabsTrigger>
-                      <TabsTrigger value="resolved">تم الحل ({studentComplaints.filter(c => c.status === 'resolved').length})</TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="all-status" className="space-y-4">
-                      {studentComplaints.map(renderComplaintCard)}
-                      {studentComplaints.length === 0 && (
-                        <Card>
-                          <CardContent className="text-center py-8">
-                            <p className="text-muted-foreground">لا توجد شكاوى من الطلاب</p>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </TabsContent>
-
-                    {["pending", "in_progress", "resolved"].map(status => (
-                      <TabsContent key={status} value={status} className="space-y-4">
-                        {studentComplaints.filter(c => c.status === status).map(renderComplaintCard)}
-                        {studentComplaints.filter(c => c.status === status).length === 0 && (
-                          <Card>
-                            <CardContent className="text-center py-8">
-                              <p className="text-muted-foreground">لا توجد شكاوى بهذه الحالة</p>
-                            </CardContent>
-                          </Card>
-                        )}
-                      </TabsContent>
-                    ))}
-                  </Tabs>
-                </TabsContent>
-
-                {/* Faculty Tab */}
-                <TabsContent value="faculty" className="space-y-4">
-                  <Card className="mb-4">
-                    <CardContent className="p-4">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="البحث في شكاوى أعضاء هيئة التدريس..."
-                          className="pl-10"
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Tabs defaultValue="all-status" className="space-y-4">
-                    <TabsList>
-                      <TabsTrigger value="all-status">الكل ({facultyComplaints.length})</TabsTrigger>
-                      <TabsTrigger value="pending">جديدة ({facultyComplaints.filter(c => c.status === 'pending').length})</TabsTrigger>
-                      <TabsTrigger value="in_progress">قيد الإجراء ({facultyComplaints.filter(c => c.status === 'in_progress').length})</TabsTrigger>
-                      <TabsTrigger value="resolved">تم الحل ({facultyComplaints.filter(c => c.status === 'resolved').length})</TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="all-status" className="space-y-4">
-                      {facultyComplaints.map(renderComplaintCard)}
-                      {facultyComplaints.length === 0 && (
-                        <Card>
-                          <CardContent className="text-center py-8">
-                            <p className="text-muted-foreground">لا توجد شكاوى من أعضاء هيئة التدريس</p>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </TabsContent>
-
-                    {["pending", "in_progress", "resolved"].map(status => (
-                      <TabsContent key={status} value={status} className="space-y-4">
-                        {facultyComplaints.filter(c => c.status === status).map(renderComplaintCard)}
-                        {facultyComplaints.filter(c => c.status === status).length === 0 && (
-                          <Card>
-                            <CardContent className="text-center py-8">
-                              <p className="text-muted-foreground">لا توجد شكاوى بهذه الحالة</p>
-                            </CardContent>
-                          </Card>
-                        )}
-                      </TabsContent>
-                    ))}
-                  </Tabs>
-                </TabsContent>
-
-                {/* Employees Tab */}
-                <TabsContent value="employees" className="space-y-4">
-                  <Card className="mb-4">
-                    <CardContent className="p-4">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="البحث في شكاوى الموظفين..."
-                          className="pl-10"
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Tabs defaultValue="all-status" className="space-y-4">
-                    <TabsList>
-                      <TabsTrigger value="all-status">الكل ({employeeComplaints.length})</TabsTrigger>
-                      <TabsTrigger value="pending">جديدة ({employeeComplaints.filter(c => c.status === 'pending').length})</TabsTrigger>
-                      <TabsTrigger value="in_progress">قيد الإجراء ({employeeComplaints.filter(c => c.status === 'in_progress').length})</TabsTrigger>
-                      <TabsTrigger value="resolved">تم الحل ({employeeComplaints.filter(c => c.status === 'resolved').length})</TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="all-status" className="space-y-4">
-                      {employeeComplaints.map(renderComplaintCard)}
-                      {employeeComplaints.length === 0 && (
-                        <Card>
-                          <CardContent className="text-center py-8">
-                            <p className="text-muted-foreground">لا توجد شكاوى من الموظفين</p>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </TabsContent>
-
-                    {["pending", "in_progress", "resolved"].map(status => (
-                      <TabsContent key={status} value={status} className="space-y-4">
-                        {employeeComplaints.filter(c => c.status === status).map(renderComplaintCard)}
-                        {employeeComplaints.filter(c => c.status === status).length === 0 && (
-                          <Card>
-                            <CardContent className="text-center py-8">
-                              <p className="text-muted-foreground">لا توجد شكاوى بهذه الحالة</p>
-                            </CardContent>
-                          </Card>
-                        )}
-                      </TabsContent>
-                    ))}
-                  </Tabs>
-                </TabsContent>
-
-                {/* Other Tab */}
-                {otherComplaints.length > 0 && (
-                  <TabsContent value="other" className="space-y-4">
-                    <Tabs defaultValue="all-status" className="space-y-4">
-                      <TabsList>
-                        <TabsTrigger value="all-status">الكل ({otherComplaints.length})</TabsTrigger>
-                        <TabsTrigger value="pending">جديدة ({otherComplaints.filter(c => c.status === 'pending').length})</TabsTrigger>
-                        <TabsTrigger value="in_progress">قيد الإجراء ({otherComplaints.filter(c => c.status === 'in_progress').length})</TabsTrigger>
-                        <TabsTrigger value="resolved">تم الحل ({otherComplaints.filter(c => c.status === 'resolved').length})</TabsTrigger>
-                      </TabsList>
-
-                      <TabsContent value="all-status" className="space-y-4">
-                        {otherComplaints.map(renderComplaintCard)}
-                      </TabsContent>
-
-                      {["pending", "in_progress", "resolved"].map(status => (
-                        <TabsContent key={status} value={status} className="space-y-4">
-                          {otherComplaints.filter(c => c.status === status).map(renderComplaintCard)}
-                          {otherComplaints.filter(c => c.status === status).length === 0 && (
-                            <Card>
-                              <CardContent className="text-center py-8">
-                                <p className="text-muted-foreground">لا توجد شكاوى بهذه الحالة</p>
-                              </CardContent>
-                            </Card>
-                          )}
-                        </TabsContent>
-                      ))}
-                    </Tabs>
-                  </TabsContent>
-                )}
-              </Tabs>
+              )}
             </TabsContent>
           );
         })}
