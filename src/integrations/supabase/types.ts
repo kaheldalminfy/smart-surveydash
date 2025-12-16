@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      academic_calendar: {
+        Row: {
+          academic_year: string
+          created_at: string | null
+          end_date: string
+          id: string
+          is_current: boolean | null
+          semester: string
+          start_date: string
+          updated_at: string | null
+        }
+        Insert: {
+          academic_year: string
+          created_at?: string | null
+          end_date: string
+          id?: string
+          is_current?: boolean | null
+          semester: string
+          start_date: string
+          updated_at?: string | null
+        }
+        Update: {
+          academic_year?: string
+          created_at?: string | null
+          end_date?: string
+          id?: string
+          is_current?: boolean | null
+          semester?: string
+          start_date?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       answers: {
         Row: {
           created_at: string | null
