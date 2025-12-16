@@ -392,8 +392,12 @@ const Reports = () => {
 
   // Get unique academic years and semesters
   const getUniqueAcademicYears = () => {
-    const years = new Set(academicCalendar.map(cal => cal.academic_year));
-    return Array.from(years);
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let i = 0; i < 100; i++) {
+      years.push(`${currentYear + i}-${currentYear + i + 1}`);
+    }
+    return years;
   };
 
   const getUniqueSemesters = () => {
