@@ -21,6 +21,7 @@ import Archives from "./pages/Archives";
 import ProgramComparison from "./pages/ProgramComparison";
 import Users from "./pages/Users";
 import SystemSettings from "./pages/SystemSettings";
+import AcademicCalendar from "./pages/AcademicCalendar";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +51,7 @@ const App = () => (
             <Route path="/comparison" element={<ProtectedRoute><ProgramComparison /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
             <Route path="/system-settings" element={<ProtectedRoute><SystemSettings /></ProtectedRoute>} />
+            <Route path="/academic-calendar" element={<ProtectedRoute><AcademicCalendar /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

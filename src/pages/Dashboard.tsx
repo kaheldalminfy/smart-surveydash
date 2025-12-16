@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BarChart3, FileText, Plus, TrendingUp, Users, ClipboardList, AlertCircle, CheckCircle2, Archive, LogOut, BarChart, Home, Settings } from "lucide-react";
+import { BarChart3, FileText, Plus, TrendingUp, Users, ClipboardList, AlertCircle, CheckCircle2, Archive, LogOut, BarChart, Home, Settings, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -236,6 +236,12 @@ const Dashboard = () => {
                 <Button variant="outline" className="w-full justify-start">
                   <Users className="h-4 w-4 ml-2" />
                   {t('dashboard.manageUsers')}
+                </Button>
+              </Link>
+              <Link to="/academic-calendar">
+                <Button variant="outline" className="w-full justify-start">
+                  <Calendar className="h-4 w-4 ml-2" />
+                  الأجندة الأكاديمية
                 </Button>
               </Link>
               <Link to="/system-settings">
