@@ -593,6 +593,7 @@ export type Database = {
       }
       surveys: {
         Row: {
+          academic_year: string | null
           created_at: string | null
           created_by: string
           description: string | null
@@ -601,6 +602,7 @@ export type Database = {
           is_anonymous: boolean | null
           program_id: string | null
           qr_code: string | null
+          semester: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["survey_status"] | null
           survey_link: string | null
@@ -608,6 +610,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          academic_year?: string | null
           created_at?: string | null
           created_by: string
           description?: string | null
@@ -616,6 +619,7 @@ export type Database = {
           is_anonymous?: boolean | null
           program_id?: string | null
           qr_code?: string | null
+          semester?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["survey_status"] | null
           survey_link?: string | null
@@ -623,6 +627,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          academic_year?: string | null
           created_at?: string | null
           created_by?: string
           description?: string | null
@@ -631,6 +636,7 @@ export type Database = {
           is_anonymous?: boolean | null
           program_id?: string | null
           qr_code?: string | null
+          semester?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["survey_status"] | null
           survey_link?: string | null

@@ -47,20 +47,45 @@ const SurveyDesigner = () => {
     isAnonymous: true,
     startDate: "",
     endDate: "",
+    semester: "",
+    academicYear: "",
   });
   const [questions, setQuestions] = useState<Question[]>([]);
   const [templateName, setTemplateName] = useState("");
   const [templateDescription, setTemplateDescription] = useState("");
   const [templatePublic, setTemplatePublic] = useState(false);
+  const [academicCalendar, setAcademicCalendar] = useState<any[]>([]);
 
   useEffect(() => {
     loadPrograms();
+    loadAcademicCalendar();
     if (id) {
       loadSurvey();
     } else if (templateId) {
       loadTemplate();
     }
   }, [id, templateId]);
+
+  const loadAcademicCalendar = async () => {
+    const { data } = await supabase
+      .from("academic_calendar")
+      .select("*")
+      .order("start_date", { ascending: false });
+    
+    if (data) {
+      setAcademicCalendar(data);
+    }
+  };
+
+  const getUniqueAcademicYears = () => {
+    const years = new Set(academicCalendar.map(cal => cal.academic_year));
+    return Array.from(years);
+  };
+
+  const getUniqueSemesters = () => {
+    const semesters = new Set(academicCalendar.map(cal => cal.semester));
+    return Array.from(semesters);
+  };
 
   const loadSurvey = async () => {
     if (!id) return;
@@ -82,6 +107,8 @@ const SurveyDesigner = () => {
           isAnonymous: surveyData.is_anonymous,
           startDate: surveyData.start_date ? new Date(surveyData.start_date).toISOString().split('T')[0] : "",
           endDate: surveyData.end_date ? new Date(surveyData.end_date).toISOString().split('T')[0] : "",
+          semester: surveyData.semester || "",
+          academicYear: surveyData.academic_year || "",
         });
 
         const { data: questionsData, error: questionsError } = await supabase
@@ -323,6 +350,8 @@ const SurveyDesigner = () => {
             is_anonymous: survey.isAnonymous,
             start_date: survey.startDate || null,
             end_date: survey.endDate || null,
+            semester: survey.semester || null,
+            academic_year: survey.academicYear || null,
           })
           .eq("id", id);
 
@@ -366,6 +395,8 @@ const SurveyDesigner = () => {
             is_anonymous: survey.isAnonymous,
             start_date: survey.startDate || null,
             end_date: survey.endDate || null,
+            semester: survey.semester || null,
+            academic_year: survey.academicYear || null,
             created_by: user.id,
             status: "draft",
           })
@@ -786,6 +817,40 @@ const SurveyDesigner = () => {
                         >
                           <option value="anonymous">مجهول الهوية</option>
                           <option value="identified">محدد الهوية</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="academicYear">السنة الأكاديمية</Label>
+                        <select 
+                          id="academicYear" 
+                          className="w-full rounded-md border border-input bg-background px-3 py-2"
+                          value={survey.academicYear}
+                          onChange={(e) => setSurvey({...survey, academicYear: e.target.value})}
+                        >
+                          <option value="">اختر السنة الأكاديمية</option>
+                          {getUniqueAcademicYears().map((year) => (
+                            <option key={year} value={year}>
+                              {year}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <Label htmlFor="semester">الفصل الدراسي</Label>
+                        <select 
+                          id="semester" 
+                          className="w-full rounded-md border border-input bg-background px-3 py-2"
+                          value={survey.semester}
+                          onChange={(e) => setSurvey({...survey, semester: e.target.value})}
+                        >
+                          <option value="">اختر الفصل الدراسي</option>
+                          {getUniqueSemesters().map((sem) => (
+                            <option key={sem} value={sem}>
+                              {sem}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     </div>
