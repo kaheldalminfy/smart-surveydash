@@ -66,10 +66,13 @@ const Complaints = () => {
   const { toast } = useToast();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [programs, setPrograms] = useState<Program[]>([]);
+  const [academicCalendar, setAcademicCalendar] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProgram, setSelectedProgram] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [selectedSemester, setSelectedSemester] = useState<string>("all");
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>("all");
   const [showNewComplaintDialog, setShowNewComplaintDialog] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [qrCodeData, setQrCodeData] = useState<string>("");
@@ -95,6 +98,7 @@ const Complaints = () => {
   useEffect(() => {
     loadComplaints();
     loadPrograms();
+    loadAcademicCalendar();
     generateQRCode();
   }, []);
 
@@ -184,6 +188,23 @@ const Complaints = () => {
   const loadPrograms = async () => {
     const { data } = await supabase.from("programs").select("*").order("name");
     if (data) setPrograms(data);
+  };
+
+  const loadAcademicCalendar = async () => {
+    const { data } = await supabase
+      .from("academic_calendar")
+      .select("*")
+      .order("academic_year", { ascending: false })
+      .order("start_date", { ascending: false });
+    if (data) {
+      setAcademicCalendar(data);
+      // Set current semester as default if available
+      const current = data.find((c: any) => c.is_current);
+      if (current) {
+        setSelectedAcademicYear(current.academic_year);
+        setSelectedSemester(current.semester);
+      }
+    }
   };
 
   const handleSubmitComplaint = async () => {
@@ -377,17 +398,27 @@ const Complaints = () => {
     return categories[category as keyof typeof categories] || category;
   };
 
-  // Filter complaints based on program and status
+  // Filter complaints based on program, status, semester and academic year
   const getFilteredComplaints = () => {
     return complaints.filter(complaint => {
       const matchesSearch = complaint.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            complaint.description.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesProgram = selectedProgram === "all" || complaint.program_id === selectedProgram;
       const matchesStatus = selectedStatus === "all" || complaint.status === selectedStatus;
+      const matchesSemester = selectedSemester === "all" || complaint.semester === selectedSemester;
+      const matchesAcademicYear = selectedAcademicYear === "all" || complaint.academic_year === selectedAcademicYear;
       
-      return matchesSearch && matchesProgram && matchesStatus;
+      return matchesSearch && matchesProgram && matchesStatus && matchesSemester && matchesAcademicYear;
     });
   };
+
+  // Get unique academic years from calendar
+  const academicYears = [...new Set(academicCalendar.map(c => c.academic_year))];
+  
+  // Get semesters for selected academic year
+  const semestersForYear = selectedAcademicYear === "all" 
+    ? [...new Set(academicCalendar.map(c => c.semester))]
+    : academicCalendar.filter(c => c.academic_year === selectedAcademicYear).map(c => c.semester);
 
   // Get complaints grouped by program
   const getComplaintsByProgram = (programId: string | null) => {
@@ -850,6 +881,35 @@ const Complaints = () => {
                     <option value="pending">جديدة</option>
                     <option value="in_progress">قيد الإجراء</option>
                     <option value="resolved">تم الحل</option>
+                  </select>
+
+                  <select
+                    className="rounded-md border border-input bg-background px-3 py-2"
+                    value={selectedAcademicYear}
+                    onChange={(e) => {
+                      setSelectedAcademicYear(e.target.value);
+                      setSelectedSemester("all");
+                    }}
+                  >
+                    <option value="all">جميع السنوات</option>
+                    {academicYears.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    className="rounded-md border border-input bg-background px-3 py-2"
+                    value={selectedSemester}
+                    onChange={(e) => setSelectedSemester(e.target.value)}
+                  >
+                    <option value="all">جميع الفصول</option>
+                    {semestersForYear.map((semester) => (
+                      <option key={semester} value={semester}>
+                        {semester}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </CardContent>
