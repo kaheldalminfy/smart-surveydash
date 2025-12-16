@@ -776,12 +776,12 @@ const Reports = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">السنة الأكاديمية</Label>
-                  <Select value={filterAcademicYear} onValueChange={setFilterAcademicYear}>
+                  <Select value={filterAcademicYear || "all"} onValueChange={(v) => setFilterAcademicYear(v === "all" ? "" : v)}>
                     <SelectTrigger>
                       <SelectValue placeholder="اختر السنة الأكاديمية" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">جميع السنوات</SelectItem>
+                      <SelectItem value="all">جميع السنوات</SelectItem>
                       {getUniqueAcademicYears().map((year) => (
                         <SelectItem key={year} value={year}>{year}</SelectItem>
                       ))}
@@ -790,12 +790,12 @@ const Reports = () => {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">الفصل الدراسي</Label>
-                  <Select value={filterSemester} onValueChange={setFilterSemester}>
+                  <Select value={filterSemester || "all"} onValueChange={(v) => setFilterSemester(v === "all" ? "" : v)}>
                     <SelectTrigger>
                       <SelectValue placeholder="اختر الفصل الدراسي" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">جميع الفصول</SelectItem>
+                      <SelectItem value="all">جميع الفصول</SelectItem>
                       {getUniqueSemesters().map((semester) => (
                         <SelectItem key={semester} value={semester}>{semester}</SelectItem>
                       ))}
