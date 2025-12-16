@@ -737,7 +737,7 @@ export type Database = {
       app_role: "admin" | "coordinator" | "faculty" | "dean" | "program_manager"
       complaint_status: "pending" | "in_progress" | "resolved" | "closed"
       complaint_type: "academic" | "administrative" | "technical" | "other"
-      question_type: "likert" | "mcq" | "text" | "rating"
+      question_type: "likert" | "mcq" | "text" | "rating" | "section"
       recommendation_status:
         | "pending"
         | "in_progress"
@@ -876,7 +876,7 @@ export const Constants = {
       app_role: ["admin", "coordinator", "faculty", "dean", "program_manager"],
       complaint_status: ["pending", "in_progress", "resolved", "closed"],
       complaint_type: ["academic", "administrative", "technical", "other"],
-      question_type: ["likert", "mcq", "text", "rating"],
+      question_type: ["likert", "mcq", "text", "rating", "section"],
       recommendation_status: [
         "pending",
         "in_progress",

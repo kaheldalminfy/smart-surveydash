@@ -211,11 +211,22 @@ const SurveyDesigner = () => {
   };
 
   const questionTypes = [
+    { value: "section", label: "عنوان قسم", description: "عنوان لتجميع الأسئلة" },
     { value: "likert", label: "مقياس ليكرت", description: "مقياس من 1-5 للموافقة" },
     { value: "text", label: "نص مفتوح", description: "إجابة نصية حرة" },
     { value: "mcq", label: "اختيارات متعددة", description: "اختيار من عدة خيارات" },
     { value: "rating", label: "تقييم/ترتيب", description: "تقييم بالنجوم أو ترتيب" },
   ];
+
+  const addSection = () => {
+    setQuestions([...questions, { 
+      id: Date.now(), 
+      text: "",
+      type: "section",
+      orderIndex: questions.length,
+      required: false,
+    }]);
+  };
 
   const handleTemplateSelect = (template: any) => {
     setSurvey(prev => ({
@@ -863,20 +874,35 @@ const SurveyDesigner = () => {
                 {/* الأسئلة */}
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>الأسئلة ({questions.length})</CardTitle>
-                    <Button onClick={addQuestion} size="sm" variant="outline">
-                      <Plus className="h-4 w-4 ml-2" />
-                      إضافة سؤال
-                    </Button>
+                    <CardTitle>الأسئلة ({questions.filter(q => q.type !== 'section').length})</CardTitle>
+                    <div className="flex gap-2">
+                      <Button onClick={addSection} size="sm" variant="outline">
+                        <Plus className="h-4 w-4 ml-2" />
+                        إضافة عنوان قسم
+                      </Button>
+                      <Button onClick={addQuestion} size="sm" variant="outline">
+                        <Plus className="h-4 w-4 ml-2" />
+                        إضافة سؤال
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {questions.map((question, index) => (
-                      <div key={question.id} className="p-4 border rounded-lg bg-card space-y-3">
+                      <div 
+                        key={question.id} 
+                        className={`p-4 border rounded-lg space-y-3 ${
+                          question.type === 'section' 
+                            ? 'bg-primary/10 border-primary/30' 
+                            : 'bg-card'
+                        }`}
+                      >
                         <div className="flex items-start gap-3">
                           <GripVertical className="h-5 w-5 text-muted-foreground mt-2 cursor-move" />
                           <div className="flex-1 space-y-3">
                             <div className="flex items-center gap-2">
-                              <Badge variant="outline">سؤال {index + 1}</Badge>
+                              <Badge variant={question.type === 'section' ? 'default' : 'outline'}>
+                                {question.type === 'section' ? 'عنوان قسم' : `سؤال ${questions.slice(0, index).filter(q => q.type !== 'section').length + 1}`}
+                              </Badge>
                               <select 
                                 value={question.type}
                                 onChange={(e) => updateQuestion(question.id, 'type', e.target.value)}
@@ -886,19 +912,22 @@ const SurveyDesigner = () => {
                                   <option key={type.value} value={type.value}>{type.label}</option>
                                 ))}
                               </select>
-                              <div className="flex items-center gap-2 mr-auto">
-                                <Label htmlFor={`required-${question.id}`} className="text-sm">مطلوب</Label>
-                                <Switch
-                                  id={`required-${question.id}`}
-                                  checked={question.required}
-                                  onCheckedChange={(checked) => updateQuestion(question.id, 'required', checked)}
-                                />
-                              </div>
+                              {question.type !== 'section' && (
+                                <div className="flex items-center gap-2 mr-auto">
+                                  <Label htmlFor={`required-${question.id}`} className="text-sm">مطلوب</Label>
+                                  <Switch
+                                    id={`required-${question.id}`}
+                                    checked={question.required}
+                                    onCheckedChange={(checked) => updateQuestion(question.id, 'required', checked)}
+                                  />
+                                </div>
+                              )}
                             </div>
                             <Input 
-                              placeholder="اكتب نص السؤال هنا"
+                              placeholder={question.type === 'section' ? 'اكتب عنوان القسم هنا' : 'اكتب نص السؤال هنا'}
                               value={question.text}
                               onChange={(e) => updateQuestion(question.id, 'text', e.target.value)}
+                              className={question.type === 'section' ? 'font-bold text-lg' : ''}
                             />
                             
                             {question.type === "likert" && (

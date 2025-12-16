@@ -310,6 +310,10 @@ const TakeSurvey = () => {
     const value = responses[question.id];
 
     switch (question.type) {
+      case "section":
+        // Section headers don't need input
+        return null;
+        
       case "likert":
         const likertOptions = [
           { label: "غير موافق بشدة", value: "1" },
@@ -537,15 +541,15 @@ const TakeSurvey = () => {
         </div>
 
         {/* Question Card */}
-        <Card className={`shadow-elegant transition-all ${hasError ? 'border-2 border-red-500 animate-pulse' : 'border'}`}>
-          <CardHeader className="border-b bg-accent/5">
+        <Card className={`shadow-elegant transition-all ${hasError ? 'border-2 border-red-500 animate-pulse' : 'border'} ${currentQuestion?.type === 'section' ? 'bg-primary/5 border-primary/30' : ''}`}>
+          <CardHeader className={`border-b ${currentQuestion?.type === 'section' ? 'bg-primary/10' : 'bg-accent/5'}`}>
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="outline" className="text-xs">
-                    سؤال {currentQuestionIndex + 1}
+                  <Badge variant={currentQuestion?.type === 'section' ? 'default' : 'outline'} className="text-xs">
+                    {currentQuestion?.type === 'section' ? 'عنوان قسم' : `سؤال ${currentQuestionIndex + 1}`}
                   </Badge>
-                  {currentQuestion?.is_required && (
+                  {currentQuestion?.is_required && currentQuestion?.type !== 'section' && (
                     <Badge variant="destructive" className="text-xs">
                       * مطلوب
                     </Badge>
@@ -556,7 +560,7 @@ const TakeSurvey = () => {
           </CardHeader>
           <CardContent className="space-y-6 py-8">
             <div className="min-h-[350px]">
-              <h3 className="text-xl font-bold mb-6 text-foreground leading-relaxed">
+              <h3 className={`font-bold mb-6 text-foreground leading-relaxed ${currentQuestion?.type === 'section' ? 'text-2xl text-primary' : 'text-xl'}`}>
                 {currentQuestion?.text}
               </h3>
 
@@ -567,7 +571,13 @@ const TakeSurvey = () => {
                 </div>
               )}
 
-              {currentQuestion && renderQuestionInput(currentQuestion)}
+              {currentQuestion && currentQuestion.type !== 'section' && renderQuestionInput(currentQuestion)}
+              
+              {currentQuestion?.type === 'section' && (
+                <p className="text-muted-foreground text-center mt-8">
+                  اضغط على "التالي" للمتابعة إلى أسئلة هذا القسم
+                </p>
+              )}
 
               {hasError && (
                 <div className="flex items-center gap-2 mt-4 text-red-600">
