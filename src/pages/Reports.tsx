@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download, FileSpreadsheet, Sparkles, ArrowRight, Save, Trash2, Edit as EditIcon, BarChart3, Users, Filter, Target, MessageSquare, ListChecks } from "lucide-react";
+import { Download, FileSpreadsheet, Sparkles, ArrowRight, Save, Trash2, Edit as EditIcon, BarChart3, Users, Filter, Target, MessageSquare, ListChecks, AlertTriangle } from "lucide-react";
 import DashboardButton from "@/components/DashboardButton";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -243,9 +243,20 @@ const Reports = () => {
 
     if (question.type === 'mcq' && question.options) {
       const options = question.options;
-      if (Array.isArray(options)) return options;
+      // Handle different options formats
+      if (Array.isArray(options)) return options.map((o: string) => String(o).trim());
       if (options.choices && Array.isArray(options.choices)) {
-        return options.choices.map((choice: string) => choice.trim());
+        return options.choices.map((choice: string) => String(choice).trim());
+      }
+      // Handle string format
+      if (typeof options === 'string') {
+        try {
+          const parsed = JSON.parse(options);
+          if (Array.isArray(parsed)) return parsed;
+          if (parsed.choices) return parsed.choices;
+        } catch {
+          return [];
+        }
       }
       return [];
     }
@@ -256,6 +267,9 @@ const Reports = () => {
 
     return [];
   };
+
+  // التحقق من وجود إجابات
+  const hasAnswersData = allResponses.some(r => r.answers && r.answers.length > 0);
 
   // تطبيق الفلتر تلقائياً عند تغيير القيم
   const handleFilterValueChange = (value: string) => {
@@ -517,8 +531,27 @@ const Reports = () => {
           </Card>
         </div>
 
+        {/* تنبيه عدم وجود إجابات */}
+        {!hasAnswersData && totalResponses > 0 && (
+          <Card className="border-destructive/50 bg-destructive/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-destructive/10">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                </div>
+                <div>
+                  <p className="font-semibold text-destructive">تنبيه: لا توجد إجابات محفوظة</p>
+                  <p className="text-sm text-muted-foreground">
+                    يوجد {totalResponses} استجابة لكن بدون إجابات مفصلة. قد تكون هناك مشكلة في حفظ الإجابات عند تعبئة الاستبيان.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* الفلتر */}
-        {allQuestions.length > 0 && (
+        {allQuestions.length > 0 && hasAnswersData && (
           <Card className="border-primary/20">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-lg">
