@@ -77,6 +77,9 @@ const Complaints = () => {
   const [resolutionNotes, setResolutionNotes] = useState("");
   const [showResolutionDialog, setShowResolutionDialog] = useState(false);
   const [complaintToResolve, setComplaintToResolve] = useState<{id: string, newStatus: string} | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isDean, setIsDean] = useState(false);
+  const [userProgramIds, setUserProgramIds] = useState<string[]>([]);
   const [newComplaint, setNewComplaint] = useState({
     title: "",
     description: "",
@@ -132,9 +135,14 @@ const Complaints = () => {
         .select("role, program_id")
         .eq("user_id", user.id);
 
-      const isAdmin = userRoles?.some(r => r.role === 'admin');
-      const isDean = userRoles?.some(r => r.role === 'dean');
-      const userProgramIds = userRoles?.map(r => r.program_id).filter(Boolean);
+      const adminStatus = userRoles?.some(r => r.role === 'admin') || false;
+      const deanStatus = userRoles?.some(r => r.role === 'dean') || false;
+      const programIds = userRoles?.map(r => r.program_id).filter(Boolean) as string[] || [];
+
+      // Set user role states
+      setIsAdmin(adminStatus);
+      setIsDean(deanStatus);
+      setUserProgramIds(programIds);
 
       let query = supabase
         .from("complaints")
@@ -143,8 +151,9 @@ const Complaints = () => {
           programs (name)
         `);
 
-      if (!isAdmin && !isDean && userProgramIds && userProgramIds.length > 0) {
-        query = query.in("program_id", userProgramIds);
+      // Filter by program if not admin or dean (coordinators only see their programs)
+      if (!adminStatus && !deanStatus && programIds.length > 0) {
+        query = query.in("program_id", programIds);
       }
 
       const { data, error } = await query.order("created_at", { ascending: false });
@@ -534,8 +543,17 @@ const Complaints = () => {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">إدارة الشكاوى</h1>
-            <p className="text-muted-foreground">متابعة ومعالجة شكاوى الطلاب والموظفين</p>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold">إدارة الشكاوى</h1>
+              {isAdmin && <Badge variant="default" className="bg-purple-600">مدير النظام</Badge>}
+              {isDean && !isAdmin && <Badge variant="default" className="bg-blue-600">العميد</Badge>}
+              {!isAdmin && !isDean && <Badge variant="secondary">منسق البرنامج</Badge>}
+            </div>
+            <p className="text-muted-foreground">
+              {isAdmin || isDean 
+                ? "متابعة ومعالجة جميع شكاوى الطلاب والموظفين" 
+                : "متابعة ومعالجة شكاوى برنامجك"}
+            </p>
           </div>
         </div>
         <Dialog open={showNewComplaintDialog} onOpenChange={setShowNewComplaintDialog}>
@@ -723,14 +741,19 @@ const Complaints = () => {
       </Card>
 
       {/* Program Tabs */}
-      <Tabs defaultValue="all" className="space-y-4">
+      <Tabs defaultValue={isAdmin || isDean ? "all" : (userProgramIds[0] || "all")} className="space-y-4">
         <TabsList className="flex flex-wrap h-auto gap-2 bg-muted p-2">
-          <TabsTrigger value="all" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            جميع الشكاوى
-            <Badge variant="secondary" className="mr-1">{complaints.length}</Badge>
-          </TabsTrigger>
-          {programsWithComplaints.map(program => {
+          {/* Show "All Complaints" tab only for admin and dean */}
+          {(isAdmin || isDean) && (
+            <TabsTrigger value="all" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              جميع الشكاوى
+              <Badge variant="secondary" className="mr-1">{complaints.length}</Badge>
+            </TabsTrigger>
+          )}
+          
+          {/* Show program tabs - for admin/dean show all, for coordinator show only their programs */}
+          {(isAdmin || isDean ? programsWithComplaints : programsWithComplaints.filter(p => userProgramIds.includes(p.id))).map(program => {
             const programStats = getProgramStats(program.id);
             return (
               <TabsTrigger key={program.id} value={program.id} className="flex items-center gap-2">
@@ -740,7 +763,9 @@ const Complaints = () => {
               </TabsTrigger>
             );
           })}
-          {complaints.some(c => !c.program_id) && (
+          
+          {/* Show "No Program" tab only for admin and dean */}
+          {(isAdmin || isDean) && complaints.some(c => !c.program_id) && (
             <TabsTrigger value="no-program" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
               بدون برنامج
@@ -751,77 +776,79 @@ const Complaints = () => {
           )}
         </TabsList>
 
-        {/* All Complaints Tab */}
-        <TabsContent value="all" className="space-y-4">
-          {/* Filters */}
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex flex-wrap gap-4">
-                <div className="flex-1 min-w-64">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="البحث في الشكاوى..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                
-                <select
-                  className="rounded-md border border-input bg-background px-3 py-2"
-                  value={selectedProgram}
-                  onChange={(e) => setSelectedProgram(e.target.value)}
-                >
-                  <option value="all">جميع البرامج</option>
-                  {programs.map((program) => (
-                    <option key={program.id} value={program.id}>
-                      {program.name}
-                    </option>
-                  ))}
-                </select>
-                
-                <select
-                  className="rounded-md border border-input bg-background px-3 py-2"
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                >
-                  <option value="all">جميع الحالات</option>
-                  <option value="pending">قيد المراجعة</option>
-                  <option value="in_progress">قيد المعالجة</option>
-                  <option value="resolved">تم الحل</option>
-                  <option value="closed">مغلقة</option>
-                </select>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Status-grouped complaints */}
-          <div className="space-y-6">
-            {renderStatusSection("pending", "قيد المراجعة", <Clock className="h-5 w-5 text-yellow-600" />, filteredComplaints)}
-            {renderStatusSection("in_progress", "قيد المعالجة", <MessageSquare className="h-5 w-5 text-orange-600" />, filteredComplaints)}
-            {renderStatusSection("resolved", "تم الحل", <CheckCircle className="h-5 w-5 text-green-600" />, filteredComplaints)}
-            {renderStatusSection("closed", "مغلقة", <XCircle className="h-5 w-5 text-gray-600" />, filteredComplaints)}
-          </div>
-
-          {filteredComplaints.length === 0 && (
+        {/* All Complaints Tab - Only for admin and dean */}
+        {(isAdmin || isDean) && (
+          <TabsContent value="all" className="space-y-4">
+            {/* Filters */}
             <Card>
-              <CardContent className="text-center py-12">
-                <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">لا توجد شكاوى</h3>
-                <p className="text-muted-foreground">
-                  {searchTerm || selectedStatus !== "all" || selectedProgram !== "all"
-                    ? "لا توجد شكاوى تطابق معايير البحث"
-                    : "لم يتم تقديم أي شكاوى بعد"}
-                </p>
+              <CardContent className="p-6">
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex-1 min-w-64">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="البحث في الشكاوى..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  
+                  <select
+                    className="rounded-md border border-input bg-background px-3 py-2"
+                    value={selectedProgram}
+                    onChange={(e) => setSelectedProgram(e.target.value)}
+                  >
+                    <option value="all">جميع البرامج</option>
+                    {programs.map((program) => (
+                      <option key={program.id} value={program.id}>
+                        {program.name}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  <select
+                    className="rounded-md border border-input bg-background px-3 py-2"
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                  >
+                    <option value="all">جميع الحالات</option>
+                    <option value="pending">قيد المراجعة</option>
+                    <option value="in_progress">قيد المعالجة</option>
+                    <option value="resolved">تم الحل</option>
+                    <option value="closed">مغلقة</option>
+                  </select>
+                </div>
               </CardContent>
             </Card>
-          )}
-        </TabsContent>
+
+            {/* Status-grouped complaints */}
+            <div className="space-y-6">
+              {renderStatusSection("pending", "قيد المراجعة", <Clock className="h-5 w-5 text-yellow-600" />, filteredComplaints)}
+              {renderStatusSection("in_progress", "قيد المعالجة", <MessageSquare className="h-5 w-5 text-orange-600" />, filteredComplaints)}
+              {renderStatusSection("resolved", "تم الحل", <CheckCircle className="h-5 w-5 text-green-600" />, filteredComplaints)}
+              {renderStatusSection("closed", "مغلقة", <XCircle className="h-5 w-5 text-gray-600" />, filteredComplaints)}
+            </div>
+
+            {filteredComplaints.length === 0 && (
+              <Card>
+                <CardContent className="text-center py-12">
+                  <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">لا توجد شكاوى</h3>
+                  <p className="text-muted-foreground">
+                    {searchTerm || selectedStatus !== "all" || selectedProgram !== "all"
+                      ? "لا توجد شكاوى تطابق معايير البحث"
+                      : "لم يتم تقديم أي شكاوى بعد"}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        )}
 
         {/* Program-specific tabs */}
-        {programsWithComplaints.map(program => {
+        {(isAdmin || isDean ? programsWithComplaints : programsWithComplaints.filter(p => userProgramIds.includes(p.id))).map(program => {
           const programComplaints = getComplaintsByProgram(program.id);
           const programStats = getProgramStats(program.id);
           
