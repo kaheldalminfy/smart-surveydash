@@ -12,7 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, ArrowLeft } from "lucide-react";
+import { Plus, Edit } from "lucide-react";
+import DashboardButton from "@/components/DashboardButton";
 
 const Recommendations = () => {
   const navigate = useNavigate();
@@ -160,14 +161,7 @@ const Recommendations = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate("/dashboard")}
-                className="shrink-0"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
+              <DashboardButton />
               <div>
                 <h1 className="text-2xl font-bold">إدارة التوصيات</h1>
                 <p className="text-sm text-muted-foreground">

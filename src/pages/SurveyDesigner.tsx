@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Trash2, GripVertical, Sparkles, Save, Eye, ArrowLeft, Copy, Upload, Download, FileJson, FileSpreadsheet, FileText } from "lucide-react";
+import { Plus, Trash2, GripVertical, Sparkles, Save, Eye, Copy, Upload, Download, FileJson, FileSpreadsheet, FileText, ArrowRight } from "lucide-react";
+import DashboardButton from "@/components/DashboardButton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -667,10 +668,7 @@ const SurveyDesigner = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={() => navigate("/surveys")}>
-                <ArrowLeft className="h-4 w-4 ml-2" />
-                العودة
-              </Button>
+              <DashboardButton />
               <div>
                 <h1 className="text-2xl font-bold">{id ? "تعديل الاستبيان" : "مصمم الاستبيان"}</h1>
                 <p className="text-sm text-muted-foreground">

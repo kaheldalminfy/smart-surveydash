@@ -13,7 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download, FileSpreadsheet, FileText, Sparkles, TrendingUp, ArrowRight, ArrowLeft, Save, Trash2, Edit as EditIcon, ChevronDown, ChevronUp, BarChart3, Users, Filter } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Sparkles, TrendingUp, ArrowRight, Save, Trash2, Edit as EditIcon, ChevronDown, ChevronUp, BarChart3, Users, Filter } from "lucide-react";
+import DashboardButton from "@/components/DashboardButton";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from "recharts";
@@ -444,14 +445,7 @@ const Reports = () => {
               </p>
             </div>
             <div className="flex gap-2 flex-wrap">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate("/dashboard")}
-                title="العودة"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
+              <DashboardButton />
               <Button variant="outline" onClick={generateReport} disabled={isGenerating}>
                 <Sparkles className="h-4 w-4 ml-2" />
                 {isGenerating ? "جاري التحليل..." : "إعادة التحليل"}
