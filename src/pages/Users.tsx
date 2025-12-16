@@ -12,7 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, UserCog, Mail } from "lucide-react";
+import { UserCog, Mail } from "lucide-react";
+import DashboardButton from "@/components/DashboardButton";
 import {
   Table,
   TableBody,
@@ -215,9 +216,7 @@ export default function Users() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <DashboardButton />
             <div>
               <h1 className="text-3xl font-bold">إدارة المستخدمين</h1>
               <p className="text-muted-foreground mt-1">إدارة المستخدمين والصلاحيات</p>

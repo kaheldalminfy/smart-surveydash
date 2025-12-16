@@ -19,9 +19,9 @@ import {
   Trash2,
   Plus,
   FolderOpen,
-  Lock,
-  ArrowLeft
+  Lock
 } from "lucide-react";
+import DashboardButton from "@/components/DashboardButton";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -193,14 +193,7 @@ const Archives = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/dashboard")}
-            className="shrink-0"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <DashboardButton />
           <div>
             <h1 className="text-3xl font-bold">الأرشيف الفصلي</h1>
             <p className="text-muted-foreground">إدارة وتنظيم الأرشيف الفصلي للاستبيانات والتقارير</p>

@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Settings, Upload, Image } from "lucide-react";
+import { Settings, Upload, Image } from "lucide-react";
+import DashboardButton from "@/components/DashboardButton";
 
 export default function SystemSettings() {
   const navigate = useNavigate();
@@ -114,9 +115,7 @@ export default function SystemSettings() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <DashboardButton />
           <div>
             <h1 className="text-3xl font-bold">إعدادات النظام</h1>
             <p className="text-muted-foreground mt-1">إدارة إعدادات النظام العامة</p>

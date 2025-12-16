@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, BarChart3, Link2, QrCode, Edit, Trash2, ArrowLeft, FileText } from "lucide-react";
+import { Plus, Search, BarChart3, Link2, QrCode, Edit, Trash2, FileText } from "lucide-react";
+import DashboardButton from "@/components/DashboardButton";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import QRCodeDialog from "@/components/QRCodeDialog";
@@ -280,13 +281,7 @@ const Surveys = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
-              <Button 
-                variant="ghost" 
-                size="icon"
-                onClick={() => navigate("/dashboard")}
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
+              <DashboardButton />
               <div>
                 <h1 className="text-2xl font-bold">إدارة الاستبيانات</h1>
                 <p className="text-sm text-muted-foreground">عرض وإدارة الاستبيانات والنماذج</p>

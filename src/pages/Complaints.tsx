@@ -21,11 +21,11 @@ import {
   Eye,
   QrCode,
   Copy,
-  ArrowLeft,
   Trash2,
   Building2,
   BarChart3
 } from "lucide-react";
+import DashboardButton from "@/components/DashboardButton";
 import ComplaintsStatistics from "@/components/ComplaintsStatistics";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -797,14 +797,7 @@ const Complaints = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/dashboard")}
-            className="shrink-0"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <DashboardButton />
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold">إدارة الشكاوى</h1>
