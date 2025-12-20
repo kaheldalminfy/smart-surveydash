@@ -278,12 +278,11 @@ const TakeSurvey = () => {
         console.warn("No answers to insert!");
       }
 
-      const { data: insertedAnswers, error: answersError } = await supabase
+      const { error: answersError } = await supabase
         .from("answers")
-        .insert(answersData)
-        .select();
+        .insert(answersData);
 
-      console.log("Inserted answers:", insertedAnswers);
+      console.log("Answers insert completed, count:", answersData.length);
       console.log("Answers error:", answersError);
 
       if (answersError) {
