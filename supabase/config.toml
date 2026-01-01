@@ -9,3 +9,6 @@ verify_jwt = false
 [functions.analyze-text-responses]
 verify_jwt = false
 
+[functions.delete-user]
+verify_jwt = true
+
