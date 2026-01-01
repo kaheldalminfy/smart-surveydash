@@ -78,10 +78,10 @@ const SurveyDesigner = () => {
   };
 
   const getUniqueAcademicYears = () => {
-    const currentYear = new Date().getFullYear();
+    const startYear = 2025;
     const years = [];
     for (let i = 0; i < 100; i++) {
-      years.push(`${currentYear + i}-${currentYear + i + 1}`);
+      years.push(`${startYear + i}-${startYear + i + 1}`);
     }
     return years;
   };
