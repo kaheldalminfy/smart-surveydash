@@ -5,15 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { UserCog, Mail } from "lucide-react";
+import { UserCog, Mail, Settings } from "lucide-react";
 import DashboardButton from "@/components/DashboardButton";
+import UserRolesDialog from "@/components/UserRolesDialog";
 import {
   Table,
   TableBody,
@@ -22,6 +16,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Database } from "@/integrations/supabase/types";
+
+type AppRole = Database["public"]["Enums"]["app_role"];
+
+interface UserRole {
+  id?: string;
+  role: AppRole;
+  program_id: string | null;
+}
 
 interface UserProfile {
   id: string;
@@ -31,19 +34,23 @@ interface UserProfile {
   programs?: {
     name: string;
   };
-  user_roles: Array<{
-    role: string;
-    program_id: string | null;
-  }>;
+  user_roles: UserRole[];
+}
+
+interface Program {
+  id: string;
+  name: string;
 }
 
 export default function Users() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [users, setUsers] = useState<UserProfile[]>([]);
-  const [programs, setPrograms] = useState<any[]>([]);
+  const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     checkAdminRole();
@@ -81,7 +88,7 @@ export default function Users() {
   const loadPrograms = async () => {
     const { data, error } = await supabase
       .from("programs")
-      .select("*")
+      .select("id, name")
       .order("name");
 
     if (error) {
@@ -95,7 +102,6 @@ export default function Users() {
   const loadUsers = async () => {
     setLoading(true);
     
-    // Load profiles with programs
     const { data: profilesData, error: profilesError } = await supabase
       .from("profiles")
       .select(`
@@ -115,7 +121,6 @@ export default function Users() {
       return;
     }
 
-    // Load all user roles
     const { data: rolesData, error: rolesError } = await supabase
       .from("user_roles")
       .select("user_id, role, program_id");
@@ -124,78 +129,36 @@ export default function Users() {
       console.error("Error loading roles:", rolesError);
     }
 
-    // Merge profiles with their roles
     const usersWithRoles = profilesData?.map(profile => ({
       ...profile,
-      user_roles: rolesData?.filter(role => role.user_id === profile.id) || []
+      user_roles: (rolesData?.filter(role => role.user_id === profile.id) || []) as UserRole[]
     })) || [];
 
     setUsers(usersWithRoles);
     setLoading(false);
   };
 
-  const updateUserRole = async (userId: string, newRole: string, programId: string | null) => {
-    try {
-      // Delete existing roles for this user
-      const { error: deleteError } = await supabase
-        .from("user_roles")
-        .delete()
-        .eq("user_id", userId);
-
-      if (deleteError) {
-        console.error("Error deleting roles:", deleteError);
-        toast({
-          title: "خطأ",
-          description: "فشل حذف الأدوار السابقة",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Insert new role
-      const { error: insertError } = await supabase.from("user_roles").insert({
-        user_id: userId,
-        role: newRole,
-        program_id: programId,
-      });
-
-      if (insertError) {
-        console.error("Error inserting role:", insertError);
-        toast({
-          title: "خطأ",
-          description: "فشل تحديث الدور",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      toast({
-        title: "تم التحديث",
-        description: "تم تحديث دور المستخدم بنجاح",
-      });
-
-      loadUsers();
-    } catch (error) {
-      console.error("Error updating user role:", error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ غير متوقع",
-        variant: "destructive",
-      });
-    }
+  const openRolesDialog = (user: UserProfile) => {
+    setSelectedUser(user);
+    setDialogOpen(true);
   };
 
-  const getRoleBadge = (role: string) => {
-    const roleMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
+  const getRoleBadge = (role: AppRole) => {
+    const roleMap: Record<AppRole, { label: string; variant: "default" | "secondary" | "destructive" }> = {
       admin: { label: "مدير النظام", variant: "destructive" },
-      coordinator: { label: "منسق البرنامج", variant: "default" },
-      program_manager: { label: "مدير البرنامج", variant: "secondary" },
+      coordinator: { label: "منسق", variant: "default" },
+      program_manager: { label: "مدير برنامج", variant: "secondary" },
       dean: { label: "العميد", variant: "secondary" },
-      user: { label: "مستخدم", variant: "secondary" },
+      faculty: { label: "عضو هيئة تدريس", variant: "secondary" },
     };
 
-    const roleInfo = roleMap[role] || { label: role, variant: "secondary" };
+    const roleInfo = roleMap[role];
     return <Badge variant={roleInfo.variant}>{roleInfo.label}</Badge>;
+  };
+
+  const getProgramName = (programId: string | null) => {
+    if (!programId) return null;
+    return programs.find(p => p.id === programId)?.name;
   };
 
   if (loading) {
@@ -277,71 +240,71 @@ export default function Users() {
                 <TableRow>
                   <TableHead>الاسم</TableHead>
                   <TableHead>البريد الإلكتروني</TableHead>
-                  <TableHead>البرنامج</TableHead>
-                  <TableHead>الدور</TableHead>
-                  <TableHead>تغيير الدور</TableHead>
+                  <TableHead>الصلاحيات</TableHead>
+                  <TableHead>الإجراءات</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => {
-                  const currentRole = user.user_roles?.[0]?.role || "user";
-                  const currentProgramId = user.user_roles?.[0]?.program_id;
-
-                  return (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.full_name || "غير محدد"}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
-                          {user.email}
-                        </div>
-                      </TableCell>
-                      <TableCell>{user.programs?.name || "لا يوجد"}</TableCell>
-                      <TableCell>{getRoleBadge(currentRole)}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-2 flex-wrap">
-                          <Select
-                            value={currentRole}
-                            onValueChange={(newRole) => updateUserRole(user.id, newRole, currentProgramId)}
-                          >
-                            <SelectTrigger className="w-[160px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="admin">مدير النظام</SelectItem>
-                              <SelectItem value="coordinator">منسق البرنامج</SelectItem>
-                              <SelectItem value="program_manager">مدير البرنامج</SelectItem>
-                              <SelectItem value="dean">العميد</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          {(currentRole === "coordinator" || currentRole === "program_manager") && (
-                            <Select
-                              value={currentProgramId || "no-program"}
-                              onValueChange={(programId) => updateUserRole(user.id, currentRole, programId === "no-program" ? null : programId)}
-                            >
-                              <SelectTrigger className="w-[180px]">
-                                <SelectValue placeholder="اختر البرنامج" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="no-program">اختر البرنامج</SelectItem>
-                                {programs.map((program) => (
-                                  <SelectItem key={program.id} value={program.id}>
-                                    {program.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {users.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">{user.full_name || "غير محدد"}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        {user.email}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {user.user_roles.length === 0 ? (
+                          <span className="text-muted-foreground text-sm">لا توجد صلاحيات</span>
+                        ) : (
+                          user.user_roles.map((role, index) => {
+                            const programName = getProgramName(role.program_id);
+                            return (
+                              <div key={index} className="flex items-center gap-1">
+                                {getRoleBadge(role.role)}
+                                {programName && (
+                                  <span className="text-xs text-muted-foreground">
+                                    ({programName})
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openRolesDialog(user)}
+                      >
+                        <Settings className="h-4 w-4 ml-2" />
+                        إدارة الصلاحيات
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
       </div>
+
+      {/* Roles Dialog */}
+      {selectedUser && (
+        <UserRolesDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          userId={selectedUser.id}
+          userName={selectedUser.full_name || selectedUser.email}
+          currentRoles={selectedUser.user_roles}
+          programs={programs}
+          onRolesUpdated={loadUsers}
+        />
+      )}
     </div>
   );
 }
