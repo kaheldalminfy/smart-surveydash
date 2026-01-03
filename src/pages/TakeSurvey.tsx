@@ -217,7 +217,7 @@ const TakeSurvey = () => {
     setIsSubmitting(true);
 
     try {
-      // إعادة تحميل الأسئلة من قاعدة البيانات للتأكد من صحتها
+      // التحقق من صحة الأسئلة المحلية قبل الإرسال
       const { data: freshQuestions, error: questionsError } = await supabase
         .from("questions")
         .select("*")
@@ -225,7 +225,7 @@ const TakeSurvey = () => {
         .order("order_index");
 
       if (questionsError) {
-        console.error("Failed to reload questions:", questionsError);
+        console.error("Failed to verify questions:", questionsError);
         throw new Error("فشل في التحقق من الأسئلة. يرجى إعادة تحميل الصفحة.");
       }
 
@@ -233,13 +233,30 @@ const TakeSurvey = () => {
         throw new Error("لا توجد أسئلة في هذا الاستبيان");
       }
 
-      // إنشاء خريطة للأسئلة الصالحة
-      const validQuestionIds = new Set(freshQuestions.map(q => q.id));
+      // إنشاء خريطة للأسئلة من قاعدة البيانات
+      const dbQuestionMap = new Map(freshQuestions.map(q => [q.id, q]));
+      const localQuestionIds = questions.map(q => q.id);
       
-      // التحقق من أن جميع الإجابات تتطابق مع أسئلة موجودة
-      const invalidResponses = Object.keys(responses).filter(qId => !validQuestionIds.has(qId));
-      if (invalidResponses.length > 0) {
-        console.warn("Found responses for non-existent questions:", invalidResponses);
+      // التحقق من تطابق الأسئلة المحلية مع قاعدة البيانات
+      const questionsChanged = localQuestionIds.some(localId => !dbQuestionMap.has(localId));
+      
+      if (questionsChanged) {
+        console.error("Questions have changed since survey was loaded");
+        console.log("Local question IDs:", localQuestionIds);
+        console.log("DB question IDs:", freshQuestions.map(q => q.id));
+        
+        toast({
+          title: "تغيرت أسئلة الاستبيان",
+          description: "يرجى إعادة تحميل الصفحة والمحاولة مرة أخرى",
+          variant: "destructive",
+        });
+        
+        // إعادة تحميل الأسئلة تلقائياً
+        setQuestions(freshQuestions);
+        setResponses({});
+        setCurrentQuestionIndex(0);
+        setIsSubmitting(false);
+        return;
       }
 
       // Try to get current user, but don't fail if not logged in
@@ -255,6 +272,27 @@ const TakeSurvey = () => {
 
       console.log("Current user ID:", userId);
       console.log("Survey is_anonymous:", survey?.is_anonymous);
+
+      // Filter out section questions - they don't need answers
+      const questionsWithAnswers = questions.filter(q => q.type !== 'section');
+      
+      // تجهيز البيانات أولاً قبل إنشاء الاستجابة
+      const answersData = questionsWithAnswers.map(question => {
+        const responseValue = responses[question.id];
+        return {
+          question_id: question.id,
+          value: responseValue !== undefined && responseValue !== null ? String(responseValue) : null,
+          numeric_value: responseValue !== undefined && responseValue !== null && !isNaN(Number(responseValue)) ? Number(responseValue) : null,
+        };
+      }).filter(answer => answer.value !== null || answer.numeric_value !== null);
+
+      console.log("Questions with answers count:", questionsWithAnswers.length);
+      console.log("Prepared answers count:", answersData.length);
+
+      // التحقق من وجود إجابات قبل إنشاء الاستجابة
+      if (answersData.length === 0) {
+        throw new Error("لا توجد إجابات للإرسال. يرجى الإجابة على الأسئلة.");
+      }
 
       // Create response record - generate UUID locally to avoid SELECT permission issue
       const responseId = crypto.randomUUID();
@@ -280,19 +318,13 @@ const TakeSurvey = () => {
         throw responseError;
       }
 
-      // Create answer records using freshly loaded questions
-      // Filter out section questions - they don't need answers
-      const questionsWithAnswers = freshQuestions.filter(q => q.type !== 'section');
+      // إضافة response_id للإجابات
+      const answersWithResponseId = answersData.map(a => ({
+        ...a,
+        response_id: responseId
+      }));
       
-      const answersData = questionsWithAnswers.map(question => {
-        const responseValue = responses[question.id];
-        return {
-          response_id: responseId,
-          question_id: question.id,
-          value: responseValue !== undefined && responseValue !== null ? String(responseValue) : null,
-          numeric_value: responseValue !== undefined && responseValue !== null && !isNaN(Number(responseValue)) ? Number(responseValue) : null,
-        };
-      }).filter(answer => answer.value !== null || answer.numeric_value !== null);
+      console.log("Inserting answers:", answersWithResponseId);
 
       console.log("Questions with answers count:", questionsWithAnswers.length);
       console.log("Inserting answers:", answersData);
@@ -304,9 +336,9 @@ const TakeSurvey = () => {
 
       const { error: answersError } = await supabase
         .from("answers")
-        .insert(answersData);
+        .insert(answersWithResponseId);
 
-      console.log("Answers insert completed, count:", answersData.length);
+      console.log("Answers insert completed, count:", answersWithResponseId.length);
       console.log("Answers error:", answersError);
 
       if (answersError) {
