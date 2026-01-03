@@ -12,7 +12,7 @@ const SurveyComplete = () => {
 
   const handleRetakeSurvey = () => {
     if (surveyId) {
-      navigate(`/survey/${surveyId}`);
+      navigate(`/take/${surveyId}`);
     } else {
       // Fallback: go back in history
       navigate(-1);
