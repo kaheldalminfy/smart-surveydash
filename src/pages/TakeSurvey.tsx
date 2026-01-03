@@ -217,6 +217,31 @@ const TakeSurvey = () => {
     setIsSubmitting(true);
 
     try {
+      // إعادة تحميل الأسئلة من قاعدة البيانات للتأكد من صحتها
+      const { data: freshQuestions, error: questionsError } = await supabase
+        .from("questions")
+        .select("*")
+        .eq("survey_id", id)
+        .order("order_index");
+
+      if (questionsError) {
+        console.error("Failed to reload questions:", questionsError);
+        throw new Error("فشل في التحقق من الأسئلة. يرجى إعادة تحميل الصفحة.");
+      }
+
+      if (!freshQuestions || freshQuestions.length === 0) {
+        throw new Error("لا توجد أسئلة في هذا الاستبيان");
+      }
+
+      // إنشاء خريطة للأسئلة الصالحة
+      const validQuestionIds = new Set(freshQuestions.map(q => q.id));
+      
+      // التحقق من أن جميع الإجابات تتطابق مع أسئلة موجودة
+      const invalidResponses = Object.keys(responses).filter(qId => !validQuestionIds.has(qId));
+      if (invalidResponses.length > 0) {
+        console.warn("Found responses for non-existent questions:", invalidResponses);
+      }
+
       // Try to get current user, but don't fail if not logged in
       let userId = null;
       try {
@@ -232,7 +257,6 @@ const TakeSurvey = () => {
       console.log("Survey is_anonymous:", survey?.is_anonymous);
 
       // Create response record - generate UUID locally to avoid SELECT permission issue
-      // استخدام UUID محلي لتجنب مشكلة صلاحيات SELECT
       const responseId = crypto.randomUUID();
       
       const { error: responseError } = await supabase
@@ -256,9 +280,9 @@ const TakeSurvey = () => {
         throw responseError;
       }
 
-      // Create answer records using the generated response ID
+      // Create answer records using freshly loaded questions
       // Filter out section questions - they don't need answers
-      const questionsWithAnswers = questions.filter(q => q.type !== 'section');
+      const questionsWithAnswers = freshQuestions.filter(q => q.type !== 'section');
       
       const answersData = questionsWithAnswers.map(question => {
         const responseValue = responses[question.id];
