@@ -18,6 +18,15 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { z } from "zod";
+
+// Validation schema for complaint form
+const complaintSchema = z.object({
+  studentName: z.string().trim().min(3).max(200),
+  studentEmail: z.string().trim().email(),
+  subject: z.string().trim().min(5).max(500),
+  description: z.string().trim().min(10).max(5000)
+});
 
 const SubmitComplaint = () => {
   const navigate = useNavigate();
@@ -82,10 +91,35 @@ const SubmitComplaint = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.studentName || !formData.studentEmail || !formData.subject || !formData.description) {
+    // Validate input using zod
+    const validation = complaintSchema.safeParse({
+      studentName: formData.studentName,
+      studentEmail: formData.studentEmail,
+      subject: formData.subject,
+      description: formData.description
+    });
+    
+    if (!validation.success) {
+      const errors = validation.error.errors;
+      const errorMessages = errors.map(err => {
+        if (err.path[0] === 'studentName') {
+          return language === 'ar' ? 'الاسم يجب أن يكون 3 أحرف على الأقل' : 'Name must be at least 3 characters';
+        }
+        if (err.path[0] === 'studentEmail') {
+          return language === 'ar' ? 'البريد الإلكتروني غير صحيح' : 'Invalid email address';
+        }
+        if (err.path[0] === 'subject') {
+          return language === 'ar' ? 'الموضوع يجب أن يكون 5 أحرف على الأقل' : 'Subject must be at least 5 characters';
+        }
+        if (err.path[0] === 'description') {
+          return language === 'ar' ? 'الوصف يجب أن يكون 10 أحرف على الأقل' : 'Description must be at least 10 characters';
+        }
+        return err.message;
+      });
+      
       toast({
         title: t('common.error'),
-        description: language === 'ar' ? "يرجى ملء جميع الحقول المطلوبة" : "Please fill in all required fields",
+        description: errorMessages.join(', '),
         variant: "destructive",
       });
       return;

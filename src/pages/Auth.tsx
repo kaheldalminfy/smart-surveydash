@@ -9,6 +9,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { z } from "zod";
+
+// Validation schemas
+const loginSchema = z.object({
+  email: z.string().trim().email(),
+  password: z.string().min(8)
+});
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -40,11 +47,38 @@ const Auth = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate input
+    const validation = loginSchema.safeParse({
+      email: formData.email,
+      password: formData.password
+    });
+    
+    if (!validation.success) {
+      const errors = validation.error.errors;
+      const errorMessages = errors.map(err => {
+        if (err.path[0] === 'email') {
+          return language === 'ar' ? 'البريد الإلكتروني غير صحيح' : 'Invalid email address';
+        }
+        if (err.path[0] === 'password') {
+          return language === 'ar' ? 'كلمة المرور يجب أن تكون 8 أحرف على الأقل' : 'Password must be at least 8 characters';
+        }
+        return err.message;
+      });
+      
+      toast({
+        title: language === 'ar' ? "خطأ في البيانات" : "Validation error",
+        description: errorMessages.join(', '),
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsLoading(true);
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
+        email: formData.email.trim(),
         password: formData.password,
       });
 
