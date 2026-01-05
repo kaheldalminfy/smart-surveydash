@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Trash2, GripVertical, Sparkles, Save, Eye, Copy, Upload, Download, FileJson, FileSpreadsheet, FileText, ArrowRight } from "lucide-react";
+import { Plus, Trash2, GripVertical, Sparkles, Save, Eye, Copy, Upload, Download, FileJson, FileSpreadsheet, FileText, ArrowRight, AlertTriangle, Lock } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import DashboardButton from "@/components/DashboardButton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -55,16 +56,45 @@ const SurveyDesigner = () => {
   const [templateDescription, setTemplateDescription] = useState("");
   const [templatePublic, setTemplatePublic] = useState(false);
   const [academicCalendar, setAcademicCalendar] = useState<any[]>([]);
+  const [responseCount, setResponseCount] = useState(0);
+  const [hasExistingAnswers, setHasExistingAnswers] = useState(false);
 
   useEffect(() => {
     loadPrograms();
     loadAcademicCalendar();
     if (id) {
       loadSurvey();
+      checkExistingResponses();
     } else if (templateId) {
       loadTemplate();
     }
   }, [id, templateId]);
+
+  const checkExistingResponses = async () => {
+    if (!id) return;
+    
+    try {
+      // التحقق من عدد الاستجابات
+      const { count: respCount } = await supabase
+        .from("responses")
+        .select("*", { count: 'exact', head: true })
+        .eq("survey_id", id);
+      
+      setResponseCount(respCount || 0);
+      
+      // التحقق من وجود إجابات فعلية
+      const { data: answersData } = await supabase
+        .from("responses")
+        .select("id, answers(id)")
+        .eq("survey_id", id)
+        .limit(1);
+      
+      const hasAnswers = answersData?.some(r => r.answers && r.answers.length > 0) || false;
+      setHasExistingAnswers(hasAnswers);
+    } catch (error) {
+      console.error("Error checking responses:", error);
+    }
+  };
 
   const loadAcademicCalendar = async () => {
     const { data } = await supabase
@@ -779,6 +809,33 @@ const SurveyDesigner = () => {
           <TabsContent value="design">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-6">
+                {/* تحذير عند وجود استجابات */}
+                {id && responseCount > 0 && (
+                  <Alert variant={hasExistingAnswers ? "destructive" : "default"} className="border-2">
+                    <AlertTriangle className="h-5 w-5" />
+                    <AlertTitle className="font-bold">
+                      {hasExistingAnswers ? "⚠️ تحذير هام: استبيان له إجابات محفوظة" : "ℹ️ معلومة: استبيان له استجابات"}
+                    </AlertTitle>
+                    <AlertDescription>
+                      {hasExistingAnswers ? (
+                        <div className="mt-2 space-y-2">
+                          <p>هذا الاستبيان لديه <strong>{responseCount} استجابة</strong> مع إجابات محفوظة.</p>
+                          <p className="text-destructive font-semibold flex items-center gap-2">
+                            <Lock className="h-4 w-4" />
+                            لا يمكن حذف أو تعديل الأسئلة الموجودة للحفاظ على سلامة البيانات.
+                          </p>
+                          <p>إذا كنت تريد تعديل الأسئلة، يُرجى إنشاء استبيان جديد.</p>
+                        </div>
+                      ) : (
+                        <p className="mt-2">
+                          هذا الاستبيان لديه <strong>{responseCount} استجابة</strong>. 
+                          يمكنك تعديل الإعدادات العامة فقط.
+                        </p>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
                 {/* معلومات الاستبيان */}
                 <Card>
                   <CardHeader>
