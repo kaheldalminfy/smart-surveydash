@@ -10,16 +10,26 @@ export const exportToPDF = async (report: any, survey: any, stats: any, logoUrl?
     format: 'a4',
   });
 
-  // Load and add Arabic font
+  // Load and add Arabic font - using embedded font for reliability
+  let fontLoaded = false;
   try {
     const arabicFontBase64 = await loadArabicFont();
-    if (arabicFontBase64) {
+    if (arabicFontBase64 && arabicFontBase64.length > 1000) {
       doc.addFileToVFS('Amiri-Regular.ttf', arabicFontBase64);
       doc.addFont('Amiri-Regular.ttf', 'Amiri', 'normal');
       doc.setFont('Amiri');
+      fontLoaded = true;
+      console.log('Arabic font loaded successfully');
+    } else {
+      console.warn('Arabic font base64 is empty or too small');
     }
   } catch (error) {
     console.error('Error setting Arabic font:', error);
+  }
+
+  // If font failed to load, show warning but continue
+  if (!fontLoaded) {
+    console.warn('Arabic font not loaded - PDF may have rendering issues');
   }
 
   doc.setLanguage('ar');
