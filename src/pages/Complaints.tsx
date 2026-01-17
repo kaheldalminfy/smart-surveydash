@@ -24,10 +24,12 @@ import {
   Trash2,
   Building2,
   BarChart3,
-  Printer
+  Printer,
+  LayoutDashboard
 } from "lucide-react";
 import DashboardButton from "@/components/DashboardButton";
 import ComplaintsStatistics from "@/components/ComplaintsStatistics";
+import ComplaintsDashboard from "@/components/ComplaintsDashboard";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -88,6 +90,8 @@ const Complaints = () => {
   const [isCoordinator, setIsCoordinator] = useState(false);
   const [userProgramIds, setUserProgramIds] = useState<string[]>([]);
   const [showStatistics, setShowStatistics] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(true);
+  const [selectedDashboardProgram, setSelectedDashboardProgram] = useState<string>("all");
   const [activeStatusView, setActiveStatusView] = useState<string | null>(null);
   const [activeStatusContext, setActiveStatusContext] = useState<{type: 'all' | 'program', programId?: string} | null>(null);
   const [newComplaint, setNewComplaint] = useState({
@@ -823,7 +827,15 @@ const Complaints = () => {
             )}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {/* Dashboard Toggle Button */}
+          <Button 
+            variant={showDashboard ? "default" : "outline"} 
+            onClick={() => setShowDashboard(!showDashboard)}
+          >
+            <LayoutDashboard className="h-4 w-4 ml-2" />
+            {showDashboard ? 'إخفاء لوحة التحكم' : 'لوحة التحكم'}
+          </Button>
           {/* Statistics button for all roles */}
           <Button variant="outline" onClick={() => setShowStatistics(true)}>
             <BarChart3 className="h-4 w-4 ml-2" />
@@ -973,6 +985,18 @@ const Complaints = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Role-Based Dashboard */}
+      {showDashboard && (
+        <ComplaintsDashboard
+          complaints={complaints}
+          programs={programs}
+          userRole={isAdmin ? 'admin' : isDean ? 'dean' : isCoordinator ? 'coordinator' : 'program_manager'}
+          userProgramIds={userProgramIds}
+          selectedDashboardProgram={selectedDashboardProgram}
+          onProgramChange={setSelectedDashboardProgram}
+        />
+      )}
 
       {/* Program Tabs */}
       <Tabs defaultValue={isAdmin || isDean ? "all" : (userProgramIds[0] || "all")} className="space-y-4">
