@@ -4,289 +4,154 @@ import * as XLSX from 'xlsx';
 import { loadArabicFont } from './arabicFont';
 
 export const exportToPDF = async (report: any, survey: any, stats: any, logoUrl?: string) => {
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-  });
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-  // Load and add Arabic font - using embedded font for reliability
-  let fontLoaded = false;
+  // Load Arabic font
   try {
     const arabicFontBase64 = await loadArabicFont();
     if (arabicFontBase64 && arabicFontBase64.length > 1000) {
       doc.addFileToVFS('Amiri-Regular.ttf', arabicFontBase64);
       doc.addFont('Amiri-Regular.ttf', 'Amiri', 'normal');
       doc.setFont('Amiri');
-      fontLoaded = true;
-      console.log('Arabic font loaded successfully');
-    } else {
-      console.warn('Arabic font base64 is empty or too small');
     }
   } catch (error) {
-    console.error('Error setting Arabic font:', error);
-  }
-
-  // If font failed to load, show warning but continue
-  if (!fontLoaded) {
-    console.warn('Arabic font not loaded - PDF may have rendering issues');
+    console.error('Error loading font:', error);
   }
 
   doc.setLanguage('ar');
-  
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
   let yPos = 20;
 
-  // Add college logo if available
-  if (logoUrl && logoUrl.trim()) {
+  // Logo
+  if (logoUrl) {
     try {
-      // Add logo at top center
-      doc.addImage(logoUrl, 'PNG', 85, yPos, 40, 40);
+      doc.addImage(logoUrl, 'PNG', (pageWidth - 35) / 2, yPos, 35, 35);
       yPos += 45;
-    } catch (error) {
-      console.error('Error adding logo to PDF:', error);
-      yPos = 20;
-    }
+    } catch (e) { console.error(e); }
   }
-  
-  // Header with border
-  doc.setFillColor(66, 139, 202);
-  doc.rect(15, yPos - 5, 180, 30, 'F');
-  
-  doc.setFont('Amiri', 'normal');
+
+  // Header
+  doc.setFillColor(37, 99, 235);
+  doc.roundedRect(15, yPos, pageWidth - 30, 35, 3, 3, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(22);
-  doc.text('تقرير الاستبيان', 105, yPos + 5, { align: 'center' });
-  yPos += 12;
-  
-  doc.setFontSize(16);
-  doc.text(survey?.title || 'استبيان', 105, yPos, { align: 'center' });
-  yPos += 8;
-  doc.text(survey?.programs?.name || '', 105, yPos, { align: 'center' });
-  
+  doc.text('تقرير الاستبيان', pageWidth / 2, yPos + 12, { align: 'center' });
+  doc.setFontSize(14);
+  doc.text(survey?.title || '', pageWidth / 2, yPos + 22, { align: 'center' });
+  doc.setFontSize(11);
+  doc.text(survey?.programs?.name || '', pageWidth / 2, yPos + 30, { align: 'center' });
+  yPos += 45;
+
+  // Info
+  if (report?.semester || report?.academic_year) {
+    doc.setFillColor(239, 246, 255);
+    doc.roundedRect(15, yPos, pageWidth - 30, 12, 2, 2, 'F');
+    doc.setTextColor(37, 99, 235);
+    doc.setFontSize(11);
+    const info = [report.semester ? `الفصل: ${report.semester}` : '', report.academic_year ? `العام: ${report.academic_year}` : ''].filter(Boolean).join(' | ');
+    doc.text(info, pageWidth / 2, yPos + 8, { align: 'center' });
+    yPos += 18;
+  }
+
+  doc.setTextColor(0, 0, 0);
+
+  // Stats table
+  doc.setFillColor(37, 99, 235);
+  doc.roundedRect(15, yPos, pageWidth - 30, 10, 2, 2, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(13);
+  doc.text('الإحصائيات الرئيسية', pageWidth - 20, yPos + 7);
   doc.setTextColor(0, 0, 0);
   yPos += 15;
-
-  // Add semester and academic year
-  if (report?.semester || report?.academic_year) {
-    doc.setFontSize(12);
-    const semesterText = report.semester ? `الفصل الدراسي: ${report.semester}` : '';
-    const yearText = report.academic_year ? `العام الأكاديمي: ${report.academic_year}` : '';
-    const infoText = [semesterText, yearText].filter(Boolean).join(' - ');
-    doc.text(infoText, 105, yPos, { align: 'center' });
-    yPos += 7;
-  }
-  
-  // Stats Section with enhanced styling
-  doc.setFillColor(240, 248, 255);
-  doc.rect(15, yPos, 180, 10, 'F');
-  
-  doc.setFontSize(14);
-  doc.setFont('Amiri', 'normal');
-  doc.text('الإحصائيات الرئيسية', 20, yPos + 7);
-  yPos += 12;
-  
-  const statsData = [
-    ['إجمالي الاستجابات', String(stats.totalResponses || 0)],
-    ['معدل الاستجابة', `${stats.responseRate || 0}%`],
-    ['المتوسط العام', stats.overallMean ? stats.overallMean.toFixed(2) : 'غير متاح'],
-    ['الانحراف المعياري', stats.overallStdDev ? stats.overallStdDev.toFixed(2) : 'غير متاح'],
-  ];
 
   autoTable(doc, {
     startY: yPos,
     head: [['المؤشر', 'القيمة']],
-    body: statsData,
-    styles: { 
-      font: 'Amiri', 
-      halign: 'right',
-      fontSize: 11,
-      cellPadding: 5
-    },
-    headStyles: { 
-      fillColor: [66, 139, 202],
-      fontSize: 12,
-      fontStyle: 'bold'
-    },
-    alternateRowStyles: { fillColor: [245, 245, 245] },
-    margin: { left: 20, right: 20 }
+    body: [
+      ['إجمالي الاستجابات', String(stats.totalResponses || 0)],
+      ['معدل الاستجابة', `${stats.responseRate || 0}%`],
+      ['المتوسط العام', stats.overallMean ? Number(stats.overallMean).toFixed(2) : '-'],
+      ['الانحراف المعياري', stats.overallStdDev ? Number(stats.overallStdDev).toFixed(2) : '-'],
+    ],
+    styles: { font: 'Amiri', halign: 'right', fontSize: 11 },
+    headStyles: { fillColor: [37, 99, 235], halign: 'center' },
+    margin: { left: 20, right: 20 },
   });
 
-  // Summary Section with enhanced styling
   yPos = (doc as any).lastAutoTable.finalY + 15;
-  
-  doc.setFillColor(240, 248, 255);
-  doc.rect(15, yPos - 3, 180, 10, 'F');
-  
-  doc.setFontSize(14);
-  doc.setFont('Amiri', 'normal');
-  doc.text('الملخص التنفيذي', 20, yPos + 4);
-  yPos += 12;
-  
-  doc.setFont('Amiri', 'normal');
-  doc.setFontSize(11);
-  const summaryText = report.summary || 'لا يوجد ملخص متاح حالياً. يرجى مراجعة التفاصيل أدناه.';
-  const summaryLines = doc.splitTextToSize(summaryText, 170);
-  
-  // Add background for summary
-  doc.setFillColor(250, 250, 250);
-  doc.rect(20, yPos - 2, 170, summaryLines.length * 6 + 4, 'F');
-  doc.setDrawColor(200, 200, 200);
-  doc.rect(20, yPos - 2, 170, summaryLines.length * 6 + 4, 'S');
-  
-  doc.text(summaryLines, 25, yPos + 2);
 
-  // Recommendations Section
+  // Summary
+  doc.setFillColor(37, 99, 235);
+  doc.roundedRect(15, yPos, pageWidth - 30, 10, 2, 2, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(13);
+  doc.text('الملخص التنفيذي', pageWidth - 20, yPos + 7);
+  yPos += 15;
+  doc.setTextColor(50, 50, 50);
+  doc.setFontSize(11);
+  const summaryLines = doc.splitTextToSize(report.summary || 'لا يوجد ملخص', pageWidth - 50);
+  doc.text(summaryLines, pageWidth - 25, yPos);
   yPos += summaryLines.length * 6 + 15;
-  if (yPos > 240) {
+
+  // Recommendations
+  doc.setFillColor(34, 139, 34);
+  doc.roundedRect(15, yPos, pageWidth - 30, 10, 2, 2, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(13);
+  doc.text('التوصيات', pageWidth - 20, yPos + 7);
+  yPos += 15;
+  doc.setTextColor(50, 50, 50);
+  doc.setFontSize(11);
+  const recLines = doc.splitTextToSize(report.recommendations_text || 'لا توجد توصيات', pageWidth - 50);
+  doc.text(recLines, pageWidth - 25, yPos);
+
+  // Question table on new page
+  if (stats.questionStats?.length > 0) {
     doc.addPage();
     yPos = 20;
-  }
-  
-  doc.setFillColor(240, 255, 240);
-  doc.rect(15, yPos - 3, 180, 10, 'F');
-  
-  doc.setFontSize(14);
-  doc.setFont('Amiri', 'normal');
-  doc.text('التوصيات والمقترحات', 20, yPos + 4);
-  yPos += 12;
-  
-  doc.setFont('Amiri', 'normal');
-  doc.setFontSize(11);
-  const recommendationText = report.recommendations_text || 'لا توجد توصيات محددة حالياً. سيتم تحديث هذا القسم بناءً على تحليل النتائج.';
-  const recommendationLines = doc.splitTextToSize(recommendationText, 170);
-  
-  // Add background for recommendations
-  doc.setFillColor(250, 255, 250);
-  doc.rect(20, yPos - 2, 170, recommendationLines.length * 6 + 4, 'F');
-  doc.setDrawColor(200, 220, 200);
-  doc.rect(20, yPos - 2, 170, recommendationLines.length * 6 + 4, 'S');
-  
-  doc.text(recommendationLines, 25, yPos + 2);
-  yPos += recommendationLines.length * 6 + 10;
-
-  // Question Stats with enhanced presentation
-  if (stats.questionStats && stats.questionStats.length > 0) {
-    if (yPos > 200) {
-      doc.addPage();
-      yPos = 20;
-    } else {
-      yPos += 10;
-    }
-    
-    doc.setFillColor(255, 248, 240);
-    doc.rect(15, yPos - 3, 180, 10, 'F');
-    
-    doc.setFontSize(14);
-    doc.setFont('Amiri', 'normal');
-    doc.text('تفاصيل الأسئلة والتقييمات', 20, yPos + 4);
-    yPos += 12;
-    
-    const questionData = stats.questionStats.map((q: any, index: number) => [
-      `${index + 1}. ${q.question}`,
-      q.mean ? q.mean.toFixed(2) : 'غير متاح',
-      q.stdDev ? q.stdDev.toFixed(2) : 'غير متاح',
-      q.responseCount || 0
-    ]);
+    doc.setFillColor(37, 99, 235);
+    doc.roundedRect(15, yPos, pageWidth - 30, 10, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(13);
+    doc.text('تفاصيل الأسئلة', pageWidth - 20, yPos + 7);
+    yPos += 15;
 
     autoTable(doc, {
       startY: yPos,
-      head: [['السؤال', 'المتوسط', 'الانحراف المعياري', 'عدد الإجابات']],
-      body: questionData,
-      styles: { 
-        font: 'Amiri', 
-        halign: 'right', 
-        fontSize: 10,
-        cellPadding: 4
-      },
-      headStyles: { 
-        fillColor: [66, 139, 202],
-        fontSize: 11,
-        fontStyle: 'bold'
-      },
-      columnStyles: { 
-        0: { cellWidth: 100 },
-        1: { cellWidth: 25, halign: 'center' },
-        2: { cellWidth: 30, halign: 'center' },
-        3: { cellWidth: 25, halign: 'center' }
-      },
-      alternateRowStyles: { fillColor: [250, 250, 250] },
-      margin: { left: 20, right: 20 }
+      head: [['#', 'المتوسط', 'الانحراف', 'السؤال']],
+      body: stats.questionStats.map((q: any, i: number) => [
+        String(q.responseCount || 0),
+        q.mean ? Number(q.mean).toFixed(2) : '-',
+        q.stdDev ? Number(q.stdDev).toFixed(2) : '-',
+        `${i + 1}. ${q.question}`,
+      ]),
+      styles: { font: 'Amiri', fontSize: 9 },
+      headStyles: { fillColor: [37, 99, 235], halign: 'center' },
+      columnStyles: { 0: { halign: 'center', cellWidth: 15 }, 1: { halign: 'center', cellWidth: 20 }, 2: { halign: 'center', cellWidth: 20 }, 3: { halign: 'right' } },
+      margin: { left: 15, right: 15 },
     });
   }
 
-  // Footer on all pages
-  const pageCount = (doc as any).internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
+  // Footer
+  const pages = doc.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
     doc.setPage(i);
-    doc.setFont('Amiri', 'normal');
     doc.setFontSize(9);
-    doc.setTextColor(128, 128, 128);
-    doc.text(
-      `صفحة ${i} من ${pageCount} | كلية العلوم الإنسانية والاجتماعية - نظام إدارة الاستبيانات`,
-      105,
-      285,
-      { align: 'center' }
-    );
+    doc.setTextColor(100, 100, 100);
+    doc.text(`صفحة ${i} من ${pages}`, 15, pageHeight - 8);
+    doc.text(`تاريخ: ${new Date().toLocaleDateString('ar-SA')}`, pageWidth - 15, pageHeight - 8, { align: 'right' });
   }
 
-  // Save
   doc.save(`تقرير_${survey?.title || 'استبيان'}.pdf`);
 };
 
 export const exportToExcel = (report: any, survey: any, stats: any) => {
-  const workbook = XLSX.utils.book_new();
-
-  // Overview sheet
-  const overviewData = [
-    ['تقرير الاستبيان'],
-    [''],
-    ['عنوان الاستبيان', survey?.title || ''],
-    ['البرنامج', survey?.programs?.name || ''],
-    ...(report?.semester ? [['الفصل الدراسي', report.semester]] : []),
-    ...(report?.academic_year ? [['العام الأكاديمي', report.academic_year]] : []),
-    [''],
-    ['الإحصائيات الرئيسية'],
-    ['إجمالي الاستجابات', stats.totalResponses || 0],
-    ['معدل الاستجابة', `${stats.responseRate || 0}%`],
-    ['المتوسط العام', stats.overallMean?.toFixed(2) || 'N/A'],
-    ['الانحراف المعياري', stats.overallStdDev?.toFixed(2) || 'N/A'],
-    [''],
-    ['الملخص التنفيذي'],
-    [report.summary || 'لا يوجد ملخص متاح'],
-    [''],
-    ['التوصيات'],
-    [report.recommendations_text || 'لا توجد توصيات متاحة'],
+  const wb = XLSX.utils.book_new();
+  const data = [
+    ['تقرير الاستبيان'], [''], ['العنوان', survey?.title], ['البرنامج', survey?.programs?.name],
+    [''], ['إجمالي الاستجابات', stats.totalResponses], ['المتوسط العام', stats.overallMean?.toFixed(2)],
   ];
-
-  const overviewSheet = XLSX.utils.aoa_to_sheet(overviewData);
-  XLSX.utils.book_append_sheet(workbook, overviewSheet, 'نظرة عامة');
-
-  // Question stats sheet
-  if (stats.questionStats && stats.questionStats.length > 0) {
-    const questionData = [
-      ['السؤال', 'المتوسط', 'الانحراف المعياري'],
-      ...stats.questionStats.map((q: any) => [
-        q.question,
-        q.mean?.toFixed(2) || 'N/A',
-        q.stdDev?.toFixed(2) || 'N/A',
-      ]),
-    ];
-    
-    const questionSheet = XLSX.utils.aoa_to_sheet(questionData);
-    XLSX.utils.book_append_sheet(workbook, questionSheet, 'تفاصيل الأسئلة');
-  }
-
-  // Likert distribution sheet
-  if (stats.likertDistribution && stats.likertDistribution.length > 0) {
-    const likertData = [
-      ['التصنيف', 'العدد'],
-      ...stats.likertDistribution.map((item: any) => [item.label, item.count]),
-    ];
-    
-    const likertSheet = XLSX.utils.aoa_to_sheet(likertData);
-    XLSX.utils.book_append_sheet(workbook, likertSheet, 'توزيع ليكرت');
-  }
-
-  // Save
-  XLSX.writeFile(workbook, `تقرير_${survey?.title || 'استبيان'}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), 'التقرير');
+  XLSX.writeFile(wb, `تقرير_${survey?.title || 'استبيان'}.xlsx`);
 };
