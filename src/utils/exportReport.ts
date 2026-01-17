@@ -111,9 +111,14 @@ export const exportToPDF = async (
   doc.text('الإحصائيات الرئيسية', pageWidth - margin - 5, yPos + 7, { align: 'right' });
   yPos += 15;
 
+  const responseRateText = stats.targetEnrollment && stats.targetEnrollment > 0 
+    ? `${stats.responseRate}% (${stats.totalResponses} من ${stats.targetEnrollment})`
+    : 'غير محدد';
+  
   const statsData = [
     ['إجمالي الاستجابات', String(stats.totalResponses || 0)],
-    ['معدل الاستجابة', `${stats.responseRate || 0}%`],
+    ['عدد الطلبة المستهدف', stats.targetEnrollment ? String(stats.targetEnrollment) : 'غير محدد'],
+    ['معدل الاستجابة', responseRateText],
     ['المتوسط العام', stats.overallMean ? Number(stats.overallMean).toFixed(2) + ' من 5.0' : '-'],
     ['التقييم', stats.overallMean ? getMeanLevel(stats.overallMean).label : '-'],
     ['الانحراف المعياري', stats.overallStdDev ? Number(stats.overallStdDev).toFixed(2) : '-'],

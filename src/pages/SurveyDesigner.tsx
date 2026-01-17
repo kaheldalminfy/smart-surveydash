@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Trash2, GripVertical, Sparkles, Save, Eye, Copy, Upload, Download, FileJson, FileSpreadsheet, FileText, ArrowRight, AlertTriangle, Lock } from "lucide-react";
+import { Plus, Trash2, GripVertical, Sparkles, Save, Eye, Copy, Upload, Download, FileJson, FileSpreadsheet, FileText, ArrowRight, AlertTriangle, Lock, Users } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import DashboardButton from "@/components/DashboardButton";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +50,7 @@ const SurveyDesigner = () => {
     endDate: "",
     semester: "",
     academicYear: "",
+    targetEnrollment: "",
   });
   const [questions, setQuestions] = useState<Question[]>([]);
   const [templateName, setTemplateName] = useState("");
@@ -142,6 +143,7 @@ const SurveyDesigner = () => {
           endDate: surveyData.end_date ? new Date(surveyData.end_date).toISOString().split('T')[0] : "",
           semester: surveyData.semester || "",
           academicYear: surveyData.academic_year || "",
+          targetEnrollment: surveyData.target_enrollment ? String(surveyData.target_enrollment) : "",
         });
 
         const { data: questionsData, error: questionsError } = await supabase
@@ -396,6 +398,7 @@ const SurveyDesigner = () => {
             end_date: survey.endDate || null,
             semester: survey.semester || null,
             academic_year: survey.academicYear || null,
+            target_enrollment: survey.targetEnrollment ? parseInt(survey.targetEnrollment) : null,
           })
           .eq("id", id);
 
@@ -441,6 +444,7 @@ const SurveyDesigner = () => {
             end_date: survey.endDate || null,
             semester: survey.semester || null,
             academic_year: survey.academicYear || null,
+            target_enrollment: survey.targetEnrollment ? parseInt(survey.targetEnrollment) : null,
             created_by: user.id,
             status: "draft",
           })
@@ -923,6 +927,29 @@ const SurveyDesigner = () => {
                             </option>
                           ))}
                         </select>
+                      </div>
+                    </div>
+                    {/* حقل عدد الطلبة المستهدف */}
+                    <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                      <div className="flex items-start gap-3">
+                        <Users className="h-5 w-5 text-primary mt-1" />
+                        <div className="flex-1 space-y-2">
+                          <Label htmlFor="targetEnrollment" className="text-sm font-medium">
+                            عدد الطلبة الإجمالي (اختياري)
+                          </Label>
+                          <Input 
+                            id="targetEnrollment" 
+                            type="number"
+                            min="0"
+                            placeholder="مثال: 100"
+                            value={survey.targetEnrollment}
+                            onChange={(e) => setSurvey({...survey, targetEnrollment: e.target.value})}
+                            className="max-w-[200px]"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            أدخل عدد الطلبة لحساب نسبة الاستجابة بدقة في التقارير
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
