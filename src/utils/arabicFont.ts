@@ -1,6 +1,18 @@
 // Arabic Font Loader - Uses embedded font file for reliable PDF generation
 
+// Track font loading status to show user feedback
+let fontLoadingFailed = false;
+let onFontLoadError: ((message: string) => void) | null = null;
+
+export const setFontLoadErrorHandler = (handler: (message: string) => void) => {
+  onFontLoadError = handler;
+};
+
+export const didFontLoadFail = () => fontLoadingFailed;
+
 export const loadArabicFont = async (): Promise<string> => {
+  fontLoadingFailed = false;
+  
   try {
     // Load font from public folder - more reliable than CDN
     const response = await fetch('/fonts/Amiri-Regular.ttf');
@@ -48,6 +60,14 @@ export const loadArabicFont = async (): Promise<string> => {
       return btoa(binaryString);
     } catch (fallbackError) {
       console.error('Fallback font loading also failed:', fallbackError);
+      
+      // Mark font as failed and notify handler
+      fontLoadingFailed = true;
+      
+      if (onFontLoadError) {
+        onFontLoadError('فشل تحميل الخط العربي، سيتم استخدام خط افتراضي. يرجى التحقق من اتصال الإنترنت.');
+      }
+      
       return '';
     }
   }

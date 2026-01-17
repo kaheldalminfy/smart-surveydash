@@ -41,23 +41,49 @@ const Dashboard = () => {
   };
 
   const loadStats = async () => {
+    // Get active surveys count
     const { count: activeSurveys } = await supabase
       .from("surveys")
       .select("*", { count: "exact", head: true })
       .eq("status", "active");
 
+    // Get total responses count
     const { count: totalResponses } = await supabase
       .from("responses")
       .select("*", { count: "exact", head: true });
 
+    // Get ready reports count
     const { count: readyReports } = await supabase
       .from("reports")
       .select("*", { count: "exact", head: true });
 
+    // Calculate REAL response rate from target_enrollment
+    const { data: surveysWithEnrollment } = await supabase
+      .from("surveys")
+      .select("id, target_enrollment, status")
+      .in("status", ["active", "closed"]);
+
+    let calculatedResponseRate = "0%";
+    
+    if (surveysWithEnrollment && surveysWithEnrollment.length > 0) {
+      // Sum all target enrollments
+      const totalTargetEnrollment = surveysWithEnrollment.reduce(
+        (sum, survey) => sum + (survey.target_enrollment || 0), 
+        0
+      );
+      
+      if (totalTargetEnrollment > 0 && totalResponses) {
+        const rate = Math.min(100, (totalResponses / totalTargetEnrollment) * 100);
+        calculatedResponseRate = `${rate.toFixed(1)}%`;
+      } else if (totalResponses && totalResponses > 0) {
+        calculatedResponseRate = "بانتظار البيانات";
+      }
+    }
+
     setStats({
       activeSurveys: activeSurveys || 0,
       totalResponses: totalResponses || 0,
-      responseRate: totalResponses ? "78%" : "0%",
+      responseRate: calculatedResponseRate,
       readyReports: readyReports || 0
     });
   };
