@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   BarChart, 
   Bar, 
@@ -29,10 +31,12 @@ import {
   Calendar,
   BarChart3,
   PieChart as PieChartIcon,
-  Activity
+  Activity,
+  FileSpreadsheet
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { exportToPDF, exportToExcel, captureAllCharts } from "@/utils/exportReport";
 
 interface SurveyAnalyticsProps {
   surveyId: string;
@@ -51,11 +55,24 @@ const SurveyAnalytics = ({ surveyId }: SurveyAnalyticsProps) => {
   const { toast } = useToast();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedTimeRange, setSelectedTimeRange] = useState("7d");
+  const [selectedTimeRange, setSelectedTimeRange] = useState("all");
+  const [exporting, setExporting] = useState(false);
+  const [surveyDetails, setSurveyDetails] = useState<any>(null);
+  const [showFilterPopover, setShowFilterPopover] = useState(false);
 
   useEffect(() => {
     loadAnalytics();
+    loadSurveyDetails();
   }, [surveyId, selectedTimeRange]);
+
+  const loadSurveyDetails = async () => {
+    const { data } = await supabase
+      .from("surveys")
+      .select("*, programs(name)")
+      .eq("id", surveyId)
+      .maybeSingle();
+    if (data) setSurveyDetails(data);
+  };
 
   const loadAnalytics = async () => {
     setLoading(true);
@@ -232,12 +249,168 @@ const SurveyAnalytics = ({ surveyId }: SurveyAnalyticsProps) => {
     });
   };
 
-  const exportReport = () => {
-    // TODO: Implement PDF/Excel export
-    toast({
-      title: "قريباً",
-      description: "ميزة تصدير التقارير ستكون متاحة قريباً",
-    });
+  const handleExportPDF = async () => {
+    if (!analytics || !surveyDetails) {
+      toast({
+        title: "خطأ",
+        description: "لا توجد بيانات كافية للتصدير",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setExporting(true);
+    try {
+      // Prepare question statistics in format expected by exportToPDF
+      const questionStats = analytics.questionAnalytics
+        .filter(q => q.type === 'likert' || q.type === 'rating')
+        .map((q, idx) => ({
+          question: q.text,
+          type: q.type,
+          mean: q.average || 0,
+          stdDev: 0,
+          responseCount: q.totalAnswers,
+        }));
+
+      // Prepare text responses in format expected by exportToPDF
+      const textResponses = analytics.questionAnalytics
+        .filter(q => q.type === 'text')
+        .map(q => ({
+          question: q.text,
+          responses: q.data || [],
+        }));
+
+      // Capture charts with correct types
+      const chartImages = await captureAllCharts([
+        { id: 'responses-over-time', type: 'summary', title: 'الاستجابات عبر الوقت' },
+        { id: 'program-distribution', type: 'summary', title: 'التوزيع حسب البرنامج' },
+      ]);
+
+      // Calculate overall stats
+      const overallMean = questionStats.length > 0 
+        ? questionStats.reduce((s, q) => s + q.mean, 0) / questionStats.length 
+        : 0;
+      
+      const responseRate = surveyDetails.target_enrollment && surveyDetails.target_enrollment > 0
+        ? (analytics.totalResponses / surveyDetails.target_enrollment) * 100 
+        : 0;
+
+      // Build report and stats objects matching the function signature
+      const report = {
+        semester: surveyDetails.semester,
+        academic_year: surveyDetails.academic_year,
+        summary: `تقرير شامل لنتائج استبيان "${surveyDetails.title}"`,
+        recommendations_text: 'يرجى مراجعة النتائج وإعداد خطة تحسين بناءً على الملاحظات.',
+      };
+
+      const stats = {
+        totalResponses: analytics.totalResponses,
+        targetEnrollment: surveyDetails.target_enrollment || 0,
+        responseRate: responseRate.toFixed(1),
+        overallMean,
+        overallStdDev: 0,
+        questionStats,
+      };
+
+      await exportToPDF(
+        report,
+        surveyDetails,
+        stats,
+        undefined, // collegeLogo
+        chartImages.length > 0 ? chartImages : undefined,
+        textResponses.length > 0 ? textResponses : undefined
+      );
+
+      toast({
+        title: "تم التصدير",
+        description: "تم تصدير التقرير بنجاح كملف PDF",
+      });
+    } catch (error: any) {
+      console.error('Export error:', error);
+      toast({
+        title: "خطأ في التصدير",
+        description: error.message || "فشل في تصدير التقرير",
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    if (!analytics || !surveyDetails) {
+      toast({
+        title: "خطأ",
+        description: "لا توجد بيانات كافية للتصدير",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const questionStats = analytics.questionAnalytics
+        .filter(q => q.type === 'likert' || q.type === 'rating')
+        .map((q, idx) => ({
+          question: q.text,
+          type: q.type,
+          mean: q.average || 0,
+          stdDev: 0,
+          responseCount: q.totalAnswers,
+        }));
+
+      const textResponses = analytics.questionAnalytics
+        .filter(q => q.type === 'text')
+        .map(q => ({
+          question: q.text,
+          responses: q.data || [],
+        }));
+
+      const overallMean = questionStats.length > 0 
+        ? questionStats.reduce((s, q) => s + q.mean, 0) / questionStats.length 
+        : 0;
+      
+      const responseRate = surveyDetails.target_enrollment && surveyDetails.target_enrollment > 0
+        ? (analytics.totalResponses / surveyDetails.target_enrollment) * 100 
+        : 0;
+
+      const report = {
+        semester: surveyDetails.semester,
+        academic_year: surveyDetails.academic_year,
+        summary: `تقرير شامل لنتائج استبيان "${surveyDetails.title}"`,
+        recommendations_text: 'يرجى مراجعة النتائج وإعداد خطة تحسين بناءً على الملاحظات.',
+      };
+
+      const stats = {
+        totalResponses: analytics.totalResponses,
+        targetEnrollment: surveyDetails.target_enrollment || 0,
+        responseRate: responseRate.toFixed(1),
+        overallMean,
+        overallStdDev: 0,
+        questionStats,
+      };
+
+      exportToExcel(report, surveyDetails, stats, textResponses.length > 0 ? textResponses : undefined);
+
+      toast({
+        title: "تم التصدير",
+        description: "تم تصدير التقرير بنجاح كملف Excel",
+      });
+    } catch (error: any) {
+      console.error('Export error:', error);
+      toast({
+        title: "خطأ في التصدير",
+        description: error.message || "فشل في تصدير التقرير",
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleTimeRangeChange = (range: string) => {
+    setSelectedTimeRange(range);
+    setShowFilterPopover(false);
   };
 
   if (loading) {
@@ -267,14 +440,87 @@ const SurveyAnalytics = ({ surveyId }: SurveyAnalyticsProps) => {
           <p className="text-muted-foreground">نظرة شاملة على نتائج الاستبيان</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 ml-2" />
-            تصفية
-          </Button>
-          <Button variant="outline" size="sm" onClick={exportReport}>
-            <Download className="h-4 w-4 ml-2" />
-            تصدير التقرير
-          </Button>
+          <Popover open={showFilterPopover} onOpenChange={setShowFilterPopover}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Filter className="h-4 w-4 ml-2" />
+                تصفية ({selectedTimeRange === 'all' ? 'الكل' : selectedTimeRange === '7d' ? '7 أيام' : selectedTimeRange === '30d' ? '30 يوم' : '90 يوم'})
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48" align="end">
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">الفترة الزمنية</p>
+                <div className="space-y-1">
+                  <Button 
+                    variant={selectedTimeRange === 'all' ? 'default' : 'ghost'} 
+                    size="sm" 
+                    className="w-full justify-start"
+                    onClick={() => handleTimeRangeChange('all')}
+                  >
+                    الكل
+                  </Button>
+                  <Button 
+                    variant={selectedTimeRange === '7d' ? 'default' : 'ghost'} 
+                    size="sm" 
+                    className="w-full justify-start"
+                    onClick={() => handleTimeRangeChange('7d')}
+                  >
+                    آخر 7 أيام
+                  </Button>
+                  <Button 
+                    variant={selectedTimeRange === '30d' ? 'default' : 'ghost'} 
+                    size="sm" 
+                    className="w-full justify-start"
+                    onClick={() => handleTimeRangeChange('30d')}
+                  >
+                    آخر 30 يوم
+                  </Button>
+                  <Button 
+                    variant={selectedTimeRange === '90d' ? 'default' : 'ghost'} 
+                    size="sm" 
+                    className="w-full justify-start"
+                    onClick={() => handleTimeRangeChange('90d')}
+                  >
+                    آخر 90 يوم
+                  </Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+          
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" disabled={exporting}>
+                <Download className="h-4 w-4 ml-2" />
+                {exporting ? 'جاري التصدير...' : 'تصدير التقرير'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48" align="end">
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">صيغة التصدير</p>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="w-full justify-start"
+                  onClick={handleExportPDF}
+                  disabled={exporting}
+                >
+                  <Download className="h-4 w-4 ml-2" />
+                  تصدير PDF
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="w-full justify-start"
+                  onClick={handleExportExcel}
+                  disabled={exporting}
+                >
+                  <FileSpreadsheet className="h-4 w-4 ml-2" />
+                  تصدير Excel
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
