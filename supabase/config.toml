@@ -1,5 +1,8 @@
 project_id = "dzjglpfhwmgbsprpgzbk"
 
+[functions.manage-user]
+verify_jwt = false
+
 [functions.analyze-survey]
 verify_jwt = true
 

@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { UserCog, Mail, Settings, Trash2 } from "lucide-react";
+import { UserCog, Mail, Settings, Trash2, UserPlus, KeyRound } from "lucide-react";
 import DashboardButton from "@/components/DashboardButton";
 import UserRolesDialog from "@/components/UserRolesDialog";
+import AddUserDialog from "@/components/AddUserDialog";
+import ResetPasswordDialog from "@/components/ResetPasswordDialog";
 import {
   Table,
   TableBody,
@@ -65,6 +67,9 @@ export default function Users() {
   const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [addUserDialogOpen, setAddUserDialogOpen] = useState(false);
+  const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
+  const [userToResetPassword, setUserToResetPassword] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     checkAdminRole();
@@ -182,6 +187,11 @@ export default function Users() {
     setDeleteDialogOpen(true);
   };
 
+  const openResetPasswordDialog = (user: UserProfile) => {
+    setUserToResetPassword(user);
+    setResetPasswordDialogOpen(true);
+  };
+
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
 
@@ -243,6 +253,10 @@ export default function Users() {
               <p className="text-muted-foreground mt-1">إدارة المستخدمين والصلاحيات</p>
             </div>
           </div>
+          <Button onClick={() => setAddUserDialogOpen(true)}>
+            <UserPlus className="h-4 w-4 ml-2" />
+            إضافة مستخدم
+          </Button>
         </div>
 
         {/* Roles Info */}
@@ -344,14 +358,24 @@ export default function Users() {
                           إدارة الصلاحيات
                         </Button>
                         {user.id !== currentUserId && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openDeleteDialog(user)}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openResetPasswordDialog(user)}
+                              className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                            >
+                              <KeyRound className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openDeleteDialog(user)}
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
                         )}
                       </div>
                     </TableCell>
@@ -373,6 +397,24 @@ export default function Users() {
           currentRoles={selectedUser.user_roles}
           programs={programs}
           onRolesUpdated={loadUsers}
+        />
+      )}
+
+      {/* Add User Dialog */}
+      <AddUserDialog
+        open={addUserDialogOpen}
+        onOpenChange={setAddUserDialogOpen}
+        onUserAdded={loadUsers}
+      />
+
+      {/* Reset Password Dialog */}
+      {userToResetPassword && (
+        <ResetPasswordDialog
+          open={resetPasswordDialogOpen}
+          onOpenChange={setResetPasswordDialogOpen}
+          userId={userToResetPassword.id}
+          userName={userToResetPassword.full_name || userToResetPassword.email}
+          onPasswordReset={loadUsers}
         />
       )}
 

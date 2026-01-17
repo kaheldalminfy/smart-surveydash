@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { z } from "zod";
+import ForcePasswordChange from "@/components/ForcePasswordChange";
 
 // Validation schemas
 const loginSchema = z.object({
@@ -23,6 +24,7 @@ const Auth = () => {
   const { t, language } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
   const [programs, setPrograms] = useState<any[]>([]);
+  const [forcePasswordChange, setForcePasswordChange] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -77,12 +79,26 @@ const Auth = () => {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
         email: formData.email.trim(),
         password: formData.password,
       });
 
       if (error) throw error;
+
+      // Check if user needs to change password
+      if (authData.user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("force_password_change")
+          .eq("id", authData.user.id)
+          .single();
+
+        if (profile?.force_password_change) {
+          setForcePasswordChange(true);
+          return;
+        }
+      }
 
       toast({
         title: language === 'ar' ? "تم تسجيل الدخول بنجاح" : "Login successful",
@@ -152,6 +168,18 @@ const Auth = () => {
       setIsLoading(false);
     }
   };
+
+  // Show force password change screen
+  if (forcePasswordChange) {
+    return (
+      <ForcePasswordChange
+        onPasswordChanged={() => {
+          setForcePasswordChange(false);
+          navigate("/dashboard");
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">

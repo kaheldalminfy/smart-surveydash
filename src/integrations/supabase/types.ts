@@ -267,6 +267,7 @@ export type Database = {
         Row: {
           created_at: string | null
           email: string | null
+          force_password_change: boolean | null
           full_name: string | null
           id: string
           program_id: string | null
@@ -275,6 +276,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           email?: string | null
+          force_password_change?: boolean | null
           full_name?: string | null
           id: string
           program_id?: string | null
@@ -283,6 +285,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           email?: string | null
+          force_password_change?: boolean | null
           full_name?: string | null
           id?: string
           program_id?: string | null
