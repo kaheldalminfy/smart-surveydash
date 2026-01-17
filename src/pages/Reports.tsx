@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -13,14 +13,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download, FileSpreadsheet, Sparkles, ArrowRight, Save, Trash2, Edit as EditIcon, BarChart3, Users, Filter, Target, MessageSquare, ListChecks, AlertTriangle } from "lucide-react";
+import { Download, FileSpreadsheet, Sparkles, ArrowRight, Save, Trash2, Edit as EditIcon, BarChart3, Users, Filter, Target, MessageSquare, ListChecks, AlertTriangle, Loader2 } from "lucide-react";
 import DashboardButton from "@/components/DashboardButton";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { exportToPDF, exportToExcel } from "@/utils/exportReport";
+import { exportToPDF, exportToExcel, captureChartAsImage } from "@/utils/exportReport";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 
@@ -42,11 +42,13 @@ const Reports = () => {
   const [report, setReport] = useState<any>(null);
   const [survey, setSurvey] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [semester, setSemester] = useState("");
   const [academicYear, setAcademicYear] = useState("");
   const [reportStatus, setReportStatus] = useState("responding");
   const [collegeLogo, setCollegeLogo] = useState("");
+  const [collegeName, setCollegeName] = useState("كلية العلوم الإنسانية والاجتماعية");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editRecommendationsOpen, setEditRecommendationsOpen] = useState(false);
   const [editedRecommendations, setEditedRecommendations] = useState("");
@@ -92,14 +94,24 @@ const Reports = () => {
   };
 
   const loadSettings = async () => {
-    const { data } = await supabase
+    const { data: logoData } = await supabase
       .from("system_settings")
       .select("value")
       .eq("key", "college_logo")
       .single();
 
-    if (data?.value) {
-      setCollegeLogo(data.value);
+    if (logoData?.value) {
+      setCollegeLogo(logoData.value);
+    }
+
+    const { data: nameData } = await supabase
+      .from("system_settings")
+      .select("value")
+      .eq("key", "college_name")
+      .single();
+
+    if (nameData?.value) {
+      setCollegeName(nameData.value);
     }
   };
 
@@ -138,7 +150,6 @@ const Reports = () => {
   ) => {
     let filteredResponses = responses;
     
-    // تطبيق الفلتر تلقائياً عند اختيار القيم
     if (filterQ && filterVals.length > 0) {
       filteredResponses = filteredResponses.filter(response => {
         const answer = response.answers?.find((a: any) => a.question_id === filterQ);
@@ -160,7 +171,6 @@ const Reports = () => {
         return [];
       }).filter(Boolean);
 
-      // توزيع likert/rating
       let distribution: any[] = [];
       if (question.type === 'likert' || question.type === 'rating') {
         const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
@@ -178,7 +188,6 @@ const Reports = () => {
         ];
       }
 
-      // حساب المتوسط والانحراف المعياري
       let mean = 0;
       let stdDev = 0;
       if (question.type === 'likert' || question.type === 'rating') {
@@ -193,7 +202,6 @@ const Reports = () => {
         }
       }
 
-      // توزيع MCQ
       let mcqDistribution: any[] = [];
       if (question.type === 'mcq' && question.options) {
         const rawOptions = question.options;
@@ -217,7 +225,6 @@ const Reports = () => {
         }));
       }
 
-      // الردود النصية
       let textResponses: string[] = [];
       if (question.type === 'text') {
         textResponses = answersForQuestion
@@ -240,7 +247,6 @@ const Reports = () => {
     setDetailedAnswers(processedData);
   };
 
-  // الحصول على خيارات الفلتر
   const getFilterOptions = () => {
     if (!filterQuestion) return [];
     
@@ -249,12 +255,10 @@ const Reports = () => {
 
     if (question.type === 'mcq' && question.options) {
       const options = question.options;
-      // Handle different options formats
       if (Array.isArray(options)) return options.map((o: string) => String(o).trim());
       if (options.choices && Array.isArray(options.choices)) {
         return options.choices.map((choice: string) => String(choice).trim());
       }
-      // Handle string format
       if (typeof options === 'string') {
         try {
           const parsed = JSON.parse(options);
@@ -274,10 +278,8 @@ const Reports = () => {
     return [];
   };
 
-  // التحقق من وجود إجابات
   const hasAnswersData = allResponses.some(r => r.answers && r.answers.length > 0);
 
-  // تطبيق الفلتر تلقائياً عند تغيير القيم
   const handleFilterValueChange = (value: string) => {
     const newValues = filterValues.includes(value) 
       ? filterValues.filter(v => v !== value)
@@ -364,6 +366,127 @@ const Reports = () => {
     }
   };
 
+  // Enhanced PDF Export with Charts
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    toast({ title: "جاري التصدير", description: "يتم التقاط الرسوم البيانية..." });
+
+    try {
+      // Capture chart images
+      const chartImages: Array<{ id: string; dataUrl: string; title: string; type: 'likert' | 'mcq' | 'summary' }> = [];
+      
+      // Capture summary chart
+      const summaryChart = await captureChartAsImage('summary-chart', 'ملخص متوسطات الأسئلة', 'summary');
+      if (summaryChart) chartImages.push(summaryChart);
+
+      // Capture individual question charts
+      for (let i = 0; i < detailedAnswers.length; i++) {
+        const q = detailedAnswers[i];
+        if (q.type === 'likert' || q.type === 'rating') {
+          const chart = await captureChartAsImage(
+            `chart-likert-${q.id}`,
+            `س${i + 1}: ${q.text.substring(0, 50)}${q.text.length > 50 ? '...' : ''}`,
+            'likert'
+          );
+          if (chart) chartImages.push(chart);
+        } else if (q.type === 'mcq') {
+          const chart = await captureChartAsImage(
+            `chart-mcq-${q.id}`,
+            `س${i + 1}: ${q.text.substring(0, 50)}${q.text.length > 50 ? '...' : ''}`,
+            'mcq'
+          );
+          if (chart) chartImages.push(chart);
+        }
+      }
+
+      // Prepare text responses
+      const textResponses = detailedAnswers
+        .filter(q => q.type === 'text' && q.textResponses.length > 0)
+        .map(q => ({
+          question: q.text,
+          responses: q.textResponses,
+        }));
+
+      // Prepare stats
+      const likertRatingQuestions = detailedAnswers.filter(q => q.type === 'likert' || q.type === 'rating');
+      const overallMean = likertRatingQuestions.length > 0
+        ? likertRatingQuestions.reduce((sum, q) => sum + (parseFloat(q.mean) || 0), 0) / likertRatingQuestions.length
+        : 0;
+      
+      const overallStdDev = likertRatingQuestions.length > 0
+        ? likertRatingQuestions.reduce((sum, q) => sum + (parseFloat(q.stdDev) || 0), 0) / likertRatingQuestions.length
+        : 0;
+
+      const stats = {
+        totalResponses: allResponses.length,
+        responseRate: 100,
+        overallMean,
+        overallStdDev,
+        questionStats: detailedAnswers.map(q => ({
+          question: q.text,
+          type: q.type,
+          mean: parseFloat(q.mean) || 0,
+          stdDev: parseFloat(q.stdDev) || 0,
+          responseCount: q.responseCount,
+        })),
+      };
+
+      // Export PDF
+      await exportToPDF(
+        report,
+        survey,
+        stats,
+        collegeLogo,
+        chartImages,
+        textResponses,
+        collegeName
+      );
+
+      toast({ title: "تم التصدير", description: "تم تصدير التقرير بنجاح" });
+    } catch (error) {
+      console.error("Export error:", error);
+      toast({ title: "خطأ", description: "حدث خطأ أثناء تصدير التقرير", variant: "destructive" });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Enhanced Excel Export
+  const handleExportExcel = () => {
+    const likertRatingQuestions = detailedAnswers.filter(q => q.type === 'likert' || q.type === 'rating');
+    const overallMean = likertRatingQuestions.length > 0
+      ? likertRatingQuestions.reduce((sum, q) => sum + (parseFloat(q.mean) || 0), 0) / likertRatingQuestions.length
+      : 0;
+    
+    const overallStdDev = likertRatingQuestions.length > 0
+      ? likertRatingQuestions.reduce((sum, q) => sum + (parseFloat(q.stdDev) || 0), 0) / likertRatingQuestions.length
+      : 0;
+
+    const stats = {
+      totalResponses: allResponses.length,
+      responseRate: 100,
+      overallMean,
+      overallStdDev,
+      questionStats: detailedAnswers.map(q => ({
+        question: q.text,
+        type: q.type,
+        mean: parseFloat(q.mean) || 0,
+        stdDev: parseFloat(q.stdDev) || 0,
+        responseCount: q.responseCount,
+      })),
+    };
+
+    const textResponses = detailedAnswers
+      .filter(q => q.type === 'text' && q.textResponses.length > 0)
+      .map(q => ({
+        question: q.text,
+        responses: q.textResponses,
+      }));
+
+    exportToExcel(report, survey, stats, textResponses);
+    toast({ title: "تم التصدير", description: "تم تصدير ملف Excel بنجاح" });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -398,7 +521,6 @@ const Reports = () => {
   const stats = report.statistics || {};
   const totalResponses = allResponses.length;
 
-  // حساب الإحصائيات العامة
   const likertRatingQuestions = detailedAnswers.filter(q => q.type === 'likert' || q.type === 'rating');
   const overallMean = likertRatingQuestions.length > 0
     ? likertRatingQuestions.reduce((sum, q) => sum + (parseFloat(q.mean) || 0), 0) / likertRatingQuestions.length
@@ -429,11 +551,15 @@ const Reports = () => {
                 <Sparkles className="h-4 w-4 ml-2" />
                 {isGenerating ? "جاري التحليل..." : "إعادة التحليل"}
               </Button>
-              <Button variant="accent" onClick={() => exportToPDF(report, survey, stats, collegeLogo)}>
-                <Download className="h-4 w-4 ml-2" />
-                PDF
+              <Button variant="accent" onClick={handleExportPDF} disabled={isExporting}>
+                {isExporting ? (
+                  <Loader2 className="h-4 w-4 ml-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 ml-2" />
+                )}
+                {isExporting ? "جاري التصدير..." : "PDF"}
               </Button>
-              <Button variant="secondary" onClick={() => exportToExcel(report, survey, stats)}>
+              <Button variant="secondary" onClick={handleExportExcel}>
                 <FileSpreadsheet className="h-4 w-4 ml-2" />
                 Excel
               </Button>
@@ -639,7 +765,7 @@ const Reports = () => {
               <CardDescription>مقارنة متوسطات جميع الأسئلة (ليكرت والتقييم)</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-80">
+              <div id="summary-chart" className="h-80 bg-white p-4 rounded-lg">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={likertRatingQuestions.map((q, i) => ({
@@ -725,7 +851,7 @@ const Reports = () => {
                 {(question.type === 'likert' || question.type === 'rating') && (
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div>
+                      <div id={`chart-likert-${question.id}`} className="bg-white p-4 rounded-lg">
                         <h4 className="font-medium mb-3 text-sm text-muted-foreground">توزيع الاستجابات</h4>
                         <div className="h-64">
                           <ResponsiveContainer width="100%" height="100%">
@@ -810,7 +936,7 @@ const Reports = () => {
                 {/* MCQ */}
                 {question.type === 'mcq' && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div>
+                    <div id={`chart-mcq-${question.id}`} className="bg-white p-4 rounded-lg">
                       <h4 className="font-medium mb-3 text-sm text-muted-foreground">توزيع الاختيارات</h4>
                       <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
