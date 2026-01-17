@@ -42,8 +42,6 @@ const SubmitComplaint = () => {
     complainantAcademicId: "",
     complainantType: "",
     programId: "",
-    semester: "",
-    academicYear: "",
     complaintCategory: "",
     subject: "",
     description: "",
@@ -145,8 +143,6 @@ const SubmitComplaint = () => {
           complainant_academic_id: formData.complainantAcademicId,
           complainant_type: formData.complainantType,
           program_id: formData.programId || null,
-          semester: formData.semester,
-          academic_year: formData.academicYear,
           complaint_category: formData.complaintCategory,
           subject: formData.subject,
           description: formData.description,
@@ -282,34 +278,6 @@ const SubmitComplaint = () => {
                     </Select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="semester">{t('complaints.semester')}</Label>
-                      <Select
-                        value={formData.semester}
-                        onValueChange={(value) => setFormData({ ...formData, semester: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder={t('complaints.selectSemester')} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="خريف">{t('complaints.fall')}</SelectItem>
-                          <SelectItem value="ربيع">{t('complaints.spring')}</SelectItem>
-                          <SelectItem value="صيفي">{t('complaints.summer')}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="academicYear">{t('complaints.academicYear')}</Label>
-                      <Input
-                        id="academicYear"
-                        value={formData.academicYear}
-                        onChange={(e) => setFormData({ ...formData, academicYear: e.target.value })}
-                        placeholder={language === 'ar' ? "مثال: 2025-2026" : "e.g., 2025-2026"}
-                      />
-                    </div>
-                  </div>
                 </div>
 
                 {/* Complaint Details */}
