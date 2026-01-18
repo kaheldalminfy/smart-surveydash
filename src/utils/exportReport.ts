@@ -1,9 +1,9 @@
-// PDF Export Utilities v3 - Fixed Arabic Support
+// PDF Export Utilities v4 - Professional Arabic Support
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { loadEmbeddedArabicFont } from './embeddedArabicFont';
-import { formatArabicDate } from './arabicTextUtils';
+import { processArabicForPDF, formatArabicDate, formatNumber } from './arabicTextUtils';
 import { toast } from '@/hooks/use-toast';
 
 // Types
@@ -19,41 +19,73 @@ interface TextResponse {
   responses: string[];
 }
 
-// College Colors - Professional palette
+// University Colors from DOCX template
 const COLORS = {
-  primary: [30, 64, 124] as [number, number, number],      // Deep blue
-  secondary: [22, 101, 52] as [number, number, number],    // Forest green
-  accent: [126, 34, 206] as [number, number, number],      // Purple
-  text: [31, 41, 55] as [number, number, number],          // Dark gray
-  muted: [107, 114, 128] as [number, number, number],      // Medium gray
-  lightBg: [243, 244, 246] as [number, number, number],    // Light gray
+  red: [207, 32, 46] as [number, number, number],       // Red bar
+  blue: [0, 112, 192] as [number, number, number],      // Blue bar
+  lightBlue: [0, 176, 240] as [number, number, number], // Light blue bar
+  darkBlue: [0, 51, 102] as [number, number, number],   // Dark blue text
+  text: [31, 41, 55] as [number, number, number],
+  muted: [107, 114, 128] as [number, number, number],
+  lightGray: [243, 244, 246] as [number, number, number],
   white: [255, 255, 255] as [number, number, number],
-  gold: [180, 130, 50] as [number, number, number],        // Gold accent
+  green: [22, 163, 74] as [number, number, number],
+  yellow: [234, 179, 8] as [number, number, number],
+  orange: [249, 115, 22] as [number, number, number],
+  redText: [239, 68, 68] as [number, number, number],
 };
 
 // Performance level helper
 const getMeanLevel = (mean: number): { label: string; color: [number, number, number] } => {
-  if (mean >= 4.5) return { label: 'ممتاز', color: [22, 163, 74] };
+  if (mean >= 4.5) return { label: 'ممتاز', color: COLORS.green };
   if (mean >= 3.5) return { label: 'جيد جداً', color: [34, 197, 94] };
-  if (mean >= 2.5) return { label: 'متوسط', color: [234, 179, 8] };
-  if (mean >= 1.5) return { label: 'ضعيف', color: [249, 115, 22] };
-  return { label: 'ضعيف جداً', color: [239, 68, 68] };
+  if (mean >= 2.5) return { label: 'متوسط', color: COLORS.yellow };
+  if (mean >= 1.5) return { label: 'ضعيف', color: COLORS.orange };
+  return { label: 'ضعيف جداً', color: COLORS.redText };
 };
 
-// Draw decorative header bar
+// Arabic text wrapper for PDF - processes and returns for right-aligned text
+const ar = (text: string): string => {
+  if (!text) return '';
+  return processArabicForPDF(text);
+};
+
+// Draw the colorful header bar (matching DOCX template)
+const drawColorBar = (doc: jsPDF, y: number, pageWidth: number) => {
+  const barHeight = 8;
+  const thirdWidth = pageWidth / 3;
+  
+  // Red bar (left)
+  doc.setFillColor(...COLORS.red);
+  doc.rect(0, y, thirdWidth, barHeight, 'F');
+  
+  // Blue bar (middle)
+  doc.setFillColor(...COLORS.blue);
+  doc.rect(thirdWidth, y, thirdWidth, barHeight, 'F');
+  
+  // Light blue bar (right)
+  doc.setFillColor(...COLORS.lightBlue);
+  doc.rect(thirdWidth * 2, y, thirdWidth + 1, barHeight, 'F');
+  
+  return y + barHeight;
+};
+
+// Draw section header with accent color
 const drawSectionHeader = (
   doc: jsPDF, 
   y: number, 
   title: string, 
   color: [number, number, number],
   pageWidth: number,
-  margin: number
+  margin: number,
+  fontLoaded: boolean
 ) => {
   doc.setFillColor(...color);
   doc.roundedRect(margin, y, pageWidth - margin * 2, 12, 2, 2, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(14);
-  doc.text(title, pageWidth - margin - 5, y + 8, { align: 'right' });
+  if (fontLoaded) doc.setFont('Amiri', 'normal');
+  doc.text(ar(title), pageWidth - margin - 5, y + 8.5, { align: 'right' });
   return y + 18;
 };
 
@@ -65,24 +97,24 @@ const addPageFooter = (
   collegeName: string,
   pageWidth: number,
   pageHeight: number,
-  margin: number
+  margin: number,
+  fontLoaded: boolean
 ) => {
-  // Footer line
-  doc.setDrawColor(...COLORS.muted);
-  doc.setLineWidth(0.3);
-  doc.line(margin, pageHeight - 18, pageWidth - margin, pageHeight - 18);
+  // Draw color bar at bottom
+  drawColorBar(doc, pageHeight - 12, pageWidth);
   
-  // Footer text
+  // Footer text above the bar
   doc.setFontSize(9);
   doc.setTextColor(...COLORS.muted);
-  doc.text(`${pageNum} / ${totalPages}`, margin + 5, pageHeight - 10);
-  doc.text(collegeName, pageWidth / 2, pageHeight - 10, { align: 'center' });
-  doc.text(formatArabicDate(new Date()), pageWidth - margin - 5, pageHeight - 10, { align: 'right' });
+  if (fontLoaded) doc.setFont('Amiri', 'normal');
+  
+  doc.text(`${pageNum} / ${totalPages}`, margin + 5, pageHeight - 16);
+  doc.text(ar(collegeName), pageWidth / 2, pageHeight - 16, { align: 'center' });
+  doc.text(new Date().toLocaleDateString('en-GB'), pageWidth - margin - 5, pageHeight - 16, { align: 'right' });
 };
 
 /**
- * Main PDF Export Function
- * Generates a professional multi-page PDF report with Arabic support
+ * Main PDF Export Function - Professional Multi-page Report
  */
 export const exportToPDF = async (
   report: any,
@@ -103,7 +135,6 @@ export const exportToPDF = async (
     return;
   }
 
-  // Show loading toast
   const loadingToast = toast({
     title: 'جاري التصدير...',
     description: 'يتم إنشاء ملف PDF، يرجى الانتظار.',
@@ -124,7 +155,7 @@ export const exportToPDF = async (
       if (arabicFontBase64 && arabicFontBase64.length > 1000) {
         doc.addFileToVFS('Amiri-Regular.ttf', arabicFontBase64);
         doc.addFont('Amiri-Regular.ttf', 'Amiri', 'normal');
-        doc.setFont('Amiri');
+        doc.setFont('Amiri', 'normal');
         fontLoaded = true;
         console.log('Arabic font loaded successfully');
       }
@@ -132,63 +163,91 @@ export const exportToPDF = async (
       console.error('Font loading error:', error);
     }
 
-    // Set language for RTL support
-    doc.setLanguage('ar');
-    
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 15;
-    let yPos = 15;
+    let yPos = 0;
 
     // ============ PAGE 1: COVER PAGE ============
     
-    // College Logo
+    // Top color bar (like DOCX template)
+    yPos = drawColorBar(doc, 0, pageWidth);
+    yPos += 10;
+    
+    // University Title - English
+    doc.setTextColor(...COLORS.darkBlue);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Libyan International Medical University', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 7;
+    
+    doc.setFontSize(14);
+    doc.text('Faculty of Human and Social Sciences', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 10;
+    
+    // Arabic Title
+    if (fontLoaded) {
+      doc.setFont('Amiri', 'normal');
+      doc.setFontSize(14);
+      doc.setTextColor(...COLORS.text);
+      doc.text(ar(collegeName), pageWidth / 2, yPos, { align: 'center' });
+      yPos += 12;
+    }
+    
+    // Separator line
+    doc.setDrawColor(...COLORS.blue);
+    doc.setLineWidth(1);
+    doc.line(margin + 20, yPos, pageWidth - margin - 20, yPos);
+    yPos += 15;
+
+    // College Logo (if available)
     if (collegeLogo) {
       try {
-        doc.addImage(collegeLogo, 'PNG', (pageWidth - 35) / 2, yPos, 35, 35);
-        yPos += 45;
+        doc.addImage(collegeLogo, 'PNG', (pageWidth - 40) / 2, yPos, 40, 40);
+        yPos += 50;
       } catch (e) {
         console.warn('Logo loading error:', e);
-        yPos += 10;
+        yPos += 5;
       }
     }
 
-    // Decorative top border
-    doc.setFillColor(...COLORS.gold);
-    doc.rect(margin, yPos, pageWidth - margin * 2, 3, 'F');
-    yPos += 8;
-
     // Main Title Box
-    doc.setFillColor(...COLORS.primary);
-    doc.roundedRect(margin, yPos, pageWidth - margin * 2, 50, 4, 4, 'F');
+    doc.setFillColor(...COLORS.blue);
+    doc.roundedRect(margin + 10, yPos, pageWidth - margin * 2 - 20, 40, 4, 4, 'F');
     
     doc.setTextColor(...COLORS.white);
-    doc.setFontSize(26);
-    doc.text('تقرير نتائج الاستبيان', pageWidth / 2, yPos + 18, { align: 'center' });
+    if (fontLoaded) doc.setFont('Amiri', 'normal');
+    doc.setFontSize(22);
+    doc.text(ar('تقرير نتائج الاستبيان'), pageWidth / 2, yPos + 16, { align: 'center' });
     
-    doc.setFontSize(18);
-    doc.text(survey?.title || 'استبيان', pageWidth / 2, yPos + 32, { align: 'center' });
-    
-    doc.setFontSize(14);
-    doc.text(survey?.programs?.name || collegeName, pageWidth / 2, yPos + 44, { align: 'center' });
-    yPos += 60;
+    doc.setFontSize(16);
+    doc.text(ar(survey?.title || 'استبيان'), pageWidth / 2, yPos + 30, { align: 'center' });
+    yPos += 50;
 
-    // Semester & Year Info Box
+    // Program name
+    if (survey?.programs?.name) {
+      doc.setTextColor(...COLORS.darkBlue);
+      doc.setFontSize(14);
+      doc.text(ar(survey.programs.name), pageWidth / 2, yPos, { align: 'center' });
+      yPos += 12;
+    }
+
+    // Semester & Year Info
     if (report?.semester || report?.academic_year) {
-      doc.setFillColor(...COLORS.lightBg);
-      doc.roundedRect(margin, yPos, pageWidth - margin * 2, 18, 2, 2, 'F');
-      doc.setTextColor(...COLORS.primary);
-      doc.setFontSize(13);
+      doc.setFillColor(...COLORS.lightGray);
+      doc.roundedRect(margin + 30, yPos, pageWidth - margin * 2 - 60, 14, 2, 2, 'F');
+      doc.setTextColor(...COLORS.text);
+      doc.setFontSize(12);
       
-      const semester = report.semester || '';
-      const academicYear = report.academic_year || '';
-      const infoText = `${semester ? 'الفصل: ' + semester : ''}${semester && academicYear ? '  |  ' : ''}${academicYear ? 'العام: ' + academicYear : ''}`;
-      doc.text(infoText, pageWidth / 2, yPos + 12, { align: 'center' });
-      yPos += 25;
+      const semesterText = report.semester ? `الفصل الدراسي: ${report.semester}` : '';
+      const yearText = report.academic_year ? `العام الأكاديمي: ${report.academic_year}` : '';
+      const infoText = [semesterText, yearText].filter(Boolean).join('  |  ');
+      doc.text(ar(infoText), pageWidth / 2, yPos + 9, { align: 'center' });
+      yPos += 22;
     }
 
     // ============ STATISTICS SECTION ============
-    yPos = drawSectionHeader(doc, yPos, 'الإحصائيات الرئيسية', COLORS.primary, pageWidth, margin);
+    yPos = drawSectionHeader(doc, yPos, 'الإحصائيات الرئيسية', COLORS.blue, pageWidth, margin, fontLoaded);
 
     // Calculate real values
     const totalResponses = stats.totalResponses || 0;
@@ -200,14 +259,14 @@ export const exportToPDF = async (
     const overallStdDev = typeof stats.overallStdDev === 'number' ? stats.overallStdDev : 0;
 
     const statsData = [
-      ['القيمة', 'المؤشر'],
-      [String(totalResponses), 'إجمالي الاستجابات'],
-      [targetEnrollment > 0 ? String(targetEnrollment) : 'غير محدد', 'العدد المستهدف'],
-      [targetEnrollment > 0 ? `${responseRate}%` : 'غير متاح', 'معدل الاستجابة'],
-      [overallMean > 0 ? `${overallMean.toFixed(2)} / 5.00` : '-', 'المتوسط العام'],
-      [overallMean > 0 ? getMeanLevel(overallMean).label : '-', 'مستوى الأداء'],
-      [overallStdDev > 0 ? overallStdDev.toFixed(2) : '-', 'الانحراف المعياري'],
-      [String(stats.questionStats?.length || 0), 'عدد الأسئلة'],
+      [ar('القيمة'), ar('المؤشر')],
+      [String(totalResponses), ar('إجمالي الاستجابات')],
+      [targetEnrollment > 0 ? String(targetEnrollment) : ar('غير محدد'), ar('العدد المستهدف')],
+      [targetEnrollment > 0 ? `${responseRate}%` : ar('غير متاح'), ar('معدل الاستجابة')],
+      [overallMean > 0 ? `${overallMean.toFixed(2)} / 5.00` : '-', ar('المتوسط العام')],
+      [overallMean > 0 ? ar(getMeanLevel(overallMean).label) : '-', ar('مستوى الأداء')],
+      [overallStdDev > 0 ? overallStdDev.toFixed(2) : '-', ar('الانحراف المعياري')],
+      [String(stats.questionStats?.length || 0), ar('عدد الأسئلة')],
     ];
 
     autoTable(doc, {
@@ -216,67 +275,82 @@ export const exportToPDF = async (
       body: statsData.slice(1),
       styles: { 
         font: fontLoaded ? 'Amiri' : 'helvetica', 
+        fontStyle: 'normal',
         halign: 'right', 
-        fontSize: 12, 
-        cellPadding: 5 
+        fontSize: 11, 
+        cellPadding: 4 
       },
       headStyles: { 
-        fillColor: COLORS.primary, 
+        fillColor: COLORS.blue, 
         halign: 'center', 
-        fontStyle: 'bold',
+        fontStyle: 'normal',
         textColor: [255, 255, 255]
       },
       columnStyles: { 
-        0: { halign: 'center', cellWidth: 60 }, 
-        1: { halign: 'right', cellWidth: 80 } 
+        0: { halign: 'center', cellWidth: 55 }, 
+        1: { halign: 'right', cellWidth: 75 } 
       },
-      alternateRowStyles: { fillColor: COLORS.lightBg },
-      margin: { left: margin + 15, right: margin + 15 },
+      alternateRowStyles: { fillColor: COLORS.lightGray },
+      margin: { left: margin + 20, right: margin + 20 },
       theme: 'grid'
     });
 
     yPos = (doc as any).lastAutoTable.finalY + 15;
 
-    // ============ SUMMARY SECTION ============
-    if (yPos + 60 > pageHeight - 30) { 
+    // ============ EXECUTIVE SUMMARY SECTION ============
+    if (yPos + 60 > pageHeight - 35) { 
       doc.addPage(); 
       yPos = 20; 
     }
 
-    yPos = drawSectionHeader(doc, yPos, 'الملخص التنفيذي', COLORS.secondary, pageWidth, margin);
+    yPos = drawSectionHeader(doc, yPos, 'الملخص التنفيذي', COLORS.green, pageWidth, margin, fontLoaded);
 
     doc.setTextColor(...COLORS.text);
+    if (fontLoaded) doc.setFont('Amiri', 'normal');
     doc.setFontSize(11);
-    const summaryText = report?.summary || 'لا يوجد ملخص تنفيذي. يمكنك توليد ملخص باستخدام الذكاء الاصطناعي من صفحة التقرير.';
-    const summaryLines = doc.splitTextToSize(summaryText, pageWidth - margin * 2 - 15);
+    
+    // Get summary text - use actual data or fallback message
+    const summaryText = report?.summary && report.summary.trim() !== '' 
+      ? report.summary 
+      : 'لا يوجد ملخص تنفيذي. يمكنك توليد ملخص باستخدام الذكاء الاصطناعي من خلال زر "توليد بالذكاء الاصطناعي" في صفحة التقرير.';
+    
+    const processedSummary = ar(summaryText);
+    const summaryLines = doc.splitTextToSize(processedSummary, pageWidth - margin * 2 - 16);
     
     // Summary box
-    const summaryHeight = Math.max(summaryLines.length * 6 + 12, 30);
+    const summaryHeight = Math.max(summaryLines.length * 6 + 12, 35);
     doc.setFillColor(240, 253, 244); // Light green
     doc.roundedRect(margin, yPos, pageWidth - margin * 2, summaryHeight, 2, 2, 'F');
-    doc.setDrawColor(...COLORS.secondary);
+    doc.setDrawColor(...COLORS.green);
     doc.setLineWidth(0.5);
     doc.roundedRect(margin, yPos, pageWidth - margin * 2, summaryHeight, 2, 2, 'S');
     doc.text(summaryLines, pageWidth - margin - 8, yPos + 8, { align: 'right' });
     yPos += summaryHeight + 12;
 
     // ============ RECOMMENDATIONS SECTION ============
-    if (yPos + 50 > pageHeight - 30) { 
+    if (yPos + 50 > pageHeight - 35) { 
       doc.addPage(); 
       yPos = 20; 
     }
 
-    yPos = drawSectionHeader(doc, yPos, 'التوصيات', COLORS.accent, pageWidth, margin);
+    yPos = drawSectionHeader(doc, yPos, 'التوصيات', COLORS.red, pageWidth, margin, fontLoaded);
 
     doc.setTextColor(...COLORS.text);
+    if (fontLoaded) doc.setFont('Amiri', 'normal');
     doc.setFontSize(11);
-    const recText = report?.recommendations_text || 'لا توجد توصيات. يمكنك توليد توصيات باستخدام الذكاء الاصطناعي من صفحة التقرير.';
-    const recLines = doc.splitTextToSize(recText, pageWidth - margin * 2 - 15);
     
-    const recHeight = Math.max(recLines.length * 6 + 12, 30);
-    doc.setFillColor(250, 245, 255); // Light purple
+    // Get recommendations text - use actual data or fallback message
+    const recText = report?.recommendations_text && report.recommendations_text.trim() !== ''
+      ? report.recommendations_text
+      : 'لا توجد توصيات. يمكنك توليد توصيات باستخدام الذكاء الاصطناعي من خلال زر "توليد بالذكاء الاصطناعي" في صفحة التقرير.';
+    
+    const processedRec = ar(recText);
+    const recLines = doc.splitTextToSize(processedRec, pageWidth - margin * 2 - 16);
+    
+    const recHeight = Math.max(recLines.length * 6 + 12, 35);
+    doc.setFillColor(254, 242, 242); // Light red
     doc.roundedRect(margin, yPos, pageWidth - margin * 2, recHeight, 2, 2, 'F');
-    doc.setDrawColor(...COLORS.accent);
+    doc.setDrawColor(...COLORS.red);
     doc.setLineWidth(0.5);
     doc.roundedRect(margin, yPos, pageWidth - margin * 2, recHeight, 2, 2, 'S');
     doc.text(recLines, pageWidth - margin - 8, yPos + 8, { align: 'right' });
@@ -286,29 +360,29 @@ export const exportToPDF = async (
       doc.addPage();
       yPos = 20;
 
-      yPos = drawSectionHeader(doc, yPos, 'الرسوم البيانية والتحليلات', COLORS.primary, pageWidth, margin);
+      yPos = drawSectionHeader(doc, yPos, 'الرسوم البيانية والتحليلات', COLORS.blue, pageWidth, margin, fontLoaded);
 
       for (const chart of chartImages) {
-        if (yPos + 95 > pageHeight - 30) { 
+        if (yPos + 90 > pageHeight - 35) { 
           doc.addPage(); 
           yPos = 20; 
         }
         
         // Chart title
         doc.setTextColor(...COLORS.text);
-        doc.setFontSize(12);
-        doc.text(chart.title, pageWidth - margin - 5, yPos, { align: 'right' });
+        if (fontLoaded) doc.setFont('Amiri', 'normal');
+        doc.setFontSize(11);
+        doc.text(ar(chart.title), pageWidth - margin - 5, yPos, { align: 'right' });
         yPos += 6;
         
         // Chart image
         try {
           const chartWidth = pageWidth - margin * 2 - 10;
-          const chartHeight = 75;
+          const chartHeight = 70;
           
-          // White background for chart
           doc.setFillColor(255, 255, 255);
           doc.roundedRect(margin + 5, yPos, chartWidth, chartHeight, 2, 2, 'F');
-          doc.setDrawColor(...COLORS.lightBg);
+          doc.setDrawColor(...COLORS.lightGray);
           doc.roundedRect(margin + 5, yPos, chartWidth, chartHeight, 2, 2, 'S');
           
           doc.addImage(chart.dataUrl, 'PNG', margin + 8, yPos + 2, chartWidth - 6, chartHeight - 4);
@@ -317,7 +391,7 @@ export const exportToPDF = async (
           console.error('Chart rendering error:', e);
           doc.setTextColor(...COLORS.muted);
           doc.setFontSize(10);
-          doc.text('تعذر تحميل الرسم البياني', pageWidth / 2, yPos + 20, { align: 'center' });
+          doc.text(ar('تعذر تحميل الرسم البياني'), pageWidth / 2, yPos + 20, { align: 'center' });
           yPos += 30;
         }
       }
@@ -328,45 +402,43 @@ export const exportToPDF = async (
       doc.addPage();
       yPos = 20;
 
-      yPos = drawSectionHeader(doc, yPos, 'تفاصيل نتائج الأسئلة', COLORS.primary, pageWidth, margin);
+      yPos = drawSectionHeader(doc, yPos, 'تفاصيل نتائج الأسئلة', COLORS.blue, pageWidth, margin, fontLoaded);
 
       const questionData = stats.questionStats.map((q: any, i: number) => [
         String(q.responseCount || 0),
         q.stdDev ? Number(q.stdDev).toFixed(2) : '-',
         q.mean ? Number(q.mean).toFixed(2) : '-',
-        q.mean ? getMeanLevel(q.mean).label : '-',
-        `${i + 1}. ${q.question?.substring(0, 60) || ''}${(q.question?.length || 0) > 60 ? '...' : ''}`,
+        q.mean ? ar(getMeanLevel(q.mean).label) : '-',
+        ar(`${i + 1}. ${(q.question || '').substring(0, 55)}${(q.question?.length || 0) > 55 ? '...' : ''}`),
       ]);
 
       autoTable(doc, {
         startY: yPos,
-        head: [['ردود', 'انحراف', 'متوسط', 'التقييم', 'السؤال']],
+        head: [[ar('ردود'), ar('انحراف'), ar('متوسط'), ar('التقييم'), ar('السؤال')]],
         body: questionData,
         styles: { 
           font: fontLoaded ? 'Amiri' : 'helvetica', 
+          fontStyle: 'normal',
           fontSize: 9, 
-          cellPadding: 4,
+          cellPadding: 3,
           overflow: 'linebreak'
         },
         headStyles: { 
-          fillColor: COLORS.primary, 
+          fillColor: COLORS.blue, 
           halign: 'center', 
-          fontStyle: 'bold',
+          fontStyle: 'normal',
           textColor: [255, 255, 255]
         },
         columnStyles: {
-          0: { halign: 'center', cellWidth: 15 },
-          1: { halign: 'center', cellWidth: 18 },
-          2: { halign: 'center', cellWidth: 18 },
-          3: { halign: 'center', cellWidth: 22 },
+          0: { halign: 'center', cellWidth: 14 },
+          1: { halign: 'center', cellWidth: 16 },
+          2: { halign: 'center', cellWidth: 16 },
+          3: { halign: 'center', cellWidth: 20 },
           4: { halign: 'right', cellWidth: 'auto' },
         },
-        alternateRowStyles: { fillColor: COLORS.lightBg },
+        alternateRowStyles: { fillColor: COLORS.lightGray },
         margin: { left: margin, right: margin },
-        theme: 'striped',
-        didDrawPage: () => {
-          // This runs on each new page created by autotable
-        }
+        theme: 'striped'
       });
     }
 
@@ -375,20 +447,22 @@ export const exportToPDF = async (
       doc.addPage();
       yPos = 20;
 
-      yPos = drawSectionHeader(doc, yPos, 'الردود النصية المفتوحة', COLORS.secondary, pageWidth, margin);
+      yPos = drawSectionHeader(doc, yPos, 'الردود النصية المفتوحة', COLORS.lightBlue, pageWidth, margin, fontLoaded);
 
       for (const item of textResponses) {
-        if (yPos + 40 > pageHeight - 30) { 
+        if (yPos + 40 > pageHeight - 35) { 
           doc.addPage(); 
           yPos = 20; 
         }
         
         // Question header
-        doc.setFillColor(...COLORS.lightBg);
-        const qLines = doc.splitTextToSize(item.question, pageWidth - margin * 2 - 10);
+        doc.setFillColor(...COLORS.lightGray);
+        const questionText = ar(item.question);
+        const qLines = doc.splitTextToSize(questionText, pageWidth - margin * 2 - 10);
         const qHeight = qLines.length * 5 + 8;
         doc.roundedRect(margin, yPos, pageWidth - margin * 2, qHeight, 2, 2, 'F');
-        doc.setTextColor(...COLORS.primary);
+        doc.setTextColor(...COLORS.darkBlue);
+        if (fontLoaded) doc.setFont('Amiri', 'normal');
         doc.setFontSize(11);
         doc.text(qLines, pageWidth - margin - 5, yPos + 6, { align: 'right' });
         yPos += qHeight + 5;
@@ -399,12 +473,12 @@ export const exportToPDF = async (
         const maxResponses = Math.min(item.responses.length, 8);
         
         for (let i = 0; i < maxResponses; i++) {
-          if (yPos + 15 > pageHeight - 30) { 
+          if (yPos + 15 > pageHeight - 35) { 
             doc.addPage(); 
             yPos = 20; 
           }
           
-          const respText = `• ${item.responses[i]}`;
+          const respText = ar(`• ${item.responses[i]}`);
           const respLines = doc.splitTextToSize(respText, pageWidth - margin * 2 - 20);
           doc.text(respLines, pageWidth - margin - 10, yPos, { align: 'right' });
           yPos += respLines.length * 5 + 4;
@@ -413,7 +487,7 @@ export const exportToPDF = async (
         if (item.responses.length > 8) {
           doc.setTextColor(...COLORS.muted);
           doc.setFontSize(9);
-          doc.text(`... و ${item.responses.length - 8} ردود إضافية`, pageWidth / 2, yPos, { align: 'center' });
+          doc.text(ar(`... و ${item.responses.length - 8} ردود إضافية`), pageWidth / 2, yPos, { align: 'center' });
           yPos += 8;
         }
         
@@ -425,18 +499,16 @@ export const exportToPDF = async (
     const totalPages = doc.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
-      if (fontLoaded) doc.setFont('Amiri');
-      addPageFooter(doc, i, totalPages, collegeName, pageWidth, pageHeight, margin);
+      addPageFooter(doc, i, totalPages, collegeName, pageWidth, pageHeight, margin, fontLoaded);
     }
 
     // Save PDF
-    const filename = `تقرير_${(survey?.title || 'استبيان').substring(0, 30)}_${new Date().toISOString().split('T')[0]}.pdf`;
+    const filename = `تقرير_${(survey?.title || 'استبيان').replace(/[^\u0600-\u06FFa-zA-Z0-9\s]/g, '').substring(0, 25)}_${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(filename);
 
-    // Success toast
     toast({
       title: 'تم التصدير بنجاح',
-      description: `تم حفظ التقرير: ${filename}`,
+      description: `تم حفظ التقرير بنجاح`,
     });
 
   } catch (error) {
