@@ -1,4 +1,4 @@
-// PDF Export Utilities v4 - Professional Arabic Support
+// PDF Export Utilities v5 - Comprehensive Professional Report
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -19,32 +19,45 @@ interface TextResponse {
   responses: string[];
 }
 
+interface QuestionStat {
+  question: string;
+  type: string;
+  mean?: number;
+  stdDev?: number;
+  responseCount: number;
+  distribution?: Array<{ name: string; value: number; fill: string }>;
+  mcqDistribution?: Array<{ name: string; value: number; fill: string }>;
+}
+
 // University Colors from DOCX template
 const COLORS = {
-  red: [207, 32, 46] as [number, number, number],       // Red bar
-  blue: [0, 112, 192] as [number, number, number],      // Blue bar
-  lightBlue: [0, 176, 240] as [number, number, number], // Light blue bar
-  darkBlue: [0, 51, 102] as [number, number, number],   // Dark blue text
+  red: [207, 32, 46] as [number, number, number],
+  blue: [0, 112, 192] as [number, number, number],
+  lightBlue: [0, 176, 240] as [number, number, number],
+  darkBlue: [0, 51, 102] as [number, number, number],
   text: [31, 41, 55] as [number, number, number],
   muted: [107, 114, 128] as [number, number, number],
   lightGray: [243, 244, 246] as [number, number, number],
   white: [255, 255, 255] as [number, number, number],
   green: [22, 163, 74] as [number, number, number],
+  lightGreen: [34, 197, 94] as [number, number, number],
   yellow: [234, 179, 8] as [number, number, number],
   orange: [249, 115, 22] as [number, number, number],
   redText: [239, 68, 68] as [number, number, number],
+  purple: [139, 92, 246] as [number, number, number],
+  amber: [245, 158, 11] as [number, number, number],
 };
 
 // Performance level helper
 const getMeanLevel = (mean: number): { label: string; color: [number, number, number] } => {
   if (mean >= 4.5) return { label: 'ممتاز', color: COLORS.green };
-  if (mean >= 3.5) return { label: 'جيد جداً', color: [34, 197, 94] };
+  if (mean >= 3.5) return { label: 'جيد جداً', color: COLORS.lightGreen };
   if (mean >= 2.5) return { label: 'متوسط', color: COLORS.yellow };
   if (mean >= 1.5) return { label: 'ضعيف', color: COLORS.orange };
   return { label: 'ضعيف جداً', color: COLORS.redText };
 };
 
-// Arabic text wrapper for PDF - processes and returns for right-aligned text
+// Arabic text wrapper
 const ar = (text: string): string => {
   if (!text) return '';
   return processArabicForPDF(text);
@@ -55,22 +68,19 @@ const drawColorBar = (doc: jsPDF, y: number, pageWidth: number) => {
   const barHeight = 8;
   const thirdWidth = pageWidth / 3;
   
-  // Red bar (left)
   doc.setFillColor(...COLORS.red);
   doc.rect(0, y, thirdWidth, barHeight, 'F');
   
-  // Blue bar (middle)
   doc.setFillColor(...COLORS.blue);
   doc.rect(thirdWidth, y, thirdWidth, barHeight, 'F');
   
-  // Light blue bar (right)
   doc.setFillColor(...COLORS.lightBlue);
   doc.rect(thirdWidth * 2, y, thirdWidth + 1, barHeight, 'F');
   
   return y + barHeight;
 };
 
-// Draw section header with accent color
+// Draw section header
 const drawSectionHeader = (
   doc: jsPDF, 
   y: number, 
@@ -81,12 +91,49 @@ const drawSectionHeader = (
   fontLoaded: boolean
 ) => {
   doc.setFillColor(...color);
-  doc.roundedRect(margin, y, pageWidth - margin * 2, 12, 2, 2, 'F');
+  doc.roundedRect(margin, y, pageWidth - margin * 2, 10, 2, 2, 'F');
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(14);
+  doc.setFontSize(12);
   if (fontLoaded) doc.setFont('Amiri', 'normal');
-  doc.text(ar(title), pageWidth - margin - 5, y + 8.5, { align: 'right' });
-  return y + 18;
+  doc.text(ar(title), pageWidth - margin - 5, y + 7, { align: 'right' });
+  return y + 15;
+};
+
+// Draw KPI Card
+const drawKPICard = (
+  doc: jsPDF,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  label: string,
+  value: string,
+  subText: string,
+  bgColor: [number, number, number],
+  textColor: [number, number, number],
+  fontLoaded: boolean
+) => {
+  // Background
+  doc.setFillColor(...bgColor);
+  doc.roundedRect(x, y, width, height, 3, 3, 'F');
+  
+  // Label
+  doc.setTextColor(...COLORS.muted);
+  doc.setFontSize(8);
+  if (fontLoaded) doc.setFont('Amiri', 'normal');
+  doc.text(ar(label), x + width / 2, y + 8, { align: 'center' });
+  
+  // Value
+  doc.setTextColor(...textColor);
+  doc.setFontSize(18);
+  doc.text(value, x + width / 2, y + 20, { align: 'center' });
+  
+  // SubText
+  if (subText) {
+    doc.setTextColor(...COLORS.muted);
+    doc.setFontSize(7);
+    doc.text(ar(subText), x + width / 2, y + 27, { align: 'center' });
+  }
 };
 
 // Add page footer
@@ -100,11 +147,9 @@ const addPageFooter = (
   margin: number,
   fontLoaded: boolean
 ) => {
-  // Draw color bar at bottom
   drawColorBar(doc, pageHeight - 12, pageWidth);
   
-  // Footer text above the bar
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setTextColor(...COLORS.muted);
   if (fontLoaded) doc.setFont('Amiri', 'normal');
   
@@ -113,8 +158,17 @@ const addPageFooter = (
   doc.text(new Date().toLocaleDateString('en-GB'), pageWidth - margin - 5, pageHeight - 16, { align: 'right' });
 };
 
+// Check if need new page
+const checkNewPage = (doc: jsPDF, yPos: number, neededSpace: number, pageHeight: number): number => {
+  if (yPos + neededSpace > pageHeight - 30) {
+    doc.addPage();
+    return 20;
+  }
+  return yPos;
+};
+
 /**
- * Main PDF Export Function - Professional Multi-page Report
+ * Main PDF Export Function - Comprehensive Report matching screen exactly
  */
 export const exportToPDF = async (
   report: any,
@@ -125,7 +179,6 @@ export const exportToPDF = async (
   textResponses?: TextResponse[],
   collegeName: string = 'كلية العلوم الإنسانية والاجتماعية'
 ) => {
-  // Validate input data
   if (!stats || !survey) {
     toast({
       title: 'خطأ',
@@ -135,9 +188,9 @@ export const exportToPDF = async (
     return;
   }
 
-  const loadingToast = toast({
+  toast({
     title: 'جاري التصدير...',
-    description: 'يتم إنشاء ملف PDF، يرجى الانتظار.',
+    description: 'يتم إنشاء ملف PDF شامل، يرجى الانتظار.',
   });
 
   try {
@@ -157,7 +210,6 @@ export const exportToPDF = async (
         doc.addFont('Amiri-Regular.ttf', 'Amiri', 'normal');
         doc.setFont('Amiri', 'normal');
         fontLoaded = true;
-        console.log('Arabic font loaded successfully');
       }
     } catch (error) {
       console.error('Font loading error:', error);
@@ -165,357 +217,449 @@ export const exportToPDF = async (
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 15;
+    const margin = 12;
     let yPos = 0;
 
     // ============ PAGE 1: COVER PAGE ============
-    
-    // Top color bar (like DOCX template)
     yPos = drawColorBar(doc, 0, pageWidth);
-    yPos += 10;
+    yPos += 8;
     
-    // University Title - English
+    // University Title
     doc.setTextColor(...COLORS.darkBlue);
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     doc.text('Libyan International Medical University', pageWidth / 2, yPos, { align: 'center' });
-    yPos += 7;
+    yPos += 6;
     
-    doc.setFontSize(14);
+    doc.setFontSize(13);
     doc.text('Faculty of Human and Social Sciences', pageWidth / 2, yPos, { align: 'center' });
-    yPos += 10;
+    yPos += 8;
     
-    // Arabic Title
     if (fontLoaded) {
       doc.setFont('Amiri', 'normal');
-      doc.setFontSize(14);
+      doc.setFontSize(12);
       doc.setTextColor(...COLORS.text);
       doc.text(ar(collegeName), pageWidth / 2, yPos, { align: 'center' });
-      yPos += 12;
+      yPos += 10;
     }
     
-    // Separator line
+    // Separator
     doc.setDrawColor(...COLORS.blue);
-    doc.setLineWidth(1);
-    doc.line(margin + 20, yPos, pageWidth - margin - 20, yPos);
-    yPos += 15;
+    doc.setLineWidth(0.8);
+    doc.line(margin + 30, yPos, pageWidth - margin - 30, yPos);
+    yPos += 10;
 
-    // College Logo (if available)
+    // Logo
     if (collegeLogo) {
       try {
-        doc.addImage(collegeLogo, 'PNG', (pageWidth - 40) / 2, yPos, 40, 40);
-        yPos += 50;
+        doc.addImage(collegeLogo, 'PNG', (pageWidth - 35) / 2, yPos, 35, 35);
+        yPos += 42;
       } catch (e) {
-        console.warn('Logo loading error:', e);
         yPos += 5;
       }
     }
 
     // Main Title Box
     doc.setFillColor(...COLORS.blue);
-    doc.roundedRect(margin + 10, yPos, pageWidth - margin * 2 - 20, 40, 4, 4, 'F');
+    doc.roundedRect(margin + 15, yPos, pageWidth - margin * 2 - 30, 35, 4, 4, 'F');
     
     doc.setTextColor(...COLORS.white);
     if (fontLoaded) doc.setFont('Amiri', 'normal');
-    doc.setFontSize(22);
-    doc.text(ar('تقرير نتائج الاستبيان'), pageWidth / 2, yPos + 16, { align: 'center' });
+    doc.setFontSize(20);
+    doc.text(ar('تقرير نتائج الاستبيان'), pageWidth / 2, yPos + 14, { align: 'center' });
     
-    doc.setFontSize(16);
-    doc.text(ar(survey?.title || 'استبيان'), pageWidth / 2, yPos + 30, { align: 'center' });
-    yPos += 50;
+    doc.setFontSize(14);
+    doc.text(ar(survey?.title || 'استبيان'), pageWidth / 2, yPos + 26, { align: 'center' });
+    yPos += 42;
 
-    // Program name
+    // Program & Semester
     if (survey?.programs?.name) {
       doc.setTextColor(...COLORS.darkBlue);
-      doc.setFontSize(14);
+      doc.setFontSize(12);
       doc.text(ar(survey.programs.name), pageWidth / 2, yPos, { align: 'center' });
-      yPos += 12;
+      yPos += 8;
     }
 
-    // Semester & Year Info
     if (report?.semester || report?.academic_year) {
       doc.setFillColor(...COLORS.lightGray);
-      doc.roundedRect(margin + 30, yPos, pageWidth - margin * 2 - 60, 14, 2, 2, 'F');
+      doc.roundedRect(margin + 35, yPos, pageWidth - margin * 2 - 70, 12, 2, 2, 'F');
       doc.setTextColor(...COLORS.text);
-      doc.setFontSize(12);
+      doc.setFontSize(10);
       
-      const semesterText = report.semester ? `الفصل الدراسي: ${report.semester}` : '';
-      const yearText = report.academic_year ? `العام الأكاديمي: ${report.academic_year}` : '';
-      const infoText = [semesterText, yearText].filter(Boolean).join('  |  ');
-      doc.text(ar(infoText), pageWidth / 2, yPos + 9, { align: 'center' });
-      yPos += 22;
+      const infoText = [
+        report.semester ? `الفصل: ${report.semester}` : '',
+        report.academic_year ? `العام: ${report.academic_year}` : ''
+      ].filter(Boolean).join('  |  ');
+      doc.text(ar(infoText), pageWidth / 2, yPos + 8, { align: 'center' });
+      yPos += 18;
     }
 
-    // ============ STATISTICS SECTION ============
-    yPos = drawSectionHeader(doc, yPos, 'الإحصائيات الرئيسية', COLORS.blue, pageWidth, margin, fontLoaded);
+    // ============ KPI CARDS (5 cards like screen) ============
+    yPos = drawSectionHeader(doc, yPos, 'الإحصائيات العامة', COLORS.blue, pageWidth, margin, fontLoaded);
 
-    // Calculate real values
     const totalResponses = stats.totalResponses || 0;
     const targetEnrollment = stats.targetEnrollment || survey?.target_enrollment || 0;
-    const responseRate = targetEnrollment > 0 
-      ? Math.round((totalResponses / targetEnrollment) * 100) 
-      : 0;
+    const responseRate = targetEnrollment > 0 ? Math.round((totalResponses / targetEnrollment) * 100) : null;
     const overallMean = typeof stats.overallMean === 'number' ? stats.overallMean : 0;
-    const overallStdDev = typeof stats.overallStdDev === 'number' ? stats.overallStdDev : 0;
+    const questionCount = stats.questionStats?.length || 0;
+    const textResponsesCount = textResponses?.reduce((sum, t) => sum + t.responses.length, 0) || 0;
 
-    const statsData = [
+    const cardWidth = (pageWidth - margin * 2 - 16) / 5;
+    const cardHeight = 32;
+    const cardY = yPos;
+
+    // Card 1: Total Responses
+    drawKPICard(doc, margin, cardY, cardWidth, cardHeight, 
+      'إجمالي الاستجابات', String(totalResponses), 
+      targetEnrollment > 0 ? `من ${targetEnrollment} طالب` : '',
+      [219, 234, 254], COLORS.blue, fontLoaded);
+
+    // Card 2: Response Rate
+    drawKPICard(doc, margin + cardWidth + 4, cardY, cardWidth, cardHeight, 
+      'معدل الاستجابة', 
+      responseRate !== null ? `${responseRate}%` : ar('غير محدد'),
+      responseRate !== null && responseRate >= 70 ? ar('نسبة جيدة') : '',
+      responseRate === null ? [243, 244, 246] : responseRate >= 70 ? [220, 252, 231] : responseRate >= 50 ? [254, 249, 195] : [254, 215, 170],
+      responseRate === null ? COLORS.muted : responseRate >= 70 ? COLORS.green : responseRate >= 50 ? COLORS.yellow : COLORS.orange,
+      fontLoaded);
+
+    // Card 3: Overall Mean
+    drawKPICard(doc, margin + (cardWidth + 4) * 2, cardY, cardWidth, cardHeight, 
+      'المتوسط العام', overallMean > 0 ? overallMean.toFixed(2) : '-', 
+      overallMean > 0 ? ar(getMeanLevel(overallMean).label) : ar('من 5.0'),
+      [220, 252, 231], COLORS.green, fontLoaded);
+
+    // Card 4: Question Count
+    drawKPICard(doc, margin + (cardWidth + 4) * 3, cardY, cardWidth, cardHeight, 
+      'عدد الأسئلة', String(questionCount), '',
+      [243, 232, 255], COLORS.purple, fontLoaded);
+
+    // Card 5: Text Responses
+    drawKPICard(doc, margin + (cardWidth + 4) * 4, cardY, cardWidth, cardHeight, 
+      'التعليقات النصية', String(textResponsesCount), '',
+      [254, 243, 199], COLORS.amber, fontLoaded);
+
+    yPos = cardY + cardHeight + 12;
+
+    // ============ STATISTICS TABLE ============
+    yPos = drawSectionHeader(doc, yPos, 'تفاصيل الإحصائيات', COLORS.darkBlue, pageWidth, margin, fontLoaded);
+
+    const statsTableData = [
       [ar('القيمة'), ar('المؤشر')],
       [String(totalResponses), ar('إجمالي الاستجابات')],
       [targetEnrollment > 0 ? String(targetEnrollment) : ar('غير محدد'), ar('العدد المستهدف')],
-      [targetEnrollment > 0 ? `${responseRate}%` : ar('غير متاح'), ar('معدل الاستجابة')],
+      [responseRate !== null ? `${responseRate}%` : ar('غير متاح'), ar('معدل الاستجابة')],
       [overallMean > 0 ? `${overallMean.toFixed(2)} / 5.00` : '-', ar('المتوسط العام')],
       [overallMean > 0 ? ar(getMeanLevel(overallMean).label) : '-', ar('مستوى الأداء')],
-      [overallStdDev > 0 ? overallStdDev.toFixed(2) : '-', ar('الانحراف المعياري')],
-      [String(stats.questionStats?.length || 0), ar('عدد الأسئلة')],
+      [stats.overallStdDev > 0 ? stats.overallStdDev.toFixed(2) : '-', ar('الانحراف المعياري')],
+      [String(questionCount), ar('عدد الأسئلة')],
+      [String(textResponsesCount), ar('عدد التعليقات النصية')],
     ];
 
     autoTable(doc, {
       startY: yPos,
-      head: [statsData[0]],
-      body: statsData.slice(1),
-      styles: { 
-        font: fontLoaded ? 'Amiri' : 'helvetica', 
-        fontStyle: 'normal',
-        halign: 'right', 
-        fontSize: 11, 
-        cellPadding: 4 
-      },
-      headStyles: { 
-        fillColor: COLORS.blue, 
-        halign: 'center', 
-        fontStyle: 'normal',
-        textColor: [255, 255, 255]
-      },
-      columnStyles: { 
-        0: { halign: 'center', cellWidth: 55 }, 
-        1: { halign: 'right', cellWidth: 75 } 
-      },
+      head: [statsTableData[0]],
+      body: statsTableData.slice(1),
+      styles: { font: fontLoaded ? 'Amiri' : 'helvetica', fontStyle: 'normal', halign: 'right', fontSize: 10, cellPadding: 3 },
+      headStyles: { fillColor: COLORS.blue, halign: 'center', fontStyle: 'normal', textColor: [255, 255, 255] },
+      columnStyles: { 0: { halign: 'center', cellWidth: 50 }, 1: { halign: 'right', cellWidth: 70 } },
       alternateRowStyles: { fillColor: COLORS.lightGray },
-      margin: { left: margin + 20, right: margin + 20 },
+      margin: { left: margin + 25, right: margin + 25 },
       theme: 'grid'
     });
 
-    yPos = (doc as any).lastAutoTable.finalY + 15;
+    yPos = (doc as any).lastAutoTable.finalY + 12;
 
-    // ============ EXECUTIVE SUMMARY SECTION ============
-    if (yPos + 60 > pageHeight - 35) { 
-      doc.addPage(); 
-      yPos = 20; 
-    }
-
+    // ============ EXECUTIVE SUMMARY ============
+    yPos = checkNewPage(doc, yPos, 50, pageHeight);
     yPos = drawSectionHeader(doc, yPos, 'الملخص التنفيذي', COLORS.green, pageWidth, margin, fontLoaded);
 
-    doc.setTextColor(...COLORS.text);
-    if (fontLoaded) doc.setFont('Amiri', 'normal');
-    doc.setFontSize(11);
-    
-    // Get summary text - use actual data or fallback message
-    const summaryText = report?.summary && report.summary.trim() !== '' 
-      ? report.summary 
-      : 'لا يوجد ملخص تنفيذي. يمكنك توليد ملخص باستخدام الذكاء الاصطناعي من خلال زر "توليد بالذكاء الاصطناعي" في صفحة التقرير.';
-    
+    const summaryText = report?.summary?.trim() || 'لا يوجد ملخص تنفيذي. يمكنك توليد ملخص باستخدام زر "إعادة التحليل" بالذكاء الاصطناعي.';
     const processedSummary = ar(summaryText);
-    const summaryLines = doc.splitTextToSize(processedSummary, pageWidth - margin * 2 - 16);
+    if (fontLoaded) doc.setFont('Amiri', 'normal');
+    doc.setFontSize(10);
+    const summaryLines = doc.splitTextToSize(processedSummary, pageWidth - margin * 2 - 12);
     
-    // Summary box
-    const summaryHeight = Math.max(summaryLines.length * 6 + 12, 35);
-    doc.setFillColor(240, 253, 244); // Light green
+    const summaryHeight = Math.max(summaryLines.length * 5 + 10, 25);
+    doc.setFillColor(240, 253, 244);
     doc.roundedRect(margin, yPos, pageWidth - margin * 2, summaryHeight, 2, 2, 'F');
     doc.setDrawColor(...COLORS.green);
-    doc.setLineWidth(0.5);
+    doc.setLineWidth(0.4);
     doc.roundedRect(margin, yPos, pageWidth - margin * 2, summaryHeight, 2, 2, 'S');
-    doc.text(summaryLines, pageWidth - margin - 8, yPos + 8, { align: 'right' });
-    yPos += summaryHeight + 12;
+    doc.setTextColor(...COLORS.text);
+    doc.text(summaryLines, pageWidth - margin - 6, yPos + 6, { align: 'right' });
+    yPos += summaryHeight + 10;
 
-    // ============ RECOMMENDATIONS SECTION ============
-    if (yPos + 50 > pageHeight - 35) { 
-      doc.addPage(); 
-      yPos = 20; 
-    }
-
+    // ============ RECOMMENDATIONS ============
+    yPos = checkNewPage(doc, yPos, 50, pageHeight);
     yPos = drawSectionHeader(doc, yPos, 'التوصيات', COLORS.red, pageWidth, margin, fontLoaded);
 
-    doc.setTextColor(...COLORS.text);
-    if (fontLoaded) doc.setFont('Amiri', 'normal');
-    doc.setFontSize(11);
-    
-    // Get recommendations text - use actual data or fallback message
-    const recText = report?.recommendations_text && report.recommendations_text.trim() !== ''
-      ? report.recommendations_text
-      : 'لا توجد توصيات. يمكنك توليد توصيات باستخدام الذكاء الاصطناعي من خلال زر "توليد بالذكاء الاصطناعي" في صفحة التقرير.';
-    
+    const recText = report?.recommendations_text?.trim() || 'لا توجد توصيات. يمكنك توليد توصيات باستخدام زر "إعادة التحليل" بالذكاء الاصطناعي.';
     const processedRec = ar(recText);
-    const recLines = doc.splitTextToSize(processedRec, pageWidth - margin * 2 - 16);
+    doc.setFontSize(10);
+    const recLines = doc.splitTextToSize(processedRec, pageWidth - margin * 2 - 12);
     
-    const recHeight = Math.max(recLines.length * 6 + 12, 35);
-    doc.setFillColor(254, 242, 242); // Light red
+    const recHeight = Math.max(recLines.length * 5 + 10, 25);
+    doc.setFillColor(254, 242, 242);
     doc.roundedRect(margin, yPos, pageWidth - margin * 2, recHeight, 2, 2, 'F');
     doc.setDrawColor(...COLORS.red);
-    doc.setLineWidth(0.5);
+    doc.setLineWidth(0.4);
     doc.roundedRect(margin, yPos, pageWidth - margin * 2, recHeight, 2, 2, 'S');
-    doc.text(recLines, pageWidth - margin - 8, yPos + 8, { align: 'right' });
+    doc.setTextColor(...COLORS.text);
+    doc.text(recLines, pageWidth - margin - 6, yPos + 6, { align: 'right' });
+    yPos += recHeight + 10;
 
-    // ============ PAGE 2: CHARTS ============
+    // ============ CHARTS PAGE ============
     if (chartImages && chartImages.length > 0) {
       doc.addPage();
-      yPos = 20;
+      yPos = 15;
 
-      yPos = drawSectionHeader(doc, yPos, 'الرسوم البيانية والتحليلات', COLORS.blue, pageWidth, margin, fontLoaded);
-
-      for (const chart of chartImages) {
-        if (yPos + 90 > pageHeight - 35) { 
-          doc.addPage(); 
-          yPos = 20; 
-        }
+      // Summary chart first (large)
+      const summaryChart = chartImages.find(c => c.type === 'summary');
+      if (summaryChart) {
+        yPos = drawSectionHeader(doc, yPos, 'ملخص متوسطات الأسئلة', COLORS.blue, pageWidth, margin, fontLoaded);
         
-        // Chart title
-        doc.setTextColor(...COLORS.text);
-        if (fontLoaded) doc.setFont('Amiri', 'normal');
-        doc.setFontSize(11);
-        doc.text(ar(chart.title), pageWidth - margin - 5, yPos, { align: 'right' });
-        yPos += 6;
-        
-        // Chart image
         try {
-          const chartWidth = pageWidth - margin * 2 - 10;
-          const chartHeight = 70;
+          const chartWidth = pageWidth - margin * 2;
+          const chartHeight = 90;
           
           doc.setFillColor(255, 255, 255);
-          doc.roundedRect(margin + 5, yPos, chartWidth, chartHeight, 2, 2, 'F');
+          doc.roundedRect(margin, yPos, chartWidth, chartHeight, 2, 2, 'F');
           doc.setDrawColor(...COLORS.lightGray);
-          doc.roundedRect(margin + 5, yPos, chartWidth, chartHeight, 2, 2, 'S');
-          
-          doc.addImage(chart.dataUrl, 'PNG', margin + 8, yPos + 2, chartWidth - 6, chartHeight - 4);
-          yPos += chartHeight + 12;
+          doc.roundedRect(margin, yPos, chartWidth, chartHeight, 2, 2, 'S');
+          doc.addImage(summaryChart.dataUrl, 'PNG', margin + 2, yPos + 2, chartWidth - 4, chartHeight - 4);
+          yPos += chartHeight + 10;
         } catch (e) {
-          console.error('Chart rendering error:', e);
-          doc.setTextColor(...COLORS.muted);
-          doc.setFontSize(10);
-          doc.text(ar('تعذر تحميل الرسم البياني'), pageWidth / 2, yPos + 20, { align: 'center' });
-          yPos += 30;
+          console.error('Summary chart error:', e);
+        }
+      }
+
+      // Individual question charts (2 per row)
+      const questionCharts = chartImages.filter(c => c.type !== 'summary');
+      if (questionCharts.length > 0) {
+        yPos = checkNewPage(doc, yPos, 80, pageHeight);
+        yPos = drawSectionHeader(doc, yPos, 'توزيع استجابات الأسئلة', COLORS.purple, pageWidth, margin, fontLoaded);
+
+        const chartW = (pageWidth - margin * 2 - 8) / 2;
+        const chartH = 55;
+
+        for (let i = 0; i < questionCharts.length; i += 2) {
+          yPos = checkNewPage(doc, yPos, chartH + 15, pageHeight);
+
+          // Left chart
+          const chart1 = questionCharts[i];
+          try {
+            doc.setFillColor(255, 255, 255);
+            doc.roundedRect(margin, yPos, chartW, chartH, 2, 2, 'F');
+            doc.setDrawColor(...COLORS.lightGray);
+            doc.roundedRect(margin, yPos, chartW, chartH, 2, 2, 'S');
+            doc.addImage(chart1.dataUrl, 'PNG', margin + 2, yPos + 2, chartW - 4, chartH - 4);
+            
+            // Title below
+            doc.setFontSize(8);
+            doc.setTextColor(...COLORS.muted);
+            if (fontLoaded) doc.setFont('Amiri', 'normal');
+            const title1 = ar(chart1.title.substring(0, 40));
+            doc.text(title1, margin + chartW / 2, yPos + chartH + 5, { align: 'center' });
+          } catch (e) {}
+
+          // Right chart
+          if (i + 1 < questionCharts.length) {
+            const chart2 = questionCharts[i + 1];
+            try {
+              doc.setFillColor(255, 255, 255);
+              doc.roundedRect(margin + chartW + 8, yPos, chartW, chartH, 2, 2, 'F');
+              doc.setDrawColor(...COLORS.lightGray);
+              doc.roundedRect(margin + chartW + 8, yPos, chartW, chartH, 2, 2, 'S');
+              doc.addImage(chart2.dataUrl, 'PNG', margin + chartW + 10, yPos + 2, chartW - 4, chartH - 4);
+              
+              const title2 = ar(chart2.title.substring(0, 40));
+              doc.text(title2, margin + chartW + 8 + chartW / 2, yPos + chartH + 5, { align: 'center' });
+            } catch (e) {}
+          }
+
+          yPos += chartH + 15;
         }
       }
     }
 
-    // ============ PAGE 3: QUESTION DETAILS ============
+    // ============ QUESTION DETAILS TABLE ============
     if (stats.questionStats && stats.questionStats.length > 0) {
       doc.addPage();
-      yPos = 20;
+      yPos = 15;
 
       yPos = drawSectionHeader(doc, yPos, 'تفاصيل نتائج الأسئلة', COLORS.blue, pageWidth, margin, fontLoaded);
 
-      const questionData = stats.questionStats.map((q: any, i: number) => [
-        String(q.responseCount || 0),
-        q.stdDev ? Number(q.stdDev).toFixed(2) : '-',
-        q.mean ? Number(q.mean).toFixed(2) : '-',
-        q.mean ? ar(getMeanLevel(q.mean).label) : '-',
-        ar(`${i + 1}. ${(q.question || '').substring(0, 55)}${(q.question?.length || 0) > 55 ? '...' : ''}`),
-      ]);
+      const questionData = stats.questionStats.map((q: any, i: number) => {
+        const mean = q.mean ? Number(q.mean) : 0;
+        return [
+          String(q.responseCount || 0),
+          q.stdDev ? Number(q.stdDev).toFixed(2) : '-',
+          mean > 0 ? mean.toFixed(2) : '-',
+          mean > 0 ? ar(getMeanLevel(mean).label) : '-',
+          q.type === 'likert' ? ar('ليكرت') : q.type === 'mcq' ? ar('اختيار') : q.type === 'rating' ? ar('تقييم') : ar('نصي'),
+          ar(`${i + 1}. ${(q.question || '').substring(0, 45)}${(q.question?.length || 0) > 45 ? '...' : ''}`),
+        ];
+      });
 
       autoTable(doc, {
         startY: yPos,
-        head: [[ar('ردود'), ar('انحراف'), ar('متوسط'), ar('التقييم'), ar('السؤال')]],
+        head: [[ar('ردود'), ar('انحراف'), ar('متوسط'), ar('التقييم'), ar('النوع'), ar('السؤال')]],
         body: questionData,
-        styles: { 
-          font: fontLoaded ? 'Amiri' : 'helvetica', 
-          fontStyle: 'normal',
-          fontSize: 9, 
-          cellPadding: 3,
-          overflow: 'linebreak'
-        },
-        headStyles: { 
-          fillColor: COLORS.blue, 
-          halign: 'center', 
-          fontStyle: 'normal',
-          textColor: [255, 255, 255]
-        },
+        styles: { font: fontLoaded ? 'Amiri' : 'helvetica', fontStyle: 'normal', fontSize: 8, cellPadding: 2.5, overflow: 'linebreak' },
+        headStyles: { fillColor: COLORS.blue, halign: 'center', fontStyle: 'normal', textColor: [255, 255, 255] },
         columnStyles: {
-          0: { halign: 'center', cellWidth: 14 },
-          1: { halign: 'center', cellWidth: 16 },
-          2: { halign: 'center', cellWidth: 16 },
-          3: { halign: 'center', cellWidth: 20 },
-          4: { halign: 'right', cellWidth: 'auto' },
+          0: { halign: 'center', cellWidth: 12 },
+          1: { halign: 'center', cellWidth: 14 },
+          2: { halign: 'center', cellWidth: 14 },
+          3: { halign: 'center', cellWidth: 18 },
+          4: { halign: 'center', cellWidth: 14 },
+          5: { halign: 'right', cellWidth: 'auto' },
         },
         alternateRowStyles: { fillColor: COLORS.lightGray },
         margin: { left: margin, right: margin },
         theme: 'striped'
       });
+
+      yPos = (doc as any).lastAutoTable.finalY + 10;
     }
 
-    // ============ PAGE 4: TEXT RESPONSES ============
-    if (textResponses && textResponses.length > 0) {
-      doc.addPage();
-      yPos = 20;
+    // ============ DISTRIBUTION TABLES FOR EACH QUESTION ============
+    if (stats.questionStats && stats.questionStats.length > 0) {
+      // Group likert questions for distribution tables
+      const likertQuestions = stats.questionStats.filter((q: any) => 
+        q.type === 'likert' || q.type === 'rating'
+      );
 
-      yPos = drawSectionHeader(doc, yPos, 'الردود النصية المفتوحة', COLORS.lightBlue, pageWidth, margin, fontLoaded);
+      if (likertQuestions.length > 0) {
+        doc.addPage();
+        yPos = 15;
+        yPos = drawSectionHeader(doc, yPos, 'توزيع استجابات أسئلة ليكرت والتقييم', COLORS.darkBlue, pageWidth, margin, fontLoaded);
 
-      for (const item of textResponses) {
-        if (yPos + 40 > pageHeight - 35) { 
-          doc.addPage(); 
-          yPos = 20; 
-        }
-        
-        // Question header
-        doc.setFillColor(...COLORS.lightGray);
-        const questionText = ar(item.question);
-        const qLines = doc.splitTextToSize(questionText, pageWidth - margin * 2 - 10);
-        const qHeight = qLines.length * 5 + 8;
-        doc.roundedRect(margin, yPos, pageWidth - margin * 2, qHeight, 2, 2, 'F');
-        doc.setTextColor(...COLORS.darkBlue);
-        if (fontLoaded) doc.setFont('Amiri', 'normal');
-        doc.setFontSize(11);
-        doc.text(qLines, pageWidth - margin - 5, yPos + 6, { align: 'right' });
-        yPos += qHeight + 5;
+        for (const [idx, q] of likertQuestions.entries()) {
+          yPos = checkNewPage(doc, yPos, 45, pageHeight);
 
-        // Responses (max 8 per question)
-        doc.setTextColor(...COLORS.text);
-        doc.setFontSize(10);
-        const maxResponses = Math.min(item.responses.length, 8);
-        
-        for (let i = 0; i < maxResponses; i++) {
-          if (yPos + 15 > pageHeight - 35) { 
-            doc.addPage(); 
-            yPos = 20; 
-          }
-          
-          const respText = ar(`• ${item.responses[i]}`);
-          const respLines = doc.splitTextToSize(respText, pageWidth - margin * 2 - 20);
-          doc.text(respLines, pageWidth - margin - 10, yPos, { align: 'right' });
-          yPos += respLines.length * 5 + 4;
-        }
-        
-        if (item.responses.length > 8) {
-          doc.setTextColor(...COLORS.muted);
+          // Question header
+          doc.setFillColor(...COLORS.lightGray);
+          doc.roundedRect(margin, yPos, pageWidth - margin * 2, 10, 2, 2, 'F');
+          doc.setTextColor(...COLORS.darkBlue);
           doc.setFontSize(9);
-          doc.text(ar(`... و ${item.responses.length - 8} ردود إضافية`), pageWidth / 2, yPos, { align: 'center' });
+          if (fontLoaded) doc.setFont('Amiri', 'normal');
+          doc.text(ar(`س${idx + 1}: ${q.question?.substring(0, 70) || ''}`), pageWidth - margin - 4, yPos + 7, { align: 'right' });
+          yPos += 13;
+
+          // Stats row
+          const mean = q.mean ? Number(q.mean) : 0;
+          doc.setFontSize(8);
+          doc.setTextColor(...COLORS.text);
+          doc.text(`${ar('المتوسط')}: ${mean.toFixed(2)}  |  ${ar('الانحراف')}: ${q.stdDev?.toFixed(2) || '-'}  |  ${ar('التقييم')}: ${mean > 0 ? ar(getMeanLevel(mean).label) : '-'}`, 
+            pageWidth / 2, yPos, { align: 'center' });
           yPos += 8;
+
+          // Simple distribution bar
+          if (q.distribution && q.distribution.length > 0) {
+            const total = q.distribution.reduce((sum: number, d: any) => sum + (d.value || 0), 0);
+            const barWidth = pageWidth - margin * 2 - 40;
+            const barHeight = 8;
+            let xOffset = margin + 20;
+
+            for (const d of q.distribution) {
+              const pct = total > 0 ? (d.value || 0) / total : 0;
+              const segWidth = barWidth * pct;
+              
+              if (segWidth > 0) {
+                // Parse color from fill
+                const fillColor = d.fill || '#888888';
+                const r = parseInt(fillColor.slice(1, 3), 16);
+                const g = parseInt(fillColor.slice(3, 5), 16);
+                const b = parseInt(fillColor.slice(5, 7), 16);
+                doc.setFillColor(r, g, b);
+                doc.rect(xOffset, yPos, segWidth, barHeight, 'F');
+                
+                // Percentage label if segment is wide enough
+                if (segWidth > 12 && pct > 0.05) {
+                  doc.setTextColor(255, 255, 255);
+                  doc.setFontSize(6);
+                  doc.text(`${Math.round(pct * 100)}%`, xOffset + segWidth / 2, yPos + 5.5, { align: 'center' });
+                }
+                
+                xOffset += segWidth;
+              }
+            }
+          }
+          yPos += 15;
         }
-        
-        yPos += 10;
       }
     }
 
-    // ============ ADD FOOTERS TO ALL PAGES ============
+    // ============ TEXT RESPONSES ============
+    if (textResponses && textResponses.length > 0) {
+      doc.addPage();
+      yPos = 15;
+
+      yPos = drawSectionHeader(doc, yPos, 'الردود النصية المفتوحة', COLORS.amber, pageWidth, margin, fontLoaded);
+
+      for (const item of textResponses) {
+        yPos = checkNewPage(doc, yPos, 35, pageHeight);
+        
+        // Question
+        doc.setFillColor(...COLORS.lightGray);
+        const questionText = ar(item.question);
+        if (fontLoaded) doc.setFont('Amiri', 'normal');
+        doc.setFontSize(10);
+        const qLines = doc.splitTextToSize(questionText, pageWidth - margin * 2 - 8);
+        const qHeight = qLines.length * 4.5 + 6;
+        doc.roundedRect(margin, yPos, pageWidth - margin * 2, qHeight, 2, 2, 'F');
+        doc.setTextColor(...COLORS.darkBlue);
+        doc.text(qLines, pageWidth - margin - 4, yPos + 5, { align: 'right' });
+        yPos += qHeight + 4;
+
+        // Responses (max 10)
+        doc.setTextColor(...COLORS.text);
+        doc.setFontSize(9);
+        const maxResp = Math.min(item.responses.length, 10);
+        
+        for (let i = 0; i < maxResp; i++) {
+          yPos = checkNewPage(doc, yPos, 12, pageHeight);
+          
+          const respText = ar(`• ${item.responses[i]}`);
+          const respLines = doc.splitTextToSize(respText, pageWidth - margin * 2 - 15);
+          doc.text(respLines, pageWidth - margin - 8, yPos, { align: 'right' });
+          yPos += respLines.length * 4 + 3;
+        }
+        
+        if (item.responses.length > 10) {
+          doc.setTextColor(...COLORS.muted);
+          doc.setFontSize(8);
+          doc.text(ar(`... و ${item.responses.length - 10} ردود إضافية`), pageWidth / 2, yPos, { align: 'center' });
+          yPos += 6;
+        }
+        
+        yPos += 8;
+      }
+    }
+
+    // ============ ADD FOOTERS ============
     const totalPages = doc.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
       addPageFooter(doc, i, totalPages, collegeName, pageWidth, pageHeight, margin, fontLoaded);
     }
 
-    // Save PDF
-    const filename = `تقرير_${(survey?.title || 'استبيان').replace(/[^\u0600-\u06FFa-zA-Z0-9\s]/g, '').substring(0, 25)}_${new Date().toISOString().split('T')[0]}.pdf`;
+    // Save
+    const filename = `تقرير_شامل_${(survey?.title || 'استبيان').replace(/[^\u0600-\u06FFa-zA-Z0-9\s]/g, '').substring(0, 20)}_${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(filename);
 
     toast({
       title: 'تم التصدير بنجاح',
-      description: `تم حفظ التقرير بنجاح`,
+      description: `تم إنشاء تقرير PDF شامل من ${totalPages} صفحات`,
     });
 
   } catch (error) {
     console.error('PDF Export Error:', error);
     toast({
       title: 'خطأ في التصدير',
-      description: 'حدث خطأ أثناء إنشاء ملف PDF. يرجى المحاولة مرة أخرى.',
+      description: 'حدث خطأ أثناء إنشاء ملف PDF.',
       variant: 'destructive'
     });
   }
@@ -528,9 +672,8 @@ export const exportToExcel = (report: any, survey: any, stats: any, textResponse
   try {
     const wb = XLSX.utils.book_new();
 
-    // Summary Sheet
     const summaryData = [
-      ['تقرير الاستبيان'], [''],
+      ['تقرير الاستبيان الشامل'], [''],
       ['العنوان', survey?.title || ''],
       ['البرنامج', survey?.programs?.name || ''],
       ['الفصل الدراسي', report?.semester || ''],
@@ -549,7 +692,6 @@ export const exportToExcel = (report: any, survey: any, stats: any, textResponse
     summarySheet['!cols'] = [{ wch: 30 }, { wch: 60 }];
     XLSX.utils.book_append_sheet(wb, summarySheet, 'الملخص');
 
-    // Questions Sheet
     if (stats.questionStats?.length > 0) {
       const questionsData = [
         ['#', 'السؤال', 'النوع', 'المتوسط', 'الانحراف المعياري', 'عدد الردود', 'التقييم'],
@@ -568,7 +710,6 @@ export const exportToExcel = (report: any, survey: any, stats: any, textResponse
       XLSX.utils.book_append_sheet(wb, questionsSheet, 'الأسئلة');
     }
 
-    // Text Responses Sheet
     if (textResponses?.length) {
       const textData: any[][] = [['السؤال', 'الرد']];
       textResponses.forEach(item => {
@@ -585,7 +726,7 @@ export const exportToExcel = (report: any, survey: any, stats: any, textResponse
 
     toast({
       title: 'تم التصدير بنجاح',
-      description: `تم حفظ ملف Excel: ${filename}`,
+      description: `تم حفظ ملف Excel`,
     });
   } catch (error) {
     console.error('Excel Export Error:', error);
@@ -608,25 +749,17 @@ export const captureChartAsImage = async (
   try {
     const html2canvas = (await import('html2canvas')).default;
     const element = document.getElementById(elementId);
-    if (!element) {
-      console.warn(`Chart element not found: ${elementId}`);
-      return null;
-    }
+    if (!element) return null;
 
     const canvas = await html2canvas(element, { 
       backgroundColor: '#ffffff', 
-      scale: 2, 
+      scale: 2.5, 
       logging: false, 
       useCORS: true,
       allowTaint: true
     });
     
-    return { 
-      id: elementId, 
-      dataUrl: canvas.toDataURL('image/png', 0.95), 
-      title, 
-      type 
-    };
+    return { id: elementId, dataUrl: canvas.toDataURL('image/png', 0.95), title, type };
   } catch (error) {
     console.error('Chart capture error:', error);
     return null;
