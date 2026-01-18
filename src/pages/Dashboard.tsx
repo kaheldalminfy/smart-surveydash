@@ -3,11 +3,15 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BarChart3, FileText, Plus, TrendingUp, Users, ClipboardList, AlertCircle, CheckCircle2, Archive, LogOut, BarChart, Home, Settings, Calendar } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BarChart3, FileText, Plus, TrendingUp, Users, ClipboardList, AlertCircle, CheckCircle2, Archive, LogOut, BarChart, Home, Settings, Calendar, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import RoleBasedDashboard from "@/components/dashboard/RoleBasedDashboard";
+
+type AppRole = 'admin' | 'dean' | 'coordinator' | 'program_manager' | 'faculty';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -21,6 +25,9 @@ const Dashboard = () => {
   });
   const [recentSurveys, setRecentSurveys] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
+  const [userRole, setUserRole] = useState<AppRole>('faculty');
+  const [userProgramIds, setUserProgramIds] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<'overview' | 'programs'>('overview');
 
   useEffect(() => {
     loadUser();
@@ -37,6 +44,33 @@ const Dashboard = () => {
         .eq("id", user.id)
         .single();
       setUser(profile);
+
+      // Load user roles
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role, program_id")
+        .eq("user_id", user.id);
+
+      if (roles && roles.length > 0) {
+        // Determine highest role
+        const roleHierarchy: AppRole[] = ['admin', 'dean', 'coordinator', 'program_manager', 'faculty'];
+        let highestRole: AppRole = 'faculty';
+        const programIds: string[] = [];
+
+        for (const userRole of roles) {
+          const roleIndex = roleHierarchy.indexOf(userRole.role as AppRole);
+          const currentIndex = roleHierarchy.indexOf(highestRole);
+          if (roleIndex !== -1 && roleIndex < currentIndex) {
+            highestRole = userRole.role as AppRole;
+          }
+          if (userRole.program_id) {
+            programIds.push(userRole.program_id);
+          }
+        }
+
+        setUserRole(highestRole);
+        setUserProgramIds(programIds);
+      }
     }
   };
 
@@ -76,7 +110,7 @@ const Dashboard = () => {
         const rate = Math.min(100, (totalResponses / totalTargetEnrollment) * 100);
         calculatedResponseRate = `${rate.toFixed(1)}%`;
       } else if (totalResponses && totalResponses > 0) {
-        calculatedResponseRate = "بانتظار البيانات";
+        calculatedResponseRate = language === 'ar' ? "بانتظار البيانات" : "Awaiting data";
       }
     }
 
@@ -127,6 +161,17 @@ const Dashboard = () => {
     return status === "active" ? "Active" : status === "closed" ? "Closed" : "Draft";
   };
 
+  const getRoleLabel = (role: AppRole) => {
+    const labels: Record<AppRole, { ar: string; en: string }> = {
+      admin: { ar: 'مدير النظام', en: 'Admin' },
+      dean: { ar: 'العميد', en: 'Dean' },
+      coordinator: { ar: 'منسق البرنامج', en: 'Coordinator' },
+      program_manager: { ar: 'مدير البرنامج', en: 'Program Manager' },
+      faculty: { ar: 'عضو هيئة تدريس', en: 'Faculty' },
+    };
+    return labels[role]?.[language] || role;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <header className="bg-card border-b shadow-sm">
@@ -143,9 +188,14 @@ const Dashboard = () => {
             <ClipboardList className="h-8 w-8 text-primary" />
             <div>
               <h1 className="text-2xl font-bold">{t('dashboard.title')}</h1>
-              <p className="text-sm text-muted-foreground">
-                {user?.full_name ? `${t('dashboard.welcomeUser')} ${user.full_name}` : t('dashboard.systemTitle')}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-muted-foreground">
+                  {user?.full_name ? `${t('dashboard.welcomeUser')} ${user.full_name}` : t('dashboard.systemTitle')}
+                </p>
+                <Badge variant="secondary" className="text-xs">
+                  {getRoleLabel(userRole)}
+                </Badge>
+              </div>
             </div>
           </div>
           <div className="flex gap-2 items-center">
@@ -165,120 +215,149 @@ const Dashboard = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {statsDisplay.map((stat, index) => (
-            <Card key={index} className="hover-scale">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {stat.label}
-                </CardTitle>
-                <stat.icon className={`h-5 w-5 ${stat.color}`} />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{stat.value}</div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {/* Tabs for different views */}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'overview' | 'programs')} className="mb-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              {language === 'ar' ? 'نظرة عامة' : 'Overview'}
+            </TabsTrigger>
+            <TabsTrigger value="programs" className="flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              {language === 'ar' ? 'البرامج' : 'Programs'}
+            </TabsTrigger>
+          </TabsList>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>{t('dashboard.recentSurveys')}</CardTitle>
-              <CardDescription>{t('dashboard.recentSurveysDesc')}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {recentSurveys.length > 0 ? (
-                  recentSurveys.map((survey) => (
-                    <div key={survey.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors">
-                      <div className="flex-1">
-                        <h3 className="font-semibold mb-1">{survey.title}</h3>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <span>{survey.responses?.length || 0} {t('dashboard.response')}</span>
-                          <span>•</span>
-                          <Badge variant={survey.status === "active" ? "default" : "secondary"}>
-                            {getSurveyStatusLabel(survey.status)}
-                          </Badge>
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              {statsDisplay.map((stat, index) => (
+                <Card key={index} className="hover-scale">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      {stat.label}
+                    </CardTitle>
+                    <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold">{stat.value}</div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>{t('dashboard.recentSurveys')}</CardTitle>
+                  <CardDescription>{t('dashboard.recentSurveysDesc')}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {recentSurveys.length > 0 ? (
+                      recentSurveys.map((survey) => (
+                        <div key={survey.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors">
+                          <div className="flex-1">
+                            <h3 className="font-semibold mb-1">{survey.title}</h3>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <span>{survey.responses?.length || 0} {t('dashboard.response')}</span>
+                              <span>•</span>
+                              <Badge variant={survey.status === "active" ? "default" : "secondary"}>
+                                {getSurveyStatusLabel(survey.status)}
+                              </Badge>
+                            </div>
+                          </div>
+                          <Link to={`/reports/${survey.id}`}>
+                            <Button variant="outline" size="sm">{t('dashboard.viewReport')}</Button>
+                          </Link>
                         </div>
-                      </div>
-                      <Link to={`/reports/${survey.id}`}>
-                        <Button variant="outline" size="sm">{t('dashboard.viewReport')}</Button>
-                      </Link>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-center text-muted-foreground py-8">{t('dashboard.noSurveys')}</p>
-                )}
-              </div>
-              <Link to="/surveys" className="block mt-4">
-                <Button variant="ghost" className="w-full">{t('dashboard.viewAllSurveys')}</Button>
-              </Link>
-            </CardContent>
-          </Card>
+                      ))
+                    ) : (
+                      <p className="text-center text-muted-foreground py-8">{t('dashboard.noSurveys')}</p>
+                    )}
+                  </div>
+                  <Link to="/surveys" className="block mt-4">
+                    <Button variant="ghost" className="w-full">{t('dashboard.viewAllSurveys')}</Button>
+                  </Link>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('dashboard.quickActions')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Link to="/surveys/new">
-                <Button variant="outline" className="w-full justify-start">
-                  <Plus className="h-4 w-4 ml-2" />
-                  {t('dashboard.createSurvey')}
-                </Button>
-              </Link>
-              <Link to="/surveys">
-                <Button variant="outline" className="w-full justify-start">
-                  <FileText className="h-4 w-4 ml-2" />
-                  {t('dashboard.manageSurveys')}
-                </Button>
-              </Link>
-              <Link to="/complaints">
-                <Button variant="outline" className="w-full justify-start">
-                  <AlertCircle className="h-4 w-4 ml-2" />
-                  {t('dashboard.manageComplaints')}
-                </Button>
-              </Link>
-              <Link to="/comparison">
-                <Button variant="outline" className="w-full justify-start">
-                  <BarChart className="h-4 w-4 ml-2" />
-                  {t('nav.comparison')}
-                </Button>
-              </Link>
-              <Link to="/recommendations">
-                <Button variant="outline" className="w-full justify-start">
-                  <CheckCircle2 className="h-4 w-4 ml-2" />
-                  {t('dashboard.followRecommendations')}
-                </Button>
-              </Link>
-              <Link to="/archives">
-                <Button variant="outline" className="w-full justify-start">
-                  <Archive className="h-4 w-4 ml-2" />
-                  {t('dashboard.semesterArchive')}
-                </Button>
-              </Link>
-              <Link to="/users">
-                <Button variant="outline" className="w-full justify-start">
-                  <Users className="h-4 w-4 ml-2" />
-                  {t('dashboard.manageUsers')}
-                </Button>
-              </Link>
-              <Link to="/academic-calendar">
-                <Button variant="outline" className="w-full justify-start">
-                  <Calendar className="h-4 w-4 ml-2" />
-                  الأجندة الأكاديمية
-                </Button>
-              </Link>
-              <Link to="/system-settings">
-                <Button variant="outline" className="w-full justify-start">
-                  <Settings className="h-4 w-4 ml-2" />
-                  {t('dashboard.systemSettings')}
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t('dashboard.quickActions')}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Link to="/surveys/new">
+                    <Button variant="outline" className="w-full justify-start">
+                      <Plus className="h-4 w-4 ml-2" />
+                      {t('dashboard.createSurvey')}
+                    </Button>
+                  </Link>
+                  <Link to="/surveys">
+                    <Button variant="outline" className="w-full justify-start">
+                      <FileText className="h-4 w-4 ml-2" />
+                      {t('dashboard.manageSurveys')}
+                    </Button>
+                  </Link>
+                  <Link to="/complaints">
+                    <Button variant="outline" className="w-full justify-start">
+                      <AlertCircle className="h-4 w-4 ml-2" />
+                      {t('dashboard.manageComplaints')}
+                    </Button>
+                  </Link>
+                  <Link to="/comparison">
+                    <Button variant="outline" className="w-full justify-start">
+                      <BarChart className="h-4 w-4 ml-2" />
+                      {t('nav.comparison')}
+                    </Button>
+                  </Link>
+                  <Link to="/recommendations">
+                    <Button variant="outline" className="w-full justify-start">
+                      <CheckCircle2 className="h-4 w-4 ml-2" />
+                      {t('dashboard.followRecommendations')}
+                    </Button>
+                  </Link>
+                  <Link to="/archives">
+                    <Button variant="outline" className="w-full justify-start">
+                      <Archive className="h-4 w-4 ml-2" />
+                      {t('dashboard.semesterArchive')}
+                    </Button>
+                  </Link>
+                  {(userRole === 'admin') && (
+                    <Link to="/users">
+                      <Button variant="outline" className="w-full justify-start">
+                        <Users className="h-4 w-4 ml-2" />
+                        {t('dashboard.manageUsers')}
+                      </Button>
+                    </Link>
+                  )}
+                  <Link to="/academic-calendar">
+                    <Button variant="outline" className="w-full justify-start">
+                      <Calendar className="h-4 w-4 ml-2" />
+                      {language === 'ar' ? 'الأجندة الأكاديمية' : 'Academic Calendar'}
+                    </Button>
+                  </Link>
+                  {(userRole === 'admin') && (
+                    <Link to="/system-settings">
+                      <Button variant="outline" className="w-full justify-start">
+                        <Settings className="h-4 w-4 ml-2" />
+                        {t('dashboard.systemSettings')}
+                      </Button>
+                    </Link>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Programs Tab - Role-Based Dashboard */}
+          <TabsContent value="programs" className="mt-6">
+            <RoleBasedDashboard 
+              userRole={userRole} 
+              userProgramIds={userProgramIds} 
+            />
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );
