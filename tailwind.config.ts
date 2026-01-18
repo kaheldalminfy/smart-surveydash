@@ -61,6 +61,16 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        program: {
+          1: "hsl(var(--program-1))",
+          2: "hsl(var(--program-2))",
+          3: "hsl(var(--program-3))",
+          4: "hsl(var(--program-4))",
+          5: "hsl(var(--program-5))",
+          6: "hsl(var(--program-6))",
+          7: "hsl(var(--program-7))",
+          8: "hsl(var(--program-8))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
