@@ -1,9 +1,8 @@
-// PDF Export Utilities v5 - Comprehensive Professional Report
+// PDF Export Utilities v6 - Comprehensive Professional Report with Arabic RTL Fix
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { loadEmbeddedArabicFont } from './embeddedArabicFont';
-import { processArabicForPDF, formatArabicDate, formatNumber } from './arabicTextUtils';
 import { toast } from '@/hooks/use-toast';
 
 // Types
@@ -57,10 +56,11 @@ const getMeanLevel = (mean: number): { label: string; color: [number, number, nu
   return { label: 'ضعيف جداً', color: COLORS.redText };
 };
 
-// Arabic text wrapper
+// Arabic text wrapper - With proper Amiri font, no reversal needed
+// The font handles RTL rendering correctly
 const ar = (text: string): string => {
   if (!text) return '';
-  return processArabicForPDF(text);
+  return text; // Amiri font handles Arabic correctly without reversal
 };
 
 // Draw the colorful header bar (matching DOCX template)
@@ -95,7 +95,7 @@ const drawSectionHeader = (
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(12);
   if (fontLoaded) doc.setFont('Amiri', 'normal');
-  doc.text(ar(title), pageWidth - margin - 5, y + 7, { align: 'right' });
+  doc.text(title, pageWidth - margin - 5, y + 7, { align: 'right' });
   return y + 15;
 };
 
@@ -121,7 +121,7 @@ const drawKPICard = (
   doc.setTextColor(...COLORS.muted);
   doc.setFontSize(8);
   if (fontLoaded) doc.setFont('Amiri', 'normal');
-  doc.text(ar(label), x + width / 2, y + 8, { align: 'center' });
+  doc.text(label, x + width / 2, y + 8, { align: 'center' });
   
   // Value
   doc.setTextColor(...textColor);
@@ -132,7 +132,7 @@ const drawKPICard = (
   if (subText) {
     doc.setTextColor(...COLORS.muted);
     doc.setFontSize(7);
-    doc.text(ar(subText), x + width / 2, y + 27, { align: 'center' });
+    doc.text(subText, x + width / 2, y + 27, { align: 'center' });
   }
 };
 
@@ -154,7 +154,7 @@ const addPageFooter = (
   if (fontLoaded) doc.setFont('Amiri', 'normal');
   
   doc.text(`${pageNum} / ${totalPages}`, margin + 5, pageHeight - 16);
-  doc.text(ar(collegeName), pageWidth / 2, pageHeight - 16, { align: 'center' });
+  doc.text(collegeName, pageWidth / 2, pageHeight - 16, { align: 'center' });
   doc.text(new Date().toLocaleDateString('en-GB'), pageWidth - margin - 5, pageHeight - 16, { align: 'right' });
 };
 
@@ -239,7 +239,7 @@ export const exportToPDF = async (
       doc.setFont('Amiri', 'normal');
       doc.setFontSize(12);
       doc.setTextColor(...COLORS.text);
-      doc.text(ar(collegeName), pageWidth / 2, yPos, { align: 'center' });
+      doc.text(collegeName, pageWidth / 2, yPos, { align: 'center' });
       yPos += 10;
     }
     
@@ -266,17 +266,17 @@ export const exportToPDF = async (
     doc.setTextColor(...COLORS.white);
     if (fontLoaded) doc.setFont('Amiri', 'normal');
     doc.setFontSize(20);
-    doc.text(ar('تقرير نتائج الاستبيان'), pageWidth / 2, yPos + 14, { align: 'center' });
+    doc.text('تقرير نتائج الاستبيان', pageWidth / 2, yPos + 14, { align: 'center' });
     
     doc.setFontSize(14);
-    doc.text(ar(survey?.title || 'استبيان'), pageWidth / 2, yPos + 26, { align: 'center' });
+    doc.text(survey?.title || 'استبيان', pageWidth / 2, yPos + 26, { align: 'center' });
     yPos += 42;
 
     // Program & Semester
     if (survey?.programs?.name) {
       doc.setTextColor(...COLORS.darkBlue);
       doc.setFontSize(12);
-      doc.text(ar(survey.programs.name), pageWidth / 2, yPos, { align: 'center' });
+      doc.text(survey.programs.name, pageWidth / 2, yPos, { align: 'center' });
       yPos += 8;
     }
 
@@ -290,7 +290,7 @@ export const exportToPDF = async (
         report.semester ? `الفصل: ${report.semester}` : '',
         report.academic_year ? `العام: ${report.academic_year}` : ''
       ].filter(Boolean).join('  |  ');
-      doc.text(ar(infoText), pageWidth / 2, yPos + 8, { align: 'center' });
+      doc.text(infoText, pageWidth / 2, yPos + 8, { align: 'center' });
       yPos += 18;
     }
 
@@ -317,8 +317,8 @@ export const exportToPDF = async (
     // Card 2: Response Rate
     drawKPICard(doc, margin + cardWidth + 4, cardY, cardWidth, cardHeight, 
       'معدل الاستجابة', 
-      responseRate !== null ? `${responseRate}%` : ar('غير محدد'),
-      responseRate !== null && responseRate >= 70 ? ar('نسبة جيدة') : '',
+      responseRate !== null ? `${responseRate}%` : 'غير محدد',
+      responseRate !== null && responseRate >= 70 ? 'نسبة جيدة' : '',
       responseRate === null ? [243, 244, 246] : responseRate >= 70 ? [220, 252, 231] : responseRate >= 50 ? [254, 249, 195] : [254, 215, 170],
       responseRate === null ? COLORS.muted : responseRate >= 70 ? COLORS.green : responseRate >= 50 ? COLORS.yellow : COLORS.orange,
       fontLoaded);
@@ -326,7 +326,7 @@ export const exportToPDF = async (
     // Card 3: Overall Mean
     drawKPICard(doc, margin + (cardWidth + 4) * 2, cardY, cardWidth, cardHeight, 
       'المتوسط العام', overallMean > 0 ? overallMean.toFixed(2) : '-', 
-      overallMean > 0 ? ar(getMeanLevel(overallMean).label) : ar('من 5.0'),
+      overallMean > 0 ? getMeanLevel(overallMean).label : 'من 5.0',
       [220, 252, 231], COLORS.green, fontLoaded);
 
     // Card 4: Question Count
@@ -345,15 +345,15 @@ export const exportToPDF = async (
     yPos = drawSectionHeader(doc, yPos, 'تفاصيل الإحصائيات', COLORS.darkBlue, pageWidth, margin, fontLoaded);
 
     const statsTableData = [
-      [ar('القيمة'), ar('المؤشر')],
-      [String(totalResponses), ar('إجمالي الاستجابات')],
-      [targetEnrollment > 0 ? String(targetEnrollment) : ar('غير محدد'), ar('العدد المستهدف')],
-      [responseRate !== null ? `${responseRate}%` : ar('غير متاح'), ar('معدل الاستجابة')],
-      [overallMean > 0 ? `${overallMean.toFixed(2)} / 5.00` : '-', ar('المتوسط العام')],
-      [overallMean > 0 ? ar(getMeanLevel(overallMean).label) : '-', ar('مستوى الأداء')],
-      [stats.overallStdDev > 0 ? stats.overallStdDev.toFixed(2) : '-', ar('الانحراف المعياري')],
-      [String(questionCount), ar('عدد الأسئلة')],
-      [String(textResponsesCount), ar('عدد التعليقات النصية')],
+      ['القيمة', 'المؤشر'],
+      [String(totalResponses), 'إجمالي الاستجابات'],
+      [targetEnrollment > 0 ? String(targetEnrollment) : 'غير محدد', 'العدد المستهدف'],
+      [responseRate !== null ? `${responseRate}%` : 'غير متاح', 'معدل الاستجابة'],
+      [overallMean > 0 ? `${overallMean.toFixed(2)} / 5.00` : '-', 'المتوسط العام'],
+      [overallMean > 0 ? getMeanLevel(overallMean).label : '-', 'مستوى الأداء'],
+      [stats.overallStdDev > 0 ? stats.overallStdDev.toFixed(2) : '-', 'الانحراف المعياري'],
+      [String(questionCount), 'عدد الأسئلة'],
+      [String(textResponsesCount), 'عدد التعليقات النصية'],
     ];
 
     autoTable(doc, {
@@ -375,10 +375,9 @@ export const exportToPDF = async (
     yPos = drawSectionHeader(doc, yPos, 'الملخص التنفيذي', COLORS.green, pageWidth, margin, fontLoaded);
 
     const summaryText = report?.summary?.trim() || 'لا يوجد ملخص تنفيذي. يمكنك توليد ملخص باستخدام زر "إعادة التحليل" بالذكاء الاصطناعي.';
-    const processedSummary = ar(summaryText);
     if (fontLoaded) doc.setFont('Amiri', 'normal');
     doc.setFontSize(10);
-    const summaryLines = doc.splitTextToSize(processedSummary, pageWidth - margin * 2 - 12);
+    const summaryLines = doc.splitTextToSize(summaryText, pageWidth - margin * 2 - 12);
     
     const summaryHeight = Math.max(summaryLines.length * 5 + 10, 25);
     doc.setFillColor(240, 253, 244);
@@ -395,9 +394,8 @@ export const exportToPDF = async (
     yPos = drawSectionHeader(doc, yPos, 'التوصيات', COLORS.red, pageWidth, margin, fontLoaded);
 
     const recText = report?.recommendations_text?.trim() || 'لا توجد توصيات. يمكنك توليد توصيات باستخدام زر "إعادة التحليل" بالذكاء الاصطناعي.';
-    const processedRec = ar(recText);
     doc.setFontSize(10);
-    const recLines = doc.splitTextToSize(processedRec, pageWidth - margin * 2 - 12);
+    const recLines = doc.splitTextToSize(recText, pageWidth - margin * 2 - 12);
     
     const recHeight = Math.max(recLines.length * 5 + 10, 25);
     doc.setFillColor(254, 242, 242);
@@ -459,8 +457,7 @@ export const exportToPDF = async (
             doc.setFontSize(8);
             doc.setTextColor(...COLORS.muted);
             if (fontLoaded) doc.setFont('Amiri', 'normal');
-            const title1 = ar(chart1.title.substring(0, 40));
-            doc.text(title1, margin + chartW / 2, yPos + chartH + 5, { align: 'center' });
+            doc.text(chart1.title.substring(0, 40), margin + chartW / 2, yPos + chartH + 5, { align: 'center' });
           } catch (e) {}
 
           // Right chart
@@ -473,8 +470,7 @@ export const exportToPDF = async (
               doc.roundedRect(margin + chartW + 8, yPos, chartW, chartH, 2, 2, 'S');
               doc.addImage(chart2.dataUrl, 'PNG', margin + chartW + 10, yPos + 2, chartW - 4, chartH - 4);
               
-              const title2 = ar(chart2.title.substring(0, 40));
-              doc.text(title2, margin + chartW + 8 + chartW / 2, yPos + chartH + 5, { align: 'center' });
+              doc.text(chart2.title.substring(0, 40), margin + chartW + 8 + chartW / 2, yPos + chartH + 5, { align: 'center' });
             } catch (e) {}
           }
 
@@ -496,15 +492,15 @@ export const exportToPDF = async (
           String(q.responseCount || 0),
           q.stdDev ? Number(q.stdDev).toFixed(2) : '-',
           mean > 0 ? mean.toFixed(2) : '-',
-          mean > 0 ? ar(getMeanLevel(mean).label) : '-',
-          q.type === 'likert' ? ar('ليكرت') : q.type === 'mcq' ? ar('اختيار') : q.type === 'rating' ? ar('تقييم') : ar('نصي'),
-          ar(`${i + 1}. ${(q.question || '').substring(0, 45)}${(q.question?.length || 0) > 45 ? '...' : ''}`),
+          mean > 0 ? getMeanLevel(mean).label : '-',
+          q.type === 'likert' ? 'ليكرت' : q.type === 'mcq' ? 'اختيار' : q.type === 'rating' ? 'تقييم' : 'نصي',
+          `${i + 1}. ${(q.question || '').substring(0, 45)}${(q.question?.length || 0) > 45 ? '...' : ''}`,
         ];
       });
 
       autoTable(doc, {
         startY: yPos,
-        head: [[ar('ردود'), ar('انحراف'), ar('متوسط'), ar('التقييم'), ar('النوع'), ar('السؤال')]],
+        head: [['ردود', 'انحراف', 'متوسط', 'التقييم', 'النوع', 'السؤال']],
         body: questionData,
         styles: { font: fontLoaded ? 'Amiri' : 'helvetica', fontStyle: 'normal', fontSize: 8, cellPadding: 2.5, overflow: 'linebreak' },
         headStyles: { fillColor: COLORS.blue, halign: 'center', fontStyle: 'normal', textColor: [255, 255, 255] },
@@ -545,14 +541,14 @@ export const exportToPDF = async (
           doc.setTextColor(...COLORS.darkBlue);
           doc.setFontSize(9);
           if (fontLoaded) doc.setFont('Amiri', 'normal');
-          doc.text(ar(`س${idx + 1}: ${q.question?.substring(0, 70) || ''}`), pageWidth - margin - 4, yPos + 7, { align: 'right' });
+          doc.text(`س${idx + 1}: ${q.question?.substring(0, 70) || ''}`, pageWidth - margin - 4, yPos + 7, { align: 'right' });
           yPos += 13;
 
           // Stats row
           const mean = q.mean ? Number(q.mean) : 0;
           doc.setFontSize(8);
           doc.setTextColor(...COLORS.text);
-          doc.text(`${ar('المتوسط')}: ${mean.toFixed(2)}  |  ${ar('الانحراف')}: ${q.stdDev?.toFixed(2) || '-'}  |  ${ar('التقييم')}: ${mean > 0 ? ar(getMeanLevel(mean).label) : '-'}`, 
+          doc.text(`المتوسط: ${mean.toFixed(2)}  |  الانحراف: ${q.stdDev?.toFixed(2) || '-'}  |  التقييم: ${mean > 0 ? getMeanLevel(mean).label : '-'}`, 
             pageWidth / 2, yPos, { align: 'center' });
           yPos += 8;
 
@@ -604,10 +600,9 @@ export const exportToPDF = async (
         
         // Question
         doc.setFillColor(...COLORS.lightGray);
-        const questionText = ar(item.question);
         if (fontLoaded) doc.setFont('Amiri', 'normal');
         doc.setFontSize(10);
-        const qLines = doc.splitTextToSize(questionText, pageWidth - margin * 2 - 8);
+        const qLines = doc.splitTextToSize(item.question, pageWidth - margin * 2 - 8);
         const qHeight = qLines.length * 4.5 + 6;
         doc.roundedRect(margin, yPos, pageWidth - margin * 2, qHeight, 2, 2, 'F');
         doc.setTextColor(...COLORS.darkBlue);
@@ -622,7 +617,7 @@ export const exportToPDF = async (
         for (let i = 0; i < maxResp; i++) {
           yPos = checkNewPage(doc, yPos, 12, pageHeight);
           
-          const respText = ar(`• ${item.responses[i]}`);
+          const respText = `• ${item.responses[i]}`;
           const respLines = doc.splitTextToSize(respText, pageWidth - margin * 2 - 15);
           doc.text(respLines, pageWidth - margin - 8, yPos, { align: 'right' });
           yPos += respLines.length * 4 + 3;
@@ -631,7 +626,7 @@ export const exportToPDF = async (
         if (item.responses.length > 10) {
           doc.setTextColor(...COLORS.muted);
           doc.setFontSize(8);
-          doc.text(ar(`... و ${item.responses.length - 10} ردود إضافية`), pageWidth / 2, yPos, { align: 'center' });
+          doc.text(`... و ${item.responses.length - 10} ردود إضافية`, pageWidth / 2, yPos, { align: 'center' });
           yPos += 6;
         }
         
@@ -662,6 +657,246 @@ export const exportToPDF = async (
       description: 'حدث خطأ أثناء إنشاء ملف PDF.',
       variant: 'destructive'
     });
+  }
+};
+
+/**
+ * Generate PDF Blob for Preview - Returns PDF as Blob without downloading
+ */
+export const generatePDFBlob = async (
+  report: any,
+  survey: any,
+  stats: any,
+  collegeLogo?: string,
+  chartImages?: ChartImage[],
+  textResponses?: TextResponse[],
+  collegeName: string = 'كلية العلوم الإنسانية والاجتماعية'
+): Promise<Blob | null> => {
+  if (!stats || !survey) {
+    return null;
+  }
+
+  try {
+    const doc = new jsPDF({ 
+      orientation: 'portrait', 
+      unit: 'mm', 
+      format: 'a4',
+      putOnlyUsedFonts: true
+    });
+
+    // Load Arabic font
+    let fontLoaded = false;
+    try {
+      const arabicFontBase64 = await loadEmbeddedArabicFont();
+      if (arabicFontBase64 && arabicFontBase64.length > 1000) {
+        doc.addFileToVFS('Amiri-Regular.ttf', arabicFontBase64);
+        doc.addFont('Amiri-Regular.ttf', 'Amiri', 'normal');
+        doc.setFont('Amiri', 'normal');
+        fontLoaded = true;
+      }
+    } catch (error) {
+      console.error('Font loading error:', error);
+    }
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 12;
+    let yPos = 0;
+
+    // ============ PAGE 1: COVER PAGE ============
+    yPos = drawColorBar(doc, 0, pageWidth);
+    yPos += 8;
+    
+    // University Title
+    doc.setTextColor(...COLORS.darkBlue);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Libyan International Medical University', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 6;
+    
+    doc.setFontSize(13);
+    doc.text('Faculty of Human and Social Sciences', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 8;
+    
+    if (fontLoaded) {
+      doc.setFont('Amiri', 'normal');
+      doc.setFontSize(12);
+      doc.setTextColor(...COLORS.text);
+      doc.text(collegeName, pageWidth / 2, yPos, { align: 'center' });
+      yPos += 10;
+    }
+    
+    // Separator
+    doc.setDrawColor(...COLORS.blue);
+    doc.setLineWidth(0.8);
+    doc.line(margin + 30, yPos, pageWidth - margin - 30, yPos);
+    yPos += 10;
+
+    // Logo
+    if (collegeLogo) {
+      try {
+        doc.addImage(collegeLogo, 'PNG', (pageWidth - 35) / 2, yPos, 35, 35);
+        yPos += 42;
+      } catch (e) {
+        yPos += 5;
+      }
+    }
+
+    // Main Title Box
+    doc.setFillColor(...COLORS.blue);
+    doc.roundedRect(margin + 15, yPos, pageWidth - margin * 2 - 30, 35, 4, 4, 'F');
+    
+    doc.setTextColor(...COLORS.white);
+    if (fontLoaded) doc.setFont('Amiri', 'normal');
+    doc.setFontSize(20);
+    doc.text('تقرير نتائج الاستبيان', pageWidth / 2, yPos + 14, { align: 'center' });
+    
+    doc.setFontSize(14);
+    doc.text(survey?.title || 'استبيان', pageWidth / 2, yPos + 26, { align: 'center' });
+    yPos += 42;
+
+    // Program & Semester
+    if (survey?.programs?.name) {
+      doc.setTextColor(...COLORS.darkBlue);
+      doc.setFontSize(12);
+      doc.text(survey.programs.name, pageWidth / 2, yPos, { align: 'center' });
+      yPos += 8;
+    }
+
+    if (report?.semester || report?.academic_year) {
+      doc.setFillColor(...COLORS.lightGray);
+      doc.roundedRect(margin + 35, yPos, pageWidth - margin * 2 - 70, 12, 2, 2, 'F');
+      doc.setTextColor(...COLORS.text);
+      doc.setFontSize(10);
+      
+      const infoText = [
+        report.semester ? `الفصل: ${report.semester}` : '',
+        report.academic_year ? `العام: ${report.academic_year}` : ''
+      ].filter(Boolean).join('  |  ');
+      doc.text(infoText, pageWidth / 2, yPos + 8, { align: 'center' });
+      yPos += 18;
+    }
+
+    // ============ KPI CARDS ============
+    yPos = drawSectionHeader(doc, yPos, 'الإحصائيات العامة', COLORS.blue, pageWidth, margin, fontLoaded);
+
+    const totalResponses = stats.totalResponses || 0;
+    const targetEnrollment = stats.targetEnrollment || survey?.target_enrollment || 0;
+    const responseRate = targetEnrollment > 0 ? Math.round((totalResponses / targetEnrollment) * 100) : null;
+    const overallMean = typeof stats.overallMean === 'number' ? stats.overallMean : 0;
+    const questionCount = stats.questionStats?.length || 0;
+    const textResponsesCount = textResponses?.reduce((sum, t) => sum + t.responses.length, 0) || 0;
+
+    const cardWidth = (pageWidth - margin * 2 - 16) / 5;
+    const cardHeight = 32;
+    const cardY = yPos;
+
+    drawKPICard(doc, margin, cardY, cardWidth, cardHeight, 
+      'إجمالي الاستجابات', String(totalResponses), 
+      targetEnrollment > 0 ? `من ${targetEnrollment} طالب` : '',
+      [219, 234, 254], COLORS.blue, fontLoaded);
+
+    drawKPICard(doc, margin + cardWidth + 4, cardY, cardWidth, cardHeight, 
+      'معدل الاستجابة', 
+      responseRate !== null ? `${responseRate}%` : 'غير محدد',
+      responseRate !== null && responseRate >= 70 ? 'نسبة جيدة' : '',
+      responseRate === null ? [243, 244, 246] : responseRate >= 70 ? [220, 252, 231] : responseRate >= 50 ? [254, 249, 195] : [254, 215, 170],
+      responseRate === null ? COLORS.muted : responseRate >= 70 ? COLORS.green : responseRate >= 50 ? COLORS.yellow : COLORS.orange,
+      fontLoaded);
+
+    drawKPICard(doc, margin + (cardWidth + 4) * 2, cardY, cardWidth, cardHeight, 
+      'المتوسط العام', overallMean > 0 ? overallMean.toFixed(2) : '-', 
+      overallMean > 0 ? getMeanLevel(overallMean).label : 'من 5.0',
+      [220, 252, 231], COLORS.green, fontLoaded);
+
+    drawKPICard(doc, margin + (cardWidth + 4) * 3, cardY, cardWidth, cardHeight, 
+      'عدد الأسئلة', String(questionCount), '',
+      [243, 232, 255], COLORS.purple, fontLoaded);
+
+    drawKPICard(doc, margin + (cardWidth + 4) * 4, cardY, cardWidth, cardHeight, 
+      'التعليقات النصية', String(textResponsesCount), '',
+      [254, 243, 199], COLORS.amber, fontLoaded);
+
+    yPos = cardY + cardHeight + 12;
+
+    // ============ STATISTICS TABLE ============
+    yPos = drawSectionHeader(doc, yPos, 'تفاصيل الإحصائيات', COLORS.darkBlue, pageWidth, margin, fontLoaded);
+
+    const statsTableData = [
+      ['القيمة', 'المؤشر'],
+      [String(totalResponses), 'إجمالي الاستجابات'],
+      [targetEnrollment > 0 ? String(targetEnrollment) : 'غير محدد', 'العدد المستهدف'],
+      [responseRate !== null ? `${responseRate}%` : 'غير متاح', 'معدل الاستجابة'],
+      [overallMean > 0 ? `${overallMean.toFixed(2)} / 5.00` : '-', 'المتوسط العام'],
+      [overallMean > 0 ? getMeanLevel(overallMean).label : '-', 'مستوى الأداء'],
+      [stats.overallStdDev > 0 ? stats.overallStdDev.toFixed(2) : '-', 'الانحراف المعياري'],
+      [String(questionCount), 'عدد الأسئلة'],
+      [String(textResponsesCount), 'عدد التعليقات النصية'],
+    ];
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [statsTableData[0]],
+      body: statsTableData.slice(1),
+      styles: { font: fontLoaded ? 'Amiri' : 'helvetica', fontStyle: 'normal', halign: 'right', fontSize: 10, cellPadding: 3 },
+      headStyles: { fillColor: COLORS.blue, halign: 'center', fontStyle: 'normal', textColor: [255, 255, 255] },
+      columnStyles: { 0: { halign: 'center', cellWidth: 50 }, 1: { halign: 'right', cellWidth: 70 } },
+      alternateRowStyles: { fillColor: COLORS.lightGray },
+      margin: { left: margin + 25, right: margin + 25 },
+      theme: 'grid'
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 12;
+
+    // ============ EXECUTIVE SUMMARY ============
+    yPos = checkNewPage(doc, yPos, 50, pageHeight);
+    yPos = drawSectionHeader(doc, yPos, 'الملخص التنفيذي', COLORS.green, pageWidth, margin, fontLoaded);
+
+    const summaryText = report?.summary?.trim() || 'لا يوجد ملخص تنفيذي.';
+    if (fontLoaded) doc.setFont('Amiri', 'normal');
+    doc.setFontSize(10);
+    const summaryLines = doc.splitTextToSize(summaryText, pageWidth - margin * 2 - 12);
+    
+    const summaryHeight = Math.max(summaryLines.length * 5 + 10, 25);
+    doc.setFillColor(240, 253, 244);
+    doc.roundedRect(margin, yPos, pageWidth - margin * 2, summaryHeight, 2, 2, 'F');
+    doc.setDrawColor(...COLORS.green);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(margin, yPos, pageWidth - margin * 2, summaryHeight, 2, 2, 'S');
+    doc.setTextColor(...COLORS.text);
+    doc.text(summaryLines, pageWidth - margin - 6, yPos + 6, { align: 'right' });
+    yPos += summaryHeight + 10;
+
+    // ============ RECOMMENDATIONS ============
+    yPos = checkNewPage(doc, yPos, 50, pageHeight);
+    yPos = drawSectionHeader(doc, yPos, 'التوصيات', COLORS.red, pageWidth, margin, fontLoaded);
+
+    const recText = report?.recommendations_text?.trim() || 'لا توجد توصيات.';
+    doc.setFontSize(10);
+    const recLines = doc.splitTextToSize(recText, pageWidth - margin * 2 - 12);
+    
+    const recHeight = Math.max(recLines.length * 5 + 10, 25);
+    doc.setFillColor(254, 242, 242);
+    doc.roundedRect(margin, yPos, pageWidth - margin * 2, recHeight, 2, 2, 'F');
+    doc.setDrawColor(...COLORS.red);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(margin, yPos, pageWidth - margin * 2, recHeight, 2, 2, 'S');
+    doc.setTextColor(...COLORS.text);
+    doc.text(recLines, pageWidth - margin - 6, yPos + 6, { align: 'right' });
+
+    // ============ ADD FOOTERS ============
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      addPageFooter(doc, i, totalPages, collegeName, pageWidth, pageHeight, margin, fontLoaded);
+    }
+
+    // Return as Blob
+    return doc.output('blob');
+
+  } catch (error) {
+    console.error('PDF Preview Error:', error);
+    return null;
   }
 };
 

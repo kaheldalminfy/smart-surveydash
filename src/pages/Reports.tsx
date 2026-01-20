@@ -13,16 +13,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download, FileSpreadsheet, Sparkles, ArrowRight, Save, Trash2, Edit as EditIcon, BarChart3, Users, Filter, Target, MessageSquare, ListChecks, AlertTriangle, Loader2 } from "lucide-react";
+import { Download, FileSpreadsheet, Sparkles, ArrowRight, Save, Trash2, Edit as EditIcon, BarChart3, Users, Filter, Target, MessageSquare, ListChecks, AlertTriangle, Loader2, Eye } from "lucide-react";
 import DashboardButton from "@/components/DashboardButton";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { exportToPDF, exportToExcel, captureChartAsImage } from "@/utils/exportReport";
+import { exportToPDF, exportToExcel, captureChartAsImage, generatePDFBlob } from "@/utils/exportReport";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
+import { PDFPreviewDialog } from "@/components/PDFPreviewDialog";
 
 const COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#16a34a'];
 const MCQ_COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#6366f1', '#84cc16'];
@@ -57,6 +58,9 @@ const Reports = () => {
   const [allResponses, setAllResponses] = useState<any[]>([]);
   const [filterQuestion, setFilterQuestion] = useState<string>("");
   const [filterValues, setFilterValues] = useState<string[]>([]);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
 
   useEffect(() => {
     loadReport();
@@ -458,6 +462,56 @@ const Reports = () => {
     }
   };
 
+  // PDF Preview Handler
+  const handlePreviewPDF = async () => {
+    setIsGeneratingPreview(true);
+    setPreviewOpen(true);
+    setPdfBlob(null);
+
+    try {
+      const likertRatingQuestions = detailedAnswers.filter(q => q.type === 'likert' || q.type === 'rating');
+      const overallMean = likertRatingQuestions.length > 0
+        ? likertRatingQuestions.reduce((sum, q) => sum + (parseFloat(q.mean) || 0), 0) / likertRatingQuestions.length
+        : 0;
+      
+      const overallStdDev = likertRatingQuestions.length > 0
+        ? likertRatingQuestions.reduce((sum, q) => sum + (parseFloat(q.stdDev) || 0), 0) / likertRatingQuestions.length
+        : 0;
+
+      const targetEnrollment = survey?.target_enrollment || 0;
+      const responseRate = targetEnrollment > 0 
+        ? Math.min(100, Math.round((allResponses.length / targetEnrollment) * 100))
+        : 0;
+
+      const textResponses = detailedAnswers
+        .filter(q => q.type === 'text' && q.textResponses.length > 0)
+        .map(q => ({ question: q.text, responses: q.textResponses }));
+
+      const stats = {
+        totalResponses: allResponses.length,
+        targetEnrollment,
+        responseRate,
+        overallMean,
+        overallStdDev,
+        questionStats: detailedAnswers.map(q => ({
+          question: q.text,
+          type: q.type,
+          mean: parseFloat(q.mean) || 0,
+          stdDev: parseFloat(q.stdDev) || 0,
+          responseCount: q.responseCount,
+        })),
+      };
+
+      const blob = await generatePDFBlob(report, survey, stats, collegeLogo, [], textResponses, collegeName);
+      setPdfBlob(blob);
+    } catch (error) {
+      console.error("Preview error:", error);
+      toast({ title: "خطأ", description: "حدث خطأ أثناء إنشاء المعاينة", variant: "destructive" });
+    } finally {
+      setIsGeneratingPreview(false);
+    }
+  };
+
   // Enhanced Excel Export
   const handleExportExcel = () => {
     const likertRatingQuestions = detailedAnswers.filter(q => q.type === 'likert' || q.type === 'rating');
@@ -564,6 +618,10 @@ const Reports = () => {
               <Button variant="outline" onClick={generateReport} disabled={isGenerating}>
                 <Sparkles className="h-4 w-4 ml-2" />
                 {isGenerating ? "جاري التحليل..." : "إعادة التحليل"}
+              </Button>
+              <Button variant="outline" onClick={handlePreviewPDF} disabled={isGeneratingPreview}>
+                <Eye className="h-4 w-4 ml-2" />
+                معاينة
               </Button>
               <Button variant="accent" onClick={handleExportPDF} disabled={isExporting}>
                 {isExporting ? (
