@@ -155,9 +155,19 @@ const Reports = () => {
     let filteredResponses = responses;
     
     if (filterQ && filterVals.length > 0) {
+      // Normalize filter values for comparison (trim whitespace)
+      const normalizedFilterVals = filterVals.map(v => String(v).trim());
+      
       filteredResponses = filteredResponses.filter(response => {
         const answer = response.answers?.find((a: any) => a.question_id === filterQ);
-        return answer && (filterVals.includes(answer.value) || filterVals.includes(String(answer.numeric_value)));
+        if (!answer) return false;
+        
+        // Normalize stored answer values for comparison
+        const answerValueNormalized = String(answer.value || '').trim();
+        const numericValueNormalized = String(answer.numeric_value || '').trim();
+        
+        return normalizedFilterVals.includes(answerValueNormalized) || 
+               normalizedFilterVals.includes(numericValueNormalized);
       });
     }
 
