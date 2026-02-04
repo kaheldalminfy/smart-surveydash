@@ -47,6 +47,165 @@ export type Database = {
         }
         Relationships: []
       }
+      accreditation_frameworks: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          name_en: string | null
+          program_id: string | null
+          scope: Database["public"]["Enums"]["accreditation_scope"]
+          source_file_url: string | null
+          type: Database["public"]["Enums"]["accreditation_type"]
+          updated_at: string | null
+          version: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          name_en?: string | null
+          program_id?: string | null
+          scope?: Database["public"]["Enums"]["accreditation_scope"]
+          source_file_url?: string | null
+          type?: Database["public"]["Enums"]["accreditation_type"]
+          updated_at?: string | null
+          version?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          name_en?: string | null
+          program_id?: string | null
+          scope?: Database["public"]["Enums"]["accreditation_scope"]
+          source_file_url?: string | null
+          type?: Database["public"]["Enums"]["accreditation_type"]
+          updated_at?: string | null
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accreditation_frameworks_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accreditation_indicators: {
+        Row: {
+          code: string
+          created_at: string | null
+          description: string | null
+          id: string
+          importance_level:
+            | Database["public"]["Enums"]["accreditation_importance"]
+            | null
+          name: string
+          objective: string | null
+          order_index: number | null
+          required_evidence: Json | null
+          response_guidelines: string | null
+          response_template: string | null
+          responsible_party: string | null
+          standard_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          importance_level?:
+            | Database["public"]["Enums"]["accreditation_importance"]
+            | null
+          name: string
+          objective?: string | null
+          order_index?: number | null
+          required_evidence?: Json | null
+          response_guidelines?: string | null
+          response_template?: string | null
+          responsible_party?: string | null
+          standard_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          importance_level?:
+            | Database["public"]["Enums"]["accreditation_importance"]
+            | null
+          name?: string
+          objective?: string | null
+          order_index?: number | null
+          required_evidence?: Json | null
+          response_guidelines?: string | null
+          response_template?: string | null
+          responsible_party?: string | null
+          standard_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accreditation_indicators_standard_id_fkey"
+            columns: ["standard_id"]
+            isOneToOne: false
+            referencedRelation: "accreditation_standards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accreditation_standards: {
+        Row: {
+          code: string
+          created_at: string | null
+          description: string | null
+          framework_id: string
+          id: string
+          name: string
+          order_index: number | null
+          weight: number | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          description?: string | null
+          framework_id: string
+          id?: string
+          name: string
+          order_index?: number | null
+          weight?: number | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          description?: string | null
+          framework_id?: string
+          id?: string
+          name?: string
+          order_index?: number | null
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accreditation_standards_framework_id_fkey"
+            columns: ["framework_id"]
+            isOneToOne: false
+            referencedRelation: "accreditation_frameworks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       answers: {
         Row: {
           created_at: string | null
@@ -256,6 +415,140 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "courses_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      indicator_evidence: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          evidence_type: string | null
+          file_type: string | null
+          file_url: string | null
+          id: string
+          response_id: string
+          title: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          evidence_type?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          response_id: string
+          title: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          evidence_type?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          response_id?: string
+          title?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "indicator_evidence_response_id_fkey"
+            columns: ["response_id"]
+            isOneToOne: false
+            referencedRelation: "indicator_responses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      indicator_responses: {
+        Row: {
+          academic_year: string | null
+          ai_feedback: string | null
+          ai_score: number | null
+          compliance_level:
+            | Database["public"]["Enums"]["accreditation_compliance"]
+            | null
+          compliance_percentage: number | null
+          created_at: string | null
+          gaps: Json | null
+          id: string
+          improvement_notes: string | null
+          indicator_id: string
+          program_id: string | null
+          response_text: string | null
+          reviewed_by: string | null
+          semester: string | null
+          status:
+            | Database["public"]["Enums"]["accreditation_response_status"]
+            | null
+          strengths: Json | null
+          submitted_by: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          academic_year?: string | null
+          ai_feedback?: string | null
+          ai_score?: number | null
+          compliance_level?:
+            | Database["public"]["Enums"]["accreditation_compliance"]
+            | null
+          compliance_percentage?: number | null
+          created_at?: string | null
+          gaps?: Json | null
+          id?: string
+          improvement_notes?: string | null
+          indicator_id: string
+          program_id?: string | null
+          response_text?: string | null
+          reviewed_by?: string | null
+          semester?: string | null
+          status?:
+            | Database["public"]["Enums"]["accreditation_response_status"]
+            | null
+          strengths?: Json | null
+          submitted_by?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          academic_year?: string | null
+          ai_feedback?: string | null
+          ai_score?: number | null
+          compliance_level?:
+            | Database["public"]["Enums"]["accreditation_compliance"]
+            | null
+          compliance_percentage?: number | null
+          created_at?: string | null
+          gaps?: Json | null
+          id?: string
+          improvement_notes?: string | null
+          indicator_id?: string
+          program_id?: string | null
+          response_text?: string | null
+          reviewed_by?: string | null
+          semester?: string | null
+          status?:
+            | Database["public"]["Enums"]["accreditation_response_status"]
+            | null
+          strengths?: Json | null
+          submitted_by?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "indicator_responses_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "accreditation_indicators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indicator_responses_program_id_fkey"
             columns: ["program_id"]
             isOneToOne: false
             referencedRelation: "programs"
@@ -740,6 +1033,15 @@ export type Database = {
       }
     }
     Enums: {
+      accreditation_compliance: "compliant" | "partial" | "non_compliant"
+      accreditation_importance: "critical" | "high" | "medium" | "low"
+      accreditation_response_status:
+        | "draft"
+        | "submitted"
+        | "reviewed"
+        | "approved"
+      accreditation_scope: "national" | "international"
+      accreditation_type: "institutional" | "programmatic"
       app_role: "admin" | "coordinator" | "faculty" | "dean" | "program_manager"
       complaint_status: "pending" | "in_progress" | "resolved" | "closed"
       complaint_type: "academic" | "administrative" | "technical" | "other"
@@ -879,6 +1181,16 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      accreditation_compliance: ["compliant", "partial", "non_compliant"],
+      accreditation_importance: ["critical", "high", "medium", "low"],
+      accreditation_response_status: [
+        "draft",
+        "submitted",
+        "reviewed",
+        "approved",
+      ],
+      accreditation_scope: ["national", "international"],
+      accreditation_type: ["institutional", "programmatic"],
       app_role: ["admin", "coordinator", "faculty", "dean", "program_manager"],
       complaint_status: ["pending", "in_progress", "resolved", "closed"],
       complaint_type: ["academic", "administrative", "technical", "other"],

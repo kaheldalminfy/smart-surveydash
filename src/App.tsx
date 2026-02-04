@@ -22,6 +22,9 @@ import ProgramComparison from "./pages/ProgramComparison";
 import Users from "./pages/Users";
 import SystemSettings from "./pages/SystemSettings";
 import AcademicCalendar from "./pages/AcademicCalendar";
+import Accreditation from "./pages/Accreditation";
+import AccreditationFramework from "./pages/AccreditationFramework";
+import IndicatorDetails from "./pages/IndicatorDetails";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +55,9 @@ const App = () => (
             <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
             <Route path="/system-settings" element={<ProtectedRoute><SystemSettings /></ProtectedRoute>} />
             <Route path="/academic-calendar" element={<ProtectedRoute><AcademicCalendar /></ProtectedRoute>} />
+            <Route path="/accreditation" element={<ProtectedRoute><Accreditation /></ProtectedRoute>} />
+            <Route path="/accreditation/framework/:id" element={<ProtectedRoute><AccreditationFramework /></ProtectedRoute>} />
+            <Route path="/accreditation/indicator/:id" element={<ProtectedRoute><IndicatorDetails /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
