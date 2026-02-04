@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, FileText, Plus, TrendingUp, Users, ClipboardList, AlertCircle, CheckCircle2, Archive, LogOut, BarChart, Home, Settings, Calendar, Building2 } from "lucide-react";
+import { BarChart3, FileText, Plus, TrendingUp, Users, ClipboardList, AlertCircle, CheckCircle2, Archive, LogOut, BarChart, Home, Settings, Calendar, Building2, Award } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -315,6 +315,12 @@ const Dashboard = () => {
                     <Button variant="outline" className="w-full justify-start">
                       <CheckCircle2 className="h-4 w-4 ml-2" />
                       {t('dashboard.followRecommendations')}
+                    </Button>
+                  </Link>
+                  <Link to="/accreditation">
+                    <Button variant="outline" className="w-full justify-start bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200 hover:border-purple-300">
+                      <Award className="h-4 w-4 ml-2 text-purple-600" />
+                      {language === 'ar' ? 'وحدة الاعتماد الذكية' : 'Smart Accreditation'}
                     </Button>
                   </Link>
                   <Link to="/archives">
