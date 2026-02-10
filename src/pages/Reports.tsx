@@ -61,6 +61,7 @@ const Reports = () => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
+  const [manualEnrollment, setManualEnrollment] = useState<string>("");
 
   useEffect(() => {
     loadReport();
@@ -306,12 +307,14 @@ const Reports = () => {
   const handleFilterQuestionChange = (questionId: string) => {
     setFilterQuestion(questionId);
     setFilterValues([]);
+    setManualEnrollment("");
     processDataWithFilter(allQuestions, allResponses, questionId, []);
   };
 
   const clearFilter = () => {
     setFilterQuestion("");
     setFilterValues([]);
+    setManualEnrollment("");
     processDataWithFilter(allQuestions, allResponses, "", []);
   };
 
@@ -889,6 +892,73 @@ const Reports = () => {
                   مسح الفلتر
                 </Button>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* حقل نسبة الاستجابة اليدوي - يظهر عند اختيار قيمة من الفلتر */}
+        {filterQuestion && filterValues.length > 0 && (
+          <Card className="border-primary/20 bg-gradient-to-br from-indigo-500/5 to-blue-500/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Target className="h-5 w-5 text-primary" />
+                حساب نسبة الاستجابة
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">العدد الفعلي للطلاب في المقرر</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    placeholder="أدخل عدد الطلاب المسجلين..."
+                    value={manualEnrollment}
+                    onChange={(e) => setManualEnrollment(e.target.value)}
+                    className="text-lg"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">عدد الطلاب الذين قيّموا (من النظام)</Label>
+                  <div className="flex items-center gap-2 h-10 px-3 rounded-md border bg-muted/50">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-lg font-bold">{filteredResponsesCount}</span>
+                    <span className="text-sm text-muted-foreground">طالب</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">نسبة الاستجابة</Label>
+                  {(() => {
+                    const manualNum = parseInt(manualEnrollment);
+                    if (!manualEnrollment || isNaN(manualNum) || manualNum <= 0) {
+                      return (
+                        <div className="flex items-center gap-2 h-10 px-3 rounded-md border bg-muted/30">
+                          <span className="text-sm text-muted-foreground">أدخل عدد الطلاب لحساب النسبة</span>
+                        </div>
+                      );
+                    }
+                    const rate = Math.min(100, Math.round((filteredResponsesCount / manualNum) * 100));
+                    const rateColor = rate >= 70 ? 'text-green-600' : rate >= 50 ? 'text-yellow-600' : 'text-orange-600';
+                    const rateBg = rate >= 70 ? 'bg-green-500' : rate >= 50 ? 'bg-yellow-500' : 'bg-orange-500';
+                    return (
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 h-10 px-3 rounded-md border bg-muted/50">
+                          <span className={`text-2xl font-bold ${rateColor}`}>{rate}%</span>
+                          <span className="text-sm text-muted-foreground">
+                            ({filteredResponsesCount} / {manualNum})
+                          </span>
+                        </div>
+                        <Progress value={rate} className="h-2" />
+                        <p className="text-xs text-muted-foreground">
+                          {rate < 50 ? '⚠️ نسبة استجابة منخفضة' : rate >= 70 ? '✓ نسبة استجابة جيدة' : '⚡ نسبة استجابة مقبولة'}
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
