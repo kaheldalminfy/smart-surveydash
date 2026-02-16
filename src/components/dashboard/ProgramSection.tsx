@@ -73,17 +73,20 @@ const ProgramSection = ({ stats, isExpanded = true }: ProgramSectionProps) => {
   const [showSurveys, setShowSurveys] = useState(false);
   const [showComplaints, setShowComplaints] = useState(false);
   
-  const totalComplaints = stats.complaintStats.pending + stats.complaintStats.inProgress + stats.complaintStats.resolved;
+  const complaintStats = stats.complaintStats || { pending: 0, inProgress: 0, resolved: 0 };
+  const totalComplaints = complaintStats.pending + complaintStats.inProgress + complaintStats.resolved;
   const resolutionRate = totalComplaints > 0 
-    ? Math.round((stats.complaintStats.resolved / totalComplaints) * 100) 
+    ? Math.round((complaintStats.resolved / totalComplaints) * 100) 
     : 0;
 
-  const sortedCourses = [...stats.courseSatisfaction].sort((a, b) => b.averageSatisfaction - a.averageSatisfaction);
+  const sortedCourses = [...(stats.courseSatisfaction || [])].sort((a, b) => b.averageSatisfaction - a.averageSatisfaction);
+  const surveyDetails = stats.surveyDetails || [];
+  const complaintDetails = stats.complaintDetails || [];
 
   const complaintStatusData = [
-    { name: language === 'ar' ? 'جديدة' : 'New', value: stats.complaintStats.pending, fill: '#f59e0b' },
-    { name: language === 'ar' ? 'قيد الإجراء' : 'In Progress', value: stats.complaintStats.inProgress, fill: '#3b82f6' },
-    { name: language === 'ar' ? 'تم الحل' : 'Resolved', value: stats.complaintStats.resolved, fill: '#22c55e' },
+    { name: language === 'ar' ? 'جديدة' : 'New', value: complaintStats.pending, fill: '#f59e0b' },
+    { name: language === 'ar' ? 'قيد الإجراء' : 'In Progress', value: complaintStats.inProgress, fill: '#3b82f6' },
+    { name: language === 'ar' ? 'تم الحل' : 'Resolved', value: complaintStats.resolved, fill: '#22c55e' },
   ].filter(item => item.value > 0);
 
   const formatDate = (dateStr: string) => {
@@ -207,7 +210,7 @@ const ProgramSection = ({ stats, isExpanded = true }: ProgramSectionProps) => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {stats.surveyDetails.length > 0 ? (
+                  {surveyDetails.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -218,7 +221,7 @@ const ProgramSection = ({ stats, isExpanded = true }: ProgramSectionProps) => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {stats.surveyDetails.map(survey => (
+                        {surveyDetails.map(survey => (
                           <TableRow key={survey.id}>
                             <TableCell className="font-medium">{survey.title}</TableCell>
                             <TableCell className="text-center">{survey.responseCount}</TableCell>
@@ -263,7 +266,7 @@ const ProgramSection = ({ stats, isExpanded = true }: ProgramSectionProps) => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {stats.complaintDetails.length > 0 ? (
+                  {complaintDetails.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -274,7 +277,7 @@ const ProgramSection = ({ stats, isExpanded = true }: ProgramSectionProps) => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {stats.complaintDetails.map(complaint => (
+                        {complaintDetails.map(complaint => (
                           <TableRow key={complaint.id}>
                             <TableCell className="font-medium">{complaint.subject}</TableCell>
                             <TableCell className="text-center">
