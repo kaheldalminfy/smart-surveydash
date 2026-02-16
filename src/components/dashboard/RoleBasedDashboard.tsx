@@ -25,7 +25,22 @@ interface Program {
   name_en?: string;
 }
 
-interface ProgramStats {
+export interface SurveyDetail {
+  id: string;
+  title: string;
+  responseCount: number;
+  avgSatisfaction: number;
+}
+
+export interface ComplaintDetail {
+  id: string;
+  subject: string;
+  status: string;
+  createdAt: string;
+  complainantType: string | null;
+}
+
+export interface ProgramStats {
   programId: string;
   programName: string;
   programNameEn?: string;
@@ -44,6 +59,8 @@ interface ProgramStats {
     name: string;
     averageSatisfaction: number;
   }>;
+  surveyDetails: SurveyDetail[];
+  complaintDetails: ComplaintDetail[];
 }
 
 interface RoleBasedDashboardProps {
@@ -68,7 +85,6 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
   const loadData = async () => {
     setLoading(true);
     try {
-      // Load programs based on role
       let programsQuery = supabase.from('programs').select('*');
       
       if (!isDeanOrAdmin && userProgramIds.length > 0) {
@@ -79,7 +95,6 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
       const loadedPrograms = programsData || [];
       setPrograms(loadedPrograms);
 
-      // Load stats for each program
       const stats: ProgramStats[] = [];
       
       for (let i = 0; i < loadedPrograms.length; i++) {
@@ -97,10 +112,10 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
   };
 
   const loadProgramStats = async (program: Program, colorIndex: number): Promise<ProgramStats> => {
-    // Get surveys for this program
+    // Get surveys for this program with titles
     const { data: surveys } = await supabase
       .from('surveys')
-      .select('id')
+      .select('id, title')
       .eq('program_id', program.id);
 
     const surveyIds = surveys?.map(s => s.id) || [];
@@ -115,24 +130,49 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
       totalResponses = count || 0;
     }
 
-    // Get average satisfaction (from answers with numeric values)
-    let averageSatisfaction = 0;
-    if (surveyIds.length > 0) {
-      const { data: answers } = await supabase
-        .from('answers')
-        .select('numeric_value, response_id, responses!inner(survey_id)')
-        .not('numeric_value', 'is', null);
+    // Build survey details with per-survey averages
+    const surveyDetails: SurveyDetail[] = [];
+    const surveyAverages: number[] = [];
 
-      if (answers && answers.length > 0) {
-        const programAnswers = answers.filter((a: any) => 
-          surveyIds.includes(a.responses?.survey_id)
-        );
-        if (programAnswers.length > 0) {
-          const sum = programAnswers.reduce((acc: number, curr: any) => acc + (curr.numeric_value || 0), 0);
-          averageSatisfaction = sum / programAnswers.length;
+    if (surveys && surveys.length > 0) {
+      for (const survey of surveys) {
+        // Get responses for this survey
+        const { data: surveyResponses } = await supabase
+          .from('responses')
+          .select('id')
+          .eq('survey_id', survey.id);
+
+        const responseCount = surveyResponses?.length || 0;
+        const responseIds = surveyResponses?.map(r => r.id) || [];
+
+        let avgSatisfaction = 0;
+        if (responseIds.length > 0) {
+          const { data: surveyAnswers } = await supabase
+            .from('answers')
+            .select('numeric_value')
+            .in('response_id', responseIds)
+            .not('numeric_value', 'is', null);
+
+          if (surveyAnswers && surveyAnswers.length > 0) {
+            const sum = surveyAnswers.reduce((acc, curr) => acc + (curr.numeric_value || 0), 0);
+            avgSatisfaction = sum / surveyAnswers.length;
+            surveyAverages.push(avgSatisfaction);
+          }
         }
+
+        surveyDetails.push({
+          id: survey.id,
+          title: survey.title,
+          responseCount,
+          avgSatisfaction,
+        });
       }
     }
+
+    // Average of averages (more fair)
+    const averageSatisfaction = surveyAverages.length > 0
+      ? surveyAverages.reduce((a, b) => a + b, 0) / surveyAverages.length
+      : 0;
 
     // Get text comments count
     let textCommentsCount = 0;
@@ -151,17 +191,26 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
       }
     }
 
-    // Get complaints for this program
+    // Get complaints for this program with details
     const { data: complaints } = await supabase
       .from('complaints')
-      .select('status')
-      .eq('program_id', program.id);
+      .select('id, subject, status, created_at, complainant_type')
+      .eq('program_id', program.id)
+      .order('created_at', { ascending: false });
 
     const complaintStats = {
       pending: complaints?.filter(c => c.status === 'pending').length || 0,
       inProgress: complaints?.filter(c => c.status === 'in_progress').length || 0,
       resolved: complaints?.filter(c => c.status === 'resolved' || c.status === 'closed').length || 0,
     };
+
+    const complaintDetails: ComplaintDetail[] = (complaints || []).map(c => ({
+      id: c.id,
+      subject: c.subject,
+      status: c.status || 'pending',
+      createdAt: c.created_at || '',
+      complainantType: c.complainant_type,
+    }));
 
     // Get course satisfaction
     const { data: courses } = await supabase
@@ -172,7 +221,6 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
     const courseSatisfaction: Array<{ id: string; name: string; averageSatisfaction: number }> = [];
     
     if (courses && courses.length > 0 && surveyIds.length > 0) {
-      // Get survey_courses
       const { data: surveyCourses } = await supabase
         .from('survey_courses')
         .select('course_id, survey_id')
@@ -184,7 +232,6 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
           .map(sc => sc.survey_id) || [];
 
         if (courseSurveyIds.length > 0) {
-          // Get responses for these surveys
           const { data: courseResponses } = await supabase
             .from('responses')
             .select('id')
@@ -224,6 +271,8 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
       textCommentsCount,
       complaintStats,
       courseSatisfaction,
+      surveyDetails,
+      complaintDetails,
     };
   };
 
