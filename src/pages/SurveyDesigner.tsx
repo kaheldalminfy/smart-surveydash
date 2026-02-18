@@ -59,6 +59,8 @@ const SurveyDesigner = () => {
   const [academicCalendar, setAcademicCalendar] = useState<any[]>([]);
   const [responseCount, setResponseCount] = useState(0);
   const [hasExistingAnswers, setHasExistingAnswers] = useState(false);
+  const [draggedQuestionId, setDraggedQuestionId] = useState<number | null>(null);
+  const [dragOverQuestionId, setDragOverQuestionId] = useState<number | null>(null);
 
   useEffect(() => {
     loadPrograms();
@@ -349,6 +351,55 @@ const SurveyDesigner = () => {
       
       setQuestions(newQuestions);
     }
+  };
+
+  const handleDragStart = (e: React.DragEvent, questionId: number) => {
+    setDraggedQuestionId(questionId);
+    e.dataTransfer.effectAllowed = 'move';
+    // Make the drag image semi-transparent
+    if (e.currentTarget instanceof HTMLElement) {
+      e.dataTransfer.setDragImage(e.currentTarget, 0, 0);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent, questionId: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedQuestionId !== null && draggedQuestionId !== questionId) {
+      setDragOverQuestionId(questionId);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverQuestionId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetQuestionId: number) => {
+    e.preventDefault();
+    if (draggedQuestionId === null || draggedQuestionId === targetQuestionId) return;
+
+    const dragIndex = questions.findIndex(q => q.id === draggedQuestionId);
+    const dropIndex = questions.findIndex(q => q.id === targetQuestionId);
+
+    if (dragIndex === -1 || dropIndex === -1) return;
+
+    const newQuestions = [...questions];
+    const [removed] = newQuestions.splice(dragIndex, 1);
+    newQuestions.splice(dropIndex, 0, removed);
+
+    // Update order indices
+    newQuestions.forEach((q, index) => {
+      q.orderIndex = index;
+    });
+
+    setQuestions(newQuestions);
+    setDraggedQuestionId(null);
+    setDragOverQuestionId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedQuestionId(null);
+    setDragOverQuestionId(null);
   };
 
   const handleSave = async () => {
@@ -973,15 +1024,25 @@ const SurveyDesigner = () => {
                   <CardContent className="space-y-4">
                     {questions.map((question, index) => (
                       <div 
-                        key={question.id} 
-                        className={`p-4 border rounded-lg space-y-3 ${
+                        key={question.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, question.id)}
+                        onDragOver={(e) => handleDragOver(e, question.id)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, question.id)}
+                        onDragEnd={handleDragEnd}
+                        className={`p-4 border rounded-lg space-y-3 transition-all ${
                           question.type === 'section' 
                             ? 'bg-primary/10 border-primary/30' 
                             : 'bg-card'
+                        } ${
+                          draggedQuestionId === question.id ? 'opacity-40 scale-95' : ''
+                        } ${
+                          dragOverQuestionId === question.id ? 'border-primary border-2 shadow-lg' : ''
                         }`}
                       >
                         <div className="flex items-start gap-3">
-                          <GripVertical className="h-5 w-5 text-muted-foreground mt-2 cursor-move" />
+                          <GripVertical className="h-5 w-5 text-muted-foreground mt-2 cursor-grab active:cursor-grabbing" />
                           <div className="flex-1 space-y-3">
                             <div className="flex items-center gap-2">
                               <Badge variant={question.type === 'section' ? 'default' : 'outline'}>
