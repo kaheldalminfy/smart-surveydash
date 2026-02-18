@@ -149,13 +149,17 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
         if (responseIds.length > 0) {
           const { data: surveyAnswers } = await supabase
             .from('answers')
-            .select('numeric_value')
+            .select('numeric_value, questions!inner(type)')
             .in('response_id', responseIds)
-            .not('numeric_value', 'is', null);
+            .not('numeric_value', 'is', null)
+            .in('questions.type', ['likert', 'rating']);
 
-          if (surveyAnswers && surveyAnswers.length > 0) {
-            const sum = surveyAnswers.reduce((acc, curr) => acc + (curr.numeric_value || 0), 0);
-            avgSatisfaction = sum / surveyAnswers.length;
+          const validAnswers = (surveyAnswers || []).filter((a: any) => 
+            a.numeric_value != null && a.numeric_value >= 1 && a.numeric_value <= 5
+          );
+          if (validAnswers.length > 0) {
+            const sum = validAnswers.reduce((acc: number, curr: any) => acc + curr.numeric_value, 0);
+            avgSatisfaction = sum / validAnswers.length;
             surveyAverages.push(avgSatisfaction);
           }
         }
@@ -242,13 +246,17 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
           if (responseIds.length > 0) {
             const { data: courseAnswers } = await supabase
               .from('answers')
-              .select('numeric_value')
+              .select('numeric_value, questions!inner(type)')
               .in('response_id', responseIds)
-              .not('numeric_value', 'is', null);
+              .not('numeric_value', 'is', null)
+              .in('questions.type', ['likert', 'rating']);
 
-            if (courseAnswers && courseAnswers.length > 0) {
-              const sum = courseAnswers.reduce((acc, curr) => acc + (curr.numeric_value || 0), 0);
-              const avg = sum / courseAnswers.length;
+            const validCourseAnswers = (courseAnswers || []).filter((a: any) => 
+              a.numeric_value != null && a.numeric_value >= 1 && a.numeric_value <= 5
+            );
+            if (validCourseAnswers.length > 0) {
+              const sum = validCourseAnswers.reduce((acc: number, curr: any) => acc + curr.numeric_value, 0);
+              const avg = sum / validCourseAnswers.length;
               courseSatisfaction.push({
                 id: course.id,
                 name: language === 'ar' ? course.name : (course.name_en || course.name),
