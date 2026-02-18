@@ -393,26 +393,120 @@ const buildPDFDocument = async (
 
   yPos = (doc as any).lastAutoTable.finalY + 12;
 
-  // ============ SUMMARY CHART (captured image) ============
-  if (chartImages && chartImages.length > 0) {
-    const summaryChart = chartImages.find(c => c.type === 'summary');
-    if (summaryChart) {
-      doc.addPage();
-      yPos = 15;
-      yPos = drawSectionHeader(doc, yPos, 'ملخص متوسطات الأسئلة', COLORS.blue, pageWidth, margin, fontLoaded);
-      try {
-        const chartWidth = pageWidth - margin * 2;
-        const chartHeight = 90;
-        doc.setFillColor(255, 255, 255);
-        doc.roundedRect(margin, yPos, chartWidth, chartHeight, 2, 2, 'F');
-        doc.setDrawColor(...COLORS.lightGray);
-        doc.roundedRect(margin, yPos, chartWidth, chartHeight, 2, 2, 'S');
-        doc.addImage(summaryChart.dataUrl, 'PNG', margin + 2, yPos + 2, chartWidth - 4, chartHeight - 4);
-        yPos += chartHeight + 10;
-      } catch (e) {
-        console.error('Summary chart error:', e);
-      }
+  // ============ SUMMARY CHART (programmatic horizontal bar chart) ============
+  const summaryLikertStats = (stats.questionStats || []).filter((q: any) =>
+    (q.type === 'likert' || q.type === 'rating') && typeof q.mean === 'number' && q.mean > 0
+  );
+
+  if (summaryLikertStats.length > 0) {
+    doc.addPage();
+    yPos = 15;
+    yPos = drawSectionHeader(doc, yPos, 'ملخص متوسطات الأسئلة', COLORS.blue, pageWidth, margin, fontLoaded);
+
+    const chartLeft = margin + 25;
+    const chartRight = pageWidth - margin - 10;
+    const maxBarWidth = chartRight - chartLeft;
+    const barHeight = 8;
+    const barGap = 4;
+    const scaleMax = 5;
+
+    // Draw scale line at top
+    doc.setDrawColor(...COLORS.lightGray);
+    doc.setLineWidth(0.3);
+    for (let s = 0; s <= scaleMax; s++) {
+      const sx = chartLeft + (s / scaleMax) * maxBarWidth;
+      doc.setTextColor(...COLORS.muted);
+      doc.setFontSize(7);
+      doc.text(String(s), sx, yPos + 3, { align: 'center' });
     }
+    yPos += 7;
+
+    // Reference line at 3.0
+    const refX = chartLeft + (3.0 / scaleMax) * maxBarWidth;
+
+    for (let idx = 0; idx < summaryLikertStats.length; idx++) {
+      yPos = checkNewPage(doc, yPos, barHeight + barGap + 5, pageHeight);
+
+      const q = summaryLikertStats[idx];
+      const mean = Number(q.mean);
+      const level = getMeanLevel(mean);
+      const bw = (mean / scaleMax) * maxBarWidth;
+
+      // Question label on the right side
+      if (fontLoaded) doc.setFont('Amiri', 'normal');
+      doc.setTextColor(...COLORS.text);
+      doc.setFontSize(7);
+      doc.text(`س${idx + 1}`, margin + 18, yPos + barHeight - 2, { align: 'right' });
+
+      // Draw bar
+      doc.setFillColor(...level.color);
+      if (bw > 0) {
+        doc.roundedRect(chartLeft, yPos, bw, barHeight, 1, 1, 'F');
+      }
+
+      // Mean value label on the bar or next to it
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9);
+      if (bw > 20) {
+        doc.text(mean.toFixed(2), chartLeft + bw - 3, yPos + barHeight - 2, { align: 'right' });
+      } else {
+        doc.setTextColor(...COLORS.text);
+        doc.text(mean.toFixed(2), chartLeft + bw + 2, yPos + barHeight - 2, { align: 'left' });
+      }
+
+      yPos += barHeight + barGap;
+    }
+
+    // Draw reference line at 3.0
+    doc.setDrawColor(...COLORS.red);
+    doc.setLineWidth(0.5);
+    doc.setLineDashPattern([2, 2], 0);
+    const lineTop = yPos - (summaryLikertStats.length * (barHeight + barGap));
+    doc.line(refX, lineTop, refX, yPos - barGap);
+    doc.setLineDashPattern([], 0);
+
+    // Reference line label
+    doc.setTextColor(...COLORS.red);
+    doc.setFontSize(6);
+    doc.text('المتوسط 3.0', refX, yPos + 2, { align: 'center' });
+    yPos += 8;
+
+    // Legend
+    const legendY = yPos;
+    const legendItems = [
+      { label: 'ممتاز (4.5+)', color: COLORS.green },
+      { label: 'جيد جداً (3.5-4.5)', color: COLORS.lightGreen },
+      { label: 'متوسط (2.5-3.5)', color: COLORS.yellow },
+      { label: 'ضعيف (1.5-2.5)', color: COLORS.orange },
+      { label: 'ضعيف جداً (<1.5)', color: COLORS.redText },
+    ];
+    const legendSpacing = (pageWidth - margin * 2) / legendItems.length;
+    for (let li = 0; li < legendItems.length; li++) {
+      const lx = margin + li * legendSpacing;
+      doc.setFillColor(...legendItems[li].color);
+      doc.rect(lx, legendY, 4, 4, 'F');
+      if (fontLoaded) doc.setFont('Amiri', 'normal');
+      doc.setTextColor(...COLORS.text);
+      doc.setFontSize(6);
+      doc.text(legendItems[li].label, lx + 5, legendY + 3.5);
+    }
+    yPos = legendY + 12;
+
+    // Question key table
+    yPos = checkNewPage(doc, yPos, 10 + summaryLikertStats.length * 5, pageHeight);
+    if (fontLoaded) doc.setFont('Amiri', 'normal');
+    doc.setTextColor(...COLORS.muted);
+    doc.setFontSize(7);
+    doc.text('مفتاح الأسئلة:', pageWidth - margin - 4, yPos, { align: 'right' });
+    yPos += 4;
+    for (let idx = 0; idx < summaryLikertStats.length; idx++) {
+      yPos = checkNewPage(doc, yPos, 5, pageHeight);
+      doc.setTextColor(...COLORS.text);
+      doc.setFontSize(6.5);
+      doc.text(`س${idx + 1}: ${(summaryLikertStats[idx].question || '').substring(0, 80)}`, pageWidth - margin - 4, yPos, { align: 'right' });
+      yPos += 4;
+    }
+    yPos += 6;
   }
 
   // ============ PER-QUESTION BAR CHARTS (drawn) ============
@@ -526,7 +620,31 @@ const buildPDFDocument = async (
   yPos = 15;
   yPos = drawSectionHeader(doc, yPos, 'الملخص التنفيذي', COLORS.green, pageWidth, margin, fontLoaded);
 
-  const summaryText = report?.summary?.trim() || 'لا يوجد ملخص تنفيذي. يمكنك توليد ملخص باستخدام زر "إعادة التحليل" بالذكاء الاصطناعي.';
+  // Auto-generate executive summary if empty
+  let summaryText = report?.summary?.trim() || '';
+  if (!summaryText) {
+    const qs = stats.questionStats || [];
+    const likertQs = qs.filter((q: any) => (q.type === 'likert' || q.type === 'rating') && typeof q.mean === 'number' && q.mean > 0);
+    const sortedByMean = [...likertQs].sort((a: any, b: any) => (b.mean || 0) - (a.mean || 0));
+    const highest = sortedByMean[0];
+    const lowest = sortedByMean[sortedByMean.length - 1];
+    const levelLabel = overallMean > 0 ? getMeanLevel(overallMean).label : '';
+    const parts: string[] = [];
+    parts.push(`بلغ إجمالي الاستجابات ${effectiveResponses} استجابة`);
+    if (targetEnrollment > 0 && responseRate !== null) {
+      parts.push(`بنسبة استجابة ${responseRate}% من أصل ${targetEnrollment} طالب`);
+    }
+    if (overallMean > 0) {
+      parts.push(`بمتوسط عام ${overallMean.toFixed(2)} من 5.00 (مستوى ${levelLabel})`);
+    }
+    if (highest) {
+      parts.push(`أعلى سؤال تقييماً: "${(highest.question || '').substring(0, 50)}" بمتوسط ${Number(highest.mean).toFixed(2)}`);
+    }
+    if (lowest && lowest !== highest) {
+      parts.push(`أدنى سؤال تقييماً: "${(lowest.question || '').substring(0, 50)}" بمتوسط ${Number(lowest.mean).toFixed(2)}`);
+    }
+    summaryText = parts.join('. ') + '.';
+  }
   if (fontLoaded) doc.setFont('Amiri', 'normal');
   doc.setFontSize(10);
   const summaryLines = doc.splitTextToSize(summaryText, pageWidth - margin * 2 - 12);
