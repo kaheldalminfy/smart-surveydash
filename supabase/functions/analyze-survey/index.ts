@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { surveyId } = await req.json();
+    const { surveyId, courseName } = await req.json();
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -51,11 +51,12 @@ serve(async (req) => {
           .map((a: any) => a.numeric_value)
           .filter((v: number) => v != null);
 
-        const mean =
-          numericValues.reduce((sum: number, v: number) => sum + v, 0) / numericValues.length;
-        const variance =
-          numericValues.reduce((sum: number, v: number) => sum + Math.pow(v - mean, 2), 0) /
-          numericValues.length;
+        const mean = numericValues.length > 0
+          ? numericValues.reduce((sum: number, v: number) => sum + v, 0) / numericValues.length
+          : 0;
+        const variance = numericValues.length > 0
+          ? numericValues.reduce((sum: number, v: number) => sum + Math.pow(v - mean, 2), 0) / numericValues.length
+          : 0;
         const stdDev = Math.sqrt(variance);
 
         stats.questions_stats.push({
@@ -88,8 +89,19 @@ serve(async (req) => {
     let aiSummary = "";
     let aiRecommendations = "";
 
-    if (textResponses.length > 0) {
-      // Call Lovable AI for analysis
+    // Build course context for AI prompts
+    const courseContext = courseName ? ` للمقرر الدراسي "${courseName}"` : "";
+
+    // Always generate AI analysis - even without text responses, use numeric stats
+    const hasTextResponses = textResponses.length > 0;
+    const hasNumericStats = stats.questions_stats.some((q: any) => q.type === "likert" || q.type === "rating");
+
+    if (hasTextResponses || hasNumericStats) {
+      // Generate summary
+      const summaryPrompt = hasTextResponses
+        ? `قم بتحليل هذه الردود النصية من استبيان "${survey.title}"${courseContext}:\n\n${textResponses.join("\n\n")}\n\nالإحصائيات الرقمية:\n${JSON.stringify(stats.questions_stats.filter((q: any) => q.mean), null, 2)}`
+        : `قم بتحليل نتائج استبيان "${survey.title}"${courseContext} بناءً على الإحصائيات الرقمية التالية:\n\n${JSON.stringify(stats.questions_stats, null, 2)}\n\nعدد الاستجابات الكلي: ${stats.total_responses}`;
+
       const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -102,11 +114,11 @@ serve(async (req) => {
             {
               role: "system",
               content:
-                "أنت محلل بيانات متخصص في تحليل استبيانات التعليم العالي. قم بتحليل الردود النصية واستخرج الموضوعات الرئيسية والمشاعر العامة.",
+                "أنت محلل بيانات متخصص في تحليل استبيانات التعليم العالي. قم بتحليل البيانات واستخرج الموضوعات الرئيسية والمشاعر العامة ونقاط القوة والضعف. قدم تحليلاً شاملاً ومنظماً.",
             },
             {
               role: "user",
-              content: `قم بتحليل هذه الردود النصية من استبيان "${survey.title}":\n\n${textResponses.join("\n\n")}`,
+              content: summaryPrompt,
             },
           ],
         }),
@@ -117,7 +129,9 @@ serve(async (req) => {
         aiSummary = aiData.choices[0].message.content;
       }
 
-      // Generate recommendations
+      // Generate recommendations - always generate based on stats
+      const recPrompt = `بناءً على نتائج الاستبيان التالي${courseContext}:\n\nالإحصائيات: ${JSON.stringify(stats)}\n\n${aiSummary ? `التحليل: ${aiSummary}\n\n` : ''}قدم 3-5 توصيات قابلة للتنفيذ لتحسين الأداء${courseName ? ` في مقرر "${courseName}"` : ''}. يجب أن تكون التوصيات محددة وعملية ومرتبطة بنتائج الاستبيان.`;
+
       const recResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -130,11 +144,11 @@ serve(async (req) => {
             {
               role: "system",
               content:
-                "أنت مستشار تعليمي متخصص في تطوير الجودة. قم بتقديم توصيات قابلة للتنفيذ بناءً على نتائج الاستبيان.",
+                "أنت مستشار تعليمي متخصص في تطوير الجودة. قم بتقديم توصيات قابلة للتنفيذ بناءً على نتائج الاستبيان. التوصيات يجب أن تكون مرقمة وواضحة ومحددة.",
             },
             {
               role: "user",
-              content: `بناءً على نتائج الاستبيان التالي:\n\nالإحصائيات: ${JSON.stringify(stats)}\n\nالتحليل النصي: ${aiSummary}\n\nقدم 3-5 توصيات قابلة للتنفيذ لتحسين الأداء.`,
+              content: recPrompt,
             },
           ],
         }),
