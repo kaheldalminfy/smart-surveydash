@@ -62,6 +62,7 @@ const Reports = () => {
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [manualEnrollment, setManualEnrollment] = useState<string>("");
+  const [courseRecommendations, setCourseRecommendations] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadReport();
@@ -295,6 +296,12 @@ const Reports = () => {
 
   const hasAnswersData = allResponses.some(r => r.answers && r.answers.length > 0);
 
+  // Get current course name from filter
+  const getSelectedCourseName = (): string => {
+    if (!filterQuestion || filterValues.length === 0) return '';
+    return filterValues[0] || '';
+  };
+
   const handleFilterValueChange = (value: string) => {
     const newValues = filterValues.includes(value) 
       ? filterValues.filter(v => v !== value)
@@ -302,6 +309,14 @@ const Reports = () => {
     
     setFilterValues(newValues);
     processDataWithFilter(allQuestions, allResponses, filterQuestion, newValues);
+    
+    // Load saved recommendations for the selected course
+    const courseName = newValues.length > 0 ? newValues[0] : '';
+    if (courseName && courseRecommendations[courseName]) {
+      setEditedRecommendations(courseRecommendations[courseName]);
+    } else if (report?.recommendations_text) {
+      setEditedRecommendations(report.recommendations_text);
+    }
   };
 
   const handleFilterQuestionChange = (questionId: string) => {
@@ -316,6 +331,10 @@ const Reports = () => {
     setFilterValues([]);
     setManualEnrollment("");
     processDataWithFilter(allQuestions, allResponses, "", []);
+    // Reset recommendations to report default
+    if (report?.recommendations_text) {
+      setEditedRecommendations(report.recommendations_text);
+    }
   };
 
   const saveReportMetadata = async () => {
@@ -350,6 +369,12 @@ const Reports = () => {
   };
 
   const handleSaveRecommendations = async () => {
+    // Save per-course if filter is active
+    const courseName = getSelectedCourseName();
+    if (courseName) {
+      setCourseRecommendations(prev => ({ ...prev, [courseName]: editedRecommendations }));
+    }
+
     const { error } = await supabase
       .from("reports")
       .update({ recommendations_text: editedRecommendations })
@@ -360,16 +385,82 @@ const Reports = () => {
       return;
     }
 
-    toast({ title: "تم الحفظ", description: "تم حفظ التوصيات بنجاح" });
+    toast({ title: "تم الحفظ", description: courseName ? `تم حفظ التوصيات لمقرر "${courseName}"` : "تم حفظ التوصيات بنجاح" });
     setEditRecommendationsOpen(false);
     loadReport();
+  };
+
+  // Helper to build filter info for PDF
+  const buildFilterInfo = () => {
+    const courseName = getSelectedCourseName();
+    const manualNum = parseInt(manualEnrollment);
+    if (!courseName) return undefined;
+    return {
+      courseName,
+      manualEnrollment: !isNaN(manualNum) && manualNum > 0 ? manualNum : undefined,
+      filteredCount: filteredResponsesCount,
+    };
+  };
+
+  // Helper to prepare PDF data (excludes filter question, includes distribution)
+  const preparePDFData = () => {
+    const courseName = getSelectedCourseName();
+    // Exclude the filter question from the PDF
+    const pdfAnswers = filterQuestion
+      ? detailedAnswers.filter(q => q.id !== filterQuestion)
+      : detailedAnswers;
+
+    const likertRating = pdfAnswers.filter(q => q.type === 'likert' || q.type === 'rating');
+    const overallMean = likertRating.length > 0
+      ? likertRating.reduce((sum: number, q: any) => sum + (parseFloat(q.mean) || 0), 0) / likertRating.length
+      : 0;
+    const overallStdDev = likertRating.length > 0
+      ? likertRating.reduce((sum: number, q: any) => sum + (parseFloat(q.stdDev) || 0), 0) / likertRating.length
+      : 0;
+
+    const manualNum = parseInt(manualEnrollment);
+    const targetEnrollment = (!isNaN(manualNum) && manualNum > 0) ? manualNum : (survey?.target_enrollment || 0);
+    const responsesCount = filterQuestion && filterValues.length > 0 ? filteredResponsesCount : allResponses.length;
+    const responseRate = targetEnrollment > 0
+      ? Math.min(100, Math.round((responsesCount / targetEnrollment) * 100))
+      : 0;
+
+    const textResponses = pdfAnswers
+      .filter((q: any) => q.type === 'text' && q.textResponses.length > 0)
+      .map((q: any) => ({ question: q.text, responses: q.textResponses }));
+
+    const stats = {
+      totalResponses: responsesCount,
+      targetEnrollment,
+      responseRate,
+      overallMean,
+      overallStdDev,
+      questionStats: pdfAnswers.map((q: any) => ({
+        question: q.text,
+        type: q.type,
+        mean: parseFloat(q.mean) || 0,
+        stdDev: parseFloat(q.stdDev) || 0,
+        responseCount: q.responseCount,
+        distribution: q.distribution,
+        mcqDistribution: q.mcqDistribution,
+      })),
+    };
+
+    // Use per-course recommendations if available
+    const reportForPDF = { ...report };
+    if (courseName && courseRecommendations[courseName]) {
+      reportForPDF.recommendations_text = courseRecommendations[courseName];
+    }
+
+    return { stats, textResponses, pdfAnswers, reportForPDF };
   };
 
   const generateReport = async () => {
     setIsGenerating(true);
     try {
+      const courseName = getSelectedCourseName();
       const { data, error } = await supabase.functions.invoke("analyze-survey", {
-        body: { surveyId: id },
+        body: { surveyId: id, courseName: courseName || undefined },
       });
 
       if (error) throw error;
@@ -389,83 +480,26 @@ const Reports = () => {
     toast({ title: "جاري التصدير", description: "يتم التقاط الرسوم البيانية..." });
 
     try {
+      const { stats, textResponses, pdfAnswers, reportForPDF } = preparePDFData();
+      const filterInfo = buildFilterInfo();
+
       // Capture chart images
       const chartImages: Array<{ id: string; dataUrl: string; title: string; type: 'likert' | 'mcq' | 'summary' }> = [];
-      
-      // Capture summary chart
       const summaryChart = await captureChartAsImage('summary-chart', 'ملخص متوسطات الأسئلة', 'summary');
       if (summaryChart) chartImages.push(summaryChart);
 
-      // Capture individual question charts
-      for (let i = 0; i < detailedAnswers.length; i++) {
-        const q = detailedAnswers[i];
+      for (let i = 0; i < pdfAnswers.length; i++) {
+        const q = pdfAnswers[i];
         if (q.type === 'likert' || q.type === 'rating') {
-          const chart = await captureChartAsImage(
-            `chart-likert-${q.id}`,
-            `س${i + 1}: ${q.text.substring(0, 50)}${q.text.length > 50 ? '...' : ''}`,
-            'likert'
-          );
+          const chart = await captureChartAsImage(`chart-likert-${q.id}`, `س${i + 1}: ${q.text.substring(0, 50)}`, 'likert');
           if (chart) chartImages.push(chart);
         } else if (q.type === 'mcq') {
-          const chart = await captureChartAsImage(
-            `chart-mcq-${q.id}`,
-            `س${i + 1}: ${q.text.substring(0, 50)}${q.text.length > 50 ? '...' : ''}`,
-            'mcq'
-          );
+          const chart = await captureChartAsImage(`chart-mcq-${q.id}`, `س${i + 1}: ${q.text.substring(0, 50)}`, 'mcq');
           if (chart) chartImages.push(chart);
         }
       }
 
-      // Prepare text responses
-      const textResponses = detailedAnswers
-        .filter(q => q.type === 'text' && q.textResponses.length > 0)
-        .map(q => ({
-          question: q.text,
-          responses: q.textResponses,
-        }));
-
-      // Prepare stats
-      const likertRatingQuestions = detailedAnswers.filter(q => q.type === 'likert' || q.type === 'rating');
-      const overallMean = likertRatingQuestions.length > 0
-        ? likertRatingQuestions.reduce((sum, q) => sum + (parseFloat(q.mean) || 0), 0) / likertRatingQuestions.length
-        : 0;
-      
-      const overallStdDev = likertRatingQuestions.length > 0
-        ? likertRatingQuestions.reduce((sum, q) => sum + (parseFloat(q.stdDev) || 0), 0) / likertRatingQuestions.length
-        : 0;
-
-      // Calculate response rate
-      const targetEnrollment = survey?.target_enrollment || 0;
-      const responseRate = targetEnrollment > 0 
-        ? Math.min(100, Math.round((allResponses.length / targetEnrollment) * 100))
-        : 0;
-
-      const stats = {
-        totalResponses: allResponses.length,
-        targetEnrollment,
-        responseRate,
-        overallMean,
-        overallStdDev,
-        questionStats: detailedAnswers.map(q => ({
-          question: q.text,
-          type: q.type,
-          mean: parseFloat(q.mean) || 0,
-          stdDev: parseFloat(q.stdDev) || 0,
-          responseCount: q.responseCount,
-        })),
-      };
-
-      // Export PDF
-      await exportToPDF(
-        report,
-        survey,
-        stats,
-        collegeLogo,
-        chartImages,
-        textResponses,
-        collegeName
-      );
-
+      await exportToPDF(reportForPDF, survey, stats, collegeLogo, chartImages, textResponses, collegeName, filterInfo);
       toast({ title: "تم التصدير", description: "تم تصدير التقرير بنجاح" });
     } catch (error) {
       console.error("Export error:", error);
@@ -482,40 +516,10 @@ const Reports = () => {
     setPdfBlob(null);
 
     try {
-      const likertRatingQuestions = detailedAnswers.filter(q => q.type === 'likert' || q.type === 'rating');
-      const overallMean = likertRatingQuestions.length > 0
-        ? likertRatingQuestions.reduce((sum, q) => sum + (parseFloat(q.mean) || 0), 0) / likertRatingQuestions.length
-        : 0;
-      
-      const overallStdDev = likertRatingQuestions.length > 0
-        ? likertRatingQuestions.reduce((sum, q) => sum + (parseFloat(q.stdDev) || 0), 0) / likertRatingQuestions.length
-        : 0;
+      const { stats, textResponses, reportForPDF } = preparePDFData();
+      const filterInfo = buildFilterInfo();
 
-      const targetEnrollment = survey?.target_enrollment || 0;
-      const responseRate = targetEnrollment > 0 
-        ? Math.min(100, Math.round((allResponses.length / targetEnrollment) * 100))
-        : 0;
-
-      const textResponses = detailedAnswers
-        .filter(q => q.type === 'text' && q.textResponses.length > 0)
-        .map(q => ({ question: q.text, responses: q.textResponses }));
-
-      const stats = {
-        totalResponses: allResponses.length,
-        targetEnrollment,
-        responseRate,
-        overallMean,
-        overallStdDev,
-        questionStats: detailedAnswers.map(q => ({
-          question: q.text,
-          type: q.type,
-          mean: parseFloat(q.mean) || 0,
-          stdDev: parseFloat(q.stdDev) || 0,
-          responseCount: q.responseCount,
-        })),
-      };
-
-      const blob = await generatePDFBlob(report, survey, stats, collegeLogo, [], textResponses, collegeName);
+      const blob = await generatePDFBlob(reportForPDF, survey, stats, collegeLogo, [], textResponses, collegeName, filterInfo);
       setPdfBlob(blob);
     } catch (error) {
       console.error("Preview error:", error);
