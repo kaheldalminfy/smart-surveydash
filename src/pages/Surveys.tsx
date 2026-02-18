@@ -1,12 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, BarChart3, Link2, QrCode, Edit, Trash2, FileText } from "lucide-react";
+import { Plus, Search, BarChart3, Link2, QrCode, Edit, Trash2, FileText, Filter } from "lucide-react";
 import DashboardButton from "@/components/DashboardButton";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -25,6 +26,32 @@ const Surveys = () => {
     title: string;
     link: string;
   } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [programSearchQueries, setProgramSearchQueries] = useState<Record<string, string>>({});
+  const [programStatusFilters, setProgramStatusFilters] = useState<Record<string, 'all' | 'active' | 'draft' | 'closed'>>({});
+
+  const groupedSurveys = useMemo(() => {
+    const filtered = surveys.filter(s => 
+      !searchQuery || s.title?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    const groups: Record<string, any[]> = {};
+    filtered.forEach(survey => {
+      const programName = survey.programs?.name || "بدون برنامج";
+      if (!groups[programName]) groups[programName] = [];
+      groups[programName].push(survey);
+    });
+    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b, 'ar'));
+  }, [surveys, searchQuery]);
+
+  const getFilteredProgramSurveys = (programName: string, programSurveys: any[]) => {
+    const localSearch = programSearchQueries[programName] || "";
+    const statusFilter = programStatusFilters[programName] || "all";
+    return programSurveys.filter(s => {
+      const matchesSearch = !localSearch || s.title?.toLowerCase().includes(localSearch.toLowerCase());
+      const matchesStatus = statusFilter === "all" || s.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  };
 
   useEffect(() => {
     loadSurveys();
@@ -325,6 +352,8 @@ const Surveys = () => {
                 <Input 
                   placeholder="البحث في الاستبيانات..."
                   className="pr-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
             </div>
@@ -333,7 +362,7 @@ const Surveys = () => {
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
               </div>
-            ) : surveys.length === 0 ? (
+            ) : groupedSurveys.length === 0 ? (
               <Card>
                 <CardContent className="text-center py-12">
                   <p className="text-muted-foreground mb-4">لا توجد استبيانات حالياً</p>
@@ -346,90 +375,128 @@ const Surveys = () => {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 gap-6">
-                {surveys.map((survey) => {
-                  const status = getSurveyStatus(survey);
-                  const responsesCount = survey.responses?.[0]?.count || 0;
-                  
+              <Accordion type="multiple" defaultValue={groupedSurveys.map(([name]) => name)} className="space-y-4">
+                {groupedSurveys.map(([programName, programSurveys]) => {
+                  const filteredSurveys = getFilteredProgramSurveys(programName, programSurveys);
+                  const currentFilter = programStatusFilters[programName] || "all";
+
                   return (
-                    <Card key={survey.id} className="hover-scale">
-                      <CardHeader>
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <CardTitle className="text-xl">{survey.title}</CardTitle>
-                              <Badge variant={status.variant}>
-                                {status.label}
-                              </Badge>
-                            </div>
-                            <CardDescription>
-                              برنامج {survey.programs?.name} • 
-                              {survey.start_date && ` ${new Date(survey.start_date).toLocaleDateString('ar-SA')}`}
-                              {survey.end_date && ` إلى ${new Date(survey.end_date).toLocaleDateString('ar-SA')}`}
-                            </CardDescription>
-                          </div>
+                    <AccordionItem key={programName} value={programName} className="border rounded-lg bg-card shadow-sm">
+                      <AccordionTrigger className="px-4 hover:no-underline">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg font-semibold">{programName}</span>
+                          <Badge variant="secondary">{programSurveys.length}</Badge>
                         </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-6 text-sm">
-                            <div>
-                              <span className="font-semibold">{responsesCount}</span>
-                              <span className="text-muted-foreground"> استجابة</span>
-                            </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 pb-4">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-4 pt-2">
+                          <div className="relative flex-1 w-full sm:max-w-xs">
+                            <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              placeholder="بحث داخل البرنامج..."
+                              className="pr-10 h-9"
+                              value={programSearchQueries[programName] || ""}
+                              onChange={(e) => setProgramSearchQueries(prev => ({ ...prev, [programName]: e.target.value }))}
+                            />
                           </div>
-                          <div className="flex gap-2 flex-wrap">
-                            <Button 
-                              variant={survey.status === "active" ? "destructive" : "default"}
-                              size="sm"
-                              onClick={() => toggleSurveyStatus(survey.id, survey.status)}
-                            >
-                              {survey.status === "active" ? "إيقاف" : "تفعيل"}
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => navigate(`/surveys/edit/${survey.id}`)}
-                            >
-                              <Edit className="h-4 w-4 ml-2" />
-                              تعديل
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => showQRCode(survey)}
-                            >
-                              <QrCode className="h-4 w-4 ml-2" />
-                              QR
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => copyLink(survey.id)}
-                            >
-                              <Link2 className="h-4 w-4 ml-2" />
-                              رابط
-                            </Button>
-                            <Link to={`/reports/${survey.id}`}>
-                              <Button variant="accent" size="sm">
-                                <BarChart3 className="h-4 w-4 ml-2" />
-                                التقرير
+                          <div className="flex gap-1 flex-wrap">
+                            {([
+                              { key: 'all' as const, label: 'الكل' },
+                              { key: 'active' as const, label: 'نشط' },
+                              { key: 'draft' as const, label: 'مسودة' },
+                              { key: 'closed' as const, label: 'مغلق' },
+                            ]).map(({ key, label }) => (
+                              <Button
+                                key={key}
+                                variant={currentFilter === key ? "default" : "outline"}
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={() => setProgramStatusFilters(prev => ({ ...prev, [programName]: key }))}
+                              >
+                                {label}
                               </Button>
-                            </Link>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => setDeleteDialog({open: true, id: survey.id, type: 'survey'})}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            ))}
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
+
+                        {filteredSurveys.length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-4">لا توجد نتائج</p>
+                        ) : (
+                          <div className="grid grid-cols-1 gap-4">
+                            {filteredSurveys.map((survey) => {
+                              const status = getSurveyStatus(survey);
+                              const responsesCount = survey.responses?.[0]?.count || 0;
+
+                              return (
+                                <Card key={survey.id} className="hover-scale">
+                                  <CardHeader className="pb-2">
+                                    <div className="flex justify-between items-start">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <CardTitle className="text-lg">{survey.title}</CardTitle>
+                                          <Badge variant={status.variant}>{status.label}</Badge>
+                                        </div>
+                                        <CardDescription>
+                                          {survey.start_date && `${new Date(survey.start_date).toLocaleDateString('ar-SA')}`}
+                                          {survey.end_date && ` إلى ${new Date(survey.end_date).toLocaleDateString('ar-SA')}`}
+                                        </CardDescription>
+                                      </div>
+                                    </div>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-6 text-sm">
+                                        <div>
+                                          <span className="font-semibold">{responsesCount}</span>
+                                          <span className="text-muted-foreground"> استجابة</span>
+                                        </div>
+                                      </div>
+                                      <div className="flex gap-2 flex-wrap">
+                                        <Button
+                                          variant={survey.status === "active" ? "destructive" : "default"}
+                                          size="sm"
+                                          onClick={() => toggleSurveyStatus(survey.id, survey.status)}
+                                        >
+                                          {survey.status === "active" ? "إيقاف" : "تفعيل"}
+                                        </Button>
+                                        <Button variant="outline" size="sm" onClick={() => navigate(`/surveys/edit/${survey.id}`)}>
+                                          <Edit className="h-4 w-4 ml-2" />
+                                          تعديل
+                                        </Button>
+                                        <Button variant="outline" size="sm" onClick={() => showQRCode(survey)}>
+                                          <QrCode className="h-4 w-4 ml-2" />
+                                          QR
+                                        </Button>
+                                        <Button variant="outline" size="sm" onClick={() => copyLink(survey.id)}>
+                                          <Link2 className="h-4 w-4 ml-2" />
+                                          رابط
+                                        </Button>
+                                        <Link to={`/reports/${survey.id}`}>
+                                          <Button variant="accent" size="sm">
+                                            <BarChart3 className="h-4 w-4 ml-2" />
+                                            التقرير
+                                          </Button>
+                                        </Link>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => setDeleteDialog({ open: true, id: survey.id, type: 'survey' })}
+                                        >
+                                          <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </AccordionContent>
+                    </AccordionItem>
                   );
                 })}
-              </div>
+              </Accordion>
             )}
           </TabsContent>
 
