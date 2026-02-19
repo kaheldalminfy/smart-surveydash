@@ -433,7 +433,7 @@ const Reports = () => {
       .filter((q: any) => q.type === 'text' && q.textResponses.length > 0)
       .map((q: any) => ({ question: q.text, responses: q.textResponses }));
 
-    const stats = {
+    const stats: any = {
       totalResponses: responsesCount,
       targetEnrollment,
       responseRate,
@@ -449,6 +449,81 @@ const Reports = () => {
         mcqDistribution: q.mcqDistribution,
       })),
     };
+
+    // When no filter is selected, calculate coursesSummary for comprehensive report
+    if (!courseName && allQuestions.length > 0 && allResponses.length > 0) {
+      // Find the MCQ question that represents courses
+      const courseQuestion = allQuestions.find(q => 
+        q.type === 'mcq' && (
+          (q.text && (q.text.includes('مقرر') || q.text.includes('المقرر') || q.text.includes('المادة'))) ||
+          false
+        )
+      ) || allQuestions.find(q => q.type === 'mcq');
+
+      if (courseQuestion) {
+        // Get all unique course names from answers
+        const courseNames = new Set<string>();
+        allResponses.forEach((response: any) => {
+          const answer = response.answers?.find((a: any) => a.question_id === courseQuestion.id);
+          if (answer?.value && String(answer.value).trim()) {
+            courseNames.add(String(answer.value).trim());
+          }
+        });
+
+        // Get likert/rating questions (excluding the course question)
+        const likertQuestions = allQuestions.filter(q => 
+          (q.type === 'likert' || q.type === 'rating') && q.id !== courseQuestion.id
+        );
+
+        const coursesSummary: Array<{
+          courseName: string;
+          responseCount: number;
+          overallMean: number;
+          questionMeans: Array<{ question: string; mean: number }>;
+        }> = [];
+
+        courseNames.forEach(cName => {
+          // Filter responses for this course
+          const courseResponses = allResponses.filter((response: any) => {
+            const answer = response.answers?.find((a: any) => a.question_id === courseQuestion.id);
+            return answer && String(answer.value || '').trim() === cName;
+          });
+
+          const questionMeans: Array<{ question: string; mean: number }> = [];
+          let totalMean = 0;
+          let meanCount = 0;
+
+          likertQuestions.forEach((q: any) => {
+            const numericValues = courseResponses
+              .map((r: any) => {
+                const a = r.answers?.find((a: any) => a.question_id === q.id);
+                return a?.numeric_value;
+              })
+              .filter((v: any) => v !== null && v !== undefined);
+
+            if (numericValues.length > 0) {
+              const mean = numericValues.reduce((s: number, v: number) => s + v, 0) / numericValues.length;
+              questionMeans.push({ question: q.text, mean });
+              totalMean += mean;
+              meanCount++;
+            }
+          });
+
+          const overallCourseMean = meanCount > 0 ? totalMean / meanCount : 0;
+
+          coursesSummary.push({
+            courseName: cName,
+            responseCount: courseResponses.length,
+            overallMean: overallCourseMean,
+            questionMeans,
+          });
+        });
+
+        // Sort by mean descending
+        coursesSummary.sort((a, b) => b.overallMean - a.overallMean);
+        stats.coursesSummary = coursesSummary;
+      }
+    }
 
     // Use per-course recommendations if available
     const reportForPDF = { ...report };
