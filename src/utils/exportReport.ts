@@ -621,27 +621,31 @@ const buildPDFDocument = async (
   yPos = drawSectionHeader(doc, yPos, 'الملخص التنفيذي', COLORS.green, pageWidth, margin, fontLoaded);
 
   // Auto-generate executive summary if empty
-  let summaryText = report?.summary?.trim() || '';
+  let summaryText = (report?.summary && typeof report.summary === 'string' && report.summary.trim().length > 0) ? report.summary.trim() : '';
   if (!summaryText) {
     const qs = stats.questionStats || [];
     const likertQs = qs.filter((q: any) => (q.type === 'likert' || q.type === 'rating') && typeof q.mean === 'number' && q.mean > 0);
-    const sortedByMean = [...likertQs].sort((a: any, b: any) => (b.mean || 0) - (a.mean || 0));
-    const highest = sortedByMean[0];
-    const lowest = sortedByMean[sortedByMean.length - 1];
-    const levelLabel = overallMean > 0 ? getMeanLevel(overallMean).label : '';
     const parts: string[] = [];
     parts.push(`بلغ إجمالي الاستجابات ${effectiveResponses} استجابة`);
     if (targetEnrollment > 0 && responseRate !== null) {
       parts.push(`بنسبة استجابة ${responseRate}% من أصل ${targetEnrollment} طالب`);
     }
-    if (overallMean > 0) {
-      parts.push(`بمتوسط عام ${overallMean.toFixed(2)} من 5.00 (مستوى ${levelLabel})`);
-    }
-    if (highest) {
-      parts.push(`أعلى سؤال تقييماً: "${(highest.question || '').substring(0, 50)}" بمتوسط ${Number(highest.mean).toFixed(2)}`);
-    }
-    if (lowest && lowest !== highest) {
-      parts.push(`أدنى سؤال تقييماً: "${(lowest.question || '').substring(0, 50)}" بمتوسط ${Number(lowest.mean).toFixed(2)}`);
+    if (likertQs.length > 0) {
+      const sortedByMean = [...likertQs].sort((a: any, b: any) => (b.mean || 0) - (a.mean || 0));
+      const highest = sortedByMean[0];
+      const lowest = sortedByMean[sortedByMean.length - 1];
+      const levelLabel = overallMean > 0 ? getMeanLevel(overallMean).label : '';
+      if (overallMean > 0) {
+        parts.push(`بمتوسط عام ${overallMean.toFixed(2)} من 5.00 (مستوى ${levelLabel})`);
+      }
+      if (highest) {
+        parts.push(`أعلى سؤال تقييماً: "${(highest.question || '').substring(0, 50)}" بمتوسط ${Number(highest.mean).toFixed(2)}`);
+      }
+      if (lowest && lowest !== highest) {
+        parts.push(`أدنى سؤال تقييماً: "${(lowest.question || '').substring(0, 50)}" بمتوسط ${Number(lowest.mean).toFixed(2)}`);
+      }
+    } else {
+      parts.push(`يحتوي الاستبيان على ${qs.length} أسئلة`);
     }
     summaryText = parts.join('. ') + '.';
   }
@@ -662,7 +666,9 @@ const buildPDFDocument = async (
   yPos = checkNewPage(doc, yPos, 50, pageHeight);
   yPos = drawSectionHeader(doc, yPos, 'التوصيات', COLORS.red, pageWidth, margin, fontLoaded);
 
-  const recText = report?.recommendations_text?.trim() || 'لا توجد توصيات. يمكنك توليد توصيات باستخدام زر "إعادة التحليل" بالذكاء الاصطناعي.';
+  const recText = (report?.recommendations_text && typeof report.recommendations_text === 'string' && report.recommendations_text.trim().length > 0) 
+    ? report.recommendations_text.trim() 
+    : 'لا توجد توصيات. يمكنك توليد توصيات باستخدام زر "إعادة التحليل" بالذكاء الاصطناعي.';
   doc.setFontSize(10);
   const recLines = doc.splitTextToSize(recText, pageWidth - margin * 2 - 12);
   const recHeight = Math.max(recLines.length * 5 + 10, 25);

@@ -63,6 +63,7 @@ const Reports = () => {
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [manualEnrollment, setManualEnrollment] = useState<string>("");
   const [courseRecommendations, setCourseRecommendations] = useState<Record<string, string>>({});
+  const [filteredResponseCount, setFilteredResponseCount] = useState(0);
 
   useEffect(() => {
     loadReport();
@@ -172,6 +173,9 @@ const Reports = () => {
                normalizedFilterVals.includes(numericValueNormalized);
       });
     }
+
+    // Save the actual filtered response count
+    setFilteredResponseCount(filteredResponses.length);
 
     const processedData = questions.map((question) => {
       const answersForQuestion = filteredResponses.flatMap((response, index) => {
@@ -615,7 +619,7 @@ const Reports = () => {
     .reduce((sum, q) => sum + q.textResponses.length, 0);
 
   const filteredResponsesCount = filterQuestion && filterValues.length > 0 
-    ? detailedAnswers[0]?.responseCount || 0 
+    ? filteredResponseCount 
     : totalResponses;
 
   return (
