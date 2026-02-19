@@ -15,11 +15,12 @@ import { useToast } from "@/hooks/use-toast";
 const PROGRAM_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'];
 
 const SURVEY_TYPE_KEYWORDS: { keywords: string[]; label: string }[] = [
-  { keywords: ['تقييم الطلاب للمقرر', 'تقييم المقرر', 'رضا الطلاب عن المقرر'], label: 'رضا الطلاب عن المقررات' },
-  { keywords: ['عضو هيئة التدريس', 'هيئة تدريس', 'رضا أعضاء'], label: 'رضا أعضاء هيئة التدريس' },
-  { keywords: ['الامتحان النهائي', 'امتحان نهائي', 'الاختبار النهائي'], label: 'رضا الطلاب عن الامتحان النهائي' },
-  { keywords: ['تقييم الخريج', 'خريجين', 'الخريج'], label: 'تقييم الخريجين' },
-  { keywords: ['ورشة عمل', 'ورش عمل'], label: 'تقييم ورش العمل' },
+  { keywords: ['تقييم الطلاب للمقرر', 'تقييم المقرر', 'رضا الطلاب عن المقرر', 'نموذج تقييم الطلاب للمقرر', 'استبانة تقييم الطلاب للمقرر'], label: 'رضا الطلاب عن المقررات' },
+  { keywords: ['عضو هيئة التدريس', 'هيئة تدريس', 'رضا أعضاء', 'رضا عضو هيئة التدريس عن جودة', 'استبانة تقييم عضو هيئة التدريس'], label: 'رضا أعضاء هيئة التدريس' },
+  { keywords: ['الامتحان النهائي', 'امتحان نهائي', 'الاختبار النهائي', 'نموذج تقييم مدى رضا الطالب عن الامتحان'], label: 'رضا الطلاب عن الامتحان النهائي' },
+  { keywords: ['تقييم الخريج', 'خريجين', 'الخريج', 'ورشة عمل للخريجين'], label: 'تقييم الخريجين' },
+  { keywords: ['ورشة عمل', 'ورش عمل', 'تقييم ورشة عمل'], label: 'تقييم ورش العمل' },
+  { keywords: ['تقييم جودة البرنامج', 'تقييم البرنامج'], label: 'تقييم البرنامج الأكاديمي' },
 ];
 
 function classifySurveyTitle(title: string): string {
@@ -28,6 +29,115 @@ function classifySurveyTitle(title: string): string {
     if (keywords.some(k => normalized.includes(k))) return label;
   }
   return normalized;
+}
+
+// --- Question-based similarity matching ---
+
+function normalizeText(text: string): string {
+  return text
+    .replace(/[^\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF\w\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function wordSimilarity(a: string, b: string): number {
+  const wordsA = new Set(normalizeText(a).split(' ').filter(w => w.length > 1));
+  const wordsB = new Set(normalizeText(b).split(' ').filter(w => w.length > 1));
+  if (wordsA.size === 0 && wordsB.size === 0) return 1;
+  if (wordsA.size === 0 || wordsB.size === 0) return 0;
+  let common = 0;
+  for (const w of wordsA) { if (wordsB.has(w)) common++; }
+  return common / Math.max(wordsA.size, wordsB.size);
+}
+
+function questionsMatch(qA: string, qB: string): boolean {
+  const nA = normalizeText(qA);
+  const nB = normalizeText(qB);
+  if (nA.includes(nB) || nB.includes(nA)) return true;
+  return wordSimilarity(qA, qB) >= 0.7;
+}
+
+function calculateQuestionsSimilarity(questionsA: string[], questionsB: string[]): number {
+  if (questionsA.length === 0 && questionsB.length === 0) return 1;
+  if (questionsA.length === 0 || questionsB.length === 0) return 0;
+  const usedB = new Set<number>();
+  let matches = 0;
+  for (const qA of questionsA) {
+    for (let j = 0; j < questionsB.length; j++) {
+      if (!usedB.has(j) && questionsMatch(qA, questionsB[j])) {
+        matches++;
+        usedB.add(j);
+        break;
+      }
+    }
+  }
+  return matches / Math.max(questionsA.length, questionsB.length);
+}
+
+interface SurveyWithQuestions {
+  id: string;
+  title: string;
+  programId: string;
+  likertQuestions: string[];
+  scores: number[];
+  responseCount: number;
+}
+
+interface SurveyCluster {
+  label: string;
+  surveys: SurveyWithQuestions[];
+}
+
+function clusterSurveys(allSurveys: SurveyWithQuestions[]): SurveyCluster[] {
+  const clusters: SurveyCluster[] = [];
+  const SIMILARITY_THRESHOLD = 0.5;
+
+  for (const survey of allSurveys) {
+    let bestCluster: SurveyCluster | null = null;
+    let bestScore = 0;
+
+    for (const cluster of clusters) {
+      // Compare with first survey in cluster (representative)
+      const rep = cluster.surveys[0];
+      // Try question similarity first
+      const qSim = calculateQuestionsSimilarity(survey.likertQuestions, rep.likertQuestions);
+      if (qSim >= SIMILARITY_THRESHOLD && qSim > bestScore) {
+        bestScore = qSim;
+        bestCluster = cluster;
+      }
+    }
+
+    if (bestCluster) {
+      bestCluster.surveys.push(survey);
+    } else {
+      // Check if keyword fallback groups it with an existing cluster
+      const surveyType = classifySurveyTitle(survey.title);
+      const existingByKeyword = clusters.find(c => {
+        const repType = classifySurveyTitle(c.surveys[0].title);
+        return repType === surveyType && surveyType !== survey.title.trim();
+      });
+      if (existingByKeyword) {
+        existingByKeyword.surveys.push(survey);
+      } else {
+        clusters.push({ label: surveyType, surveys: [survey] });
+      }
+    }
+  }
+
+  // Smart labeling: use shortest title or keyword label
+  for (const cluster of clusters) {
+    const keywordLabel = classifySurveyTitle(cluster.surveys[0].title);
+    if (keywordLabel !== cluster.surveys[0].title.trim()) {
+      cluster.label = keywordLabel;
+    } else {
+      // Use shortest title in cluster
+      cluster.label = cluster.surveys.reduce((shortest, s) =>
+        s.title.length < shortest.length ? s.title : shortest
+      , cluster.surveys[0].title);
+    }
+  }
+
+  return clusters;
 }
 
 interface ProgramSurveyData {
@@ -110,14 +220,14 @@ const ProgramComparison = () => {
 
     setLoading(true);
     try {
-      // For each program, fetch surveys with responses and answers
-      const programSurveyMap: Record<string, { title: string; scores: number[]; responseCount: number }[]> = {};
+      const allSurveysFlat: SurveyWithQuestions[] = [];
 
       for (const programId of selectedPrograms) {
         let query = supabase
           .from("surveys")
           .select(`
             id, title,
+            questions (id, text, type, order_index),
             responses (
               id,
               answers (
@@ -134,61 +244,64 @@ const ProgramComparison = () => {
         }
 
         const { data: surveys } = await query;
-        if (!surveys) { programSurveyMap[programId] = []; continue; }
+        if (!surveys) continue;
 
-        programSurveyMap[programId] = surveys.map(s => {
+        for (const s of surveys) {
+          // Extract likert/rating question texts
+          const likertQuestions = ((s.questions || []) as any[])
+            .filter((q: any) => q.type === 'likert' || q.type === 'rating')
+            .sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0))
+            .map((q: any) => q.text);
+
+          // Extract scores
           const scores: number[] = [];
           let respCount = 0;
           for (const r of (s.responses || [])) {
             respCount++;
-            for (const a of (r.answers || [])) {
+            for (const a of (r.answers || []) as any[]) {
               const q = a.questions as any;
               if ((q?.type === 'likert' || q?.type === 'rating') && a.numeric_value && a.numeric_value >= 1 && a.numeric_value <= 5) {
                 scores.push(a.numeric_value);
               }
             }
           }
-          return { title: s.title, scores, responseCount: respCount };
-        });
-      }
 
-      // Group by survey type across programs
-      const allTypesMap: Record<string, Record<string, { scores: number[]; responseCount: number }>> = {};
-
-      for (const programId of selectedPrograms) {
-        const surveys = programSurveyMap[programId];
-        // Group surveys of same program by type
-        const byType: Record<string, { scores: number[]; responseCount: number }> = {};
-        for (const s of surveys) {
-          const type = classifySurveyTitle(s.title);
-          if (!byType[type]) byType[type] = { scores: [], responseCount: 0 };
-          byType[type].scores.push(...s.scores);
-          byType[type].responseCount += s.responseCount;
-        }
-        for (const [type, data] of Object.entries(byType)) {
-          if (!allTypesMap[type]) allTypesMap[type] = {};
-          allTypesMap[type][programId] = data;
+          allSurveysFlat.push({
+            id: s.id,
+            title: s.title,
+            programId,
+            likertQuestions,
+            scores,
+            responseCount: respCount,
+          });
         }
       }
 
-      // Build surveyTypes
-      const surveyTypes: SurveyTypeComparison[] = Object.entries(allTypesMap).map(([title, progMap]) => ({
-        title,
-        programData: selectedProgramsWithColors.map(p => {
-          const d = progMap[p.id];
-          if (!d || d.scores.length === 0) {
-            return { programId: p.id, programName: p.name, averageScore: 0, responseCount: d?.responseCount || 0, exists: !!d };
-          }
-          const avg = d.scores.reduce((a, b) => a + b, 0) / d.scores.length;
-          return { programId: p.id, programName: p.name, averageScore: parseFloat(avg.toFixed(2)), responseCount: d.responseCount, exists: true };
-        }),
-      }));
+      // Cluster surveys by question similarity
+      const clusters = clusterSurveys(allSurveysFlat);
+
+      // Build surveyTypes from clusters
+      const surveyTypes: SurveyTypeComparison[] = clusters.map(cluster => {
+        return {
+          title: cluster.label,
+          programData: selectedProgramsWithColors.map(p => {
+            const programSurveys = cluster.surveys.filter(s => s.programId === p.id);
+            if (programSurveys.length === 0) {
+              return { programId: p.id, programName: p.name, averageScore: 0, responseCount: 0, exists: false };
+            }
+            const allScores = programSurveys.flatMap(s => s.scores);
+            const totalResp = programSurveys.reduce((sum, s) => sum + s.responseCount, 0);
+            const avg = allScores.length > 0 ? allScores.reduce((a, b) => a + b, 0) / allScores.length : 0;
+            return { programId: p.id, programName: p.name, averageScore: parseFloat(avg.toFixed(2)), responseCount: totalResp, exists: true };
+          }),
+        };
+      });
 
       // Build overall
       const overall: OverallData[] = selectedProgramsWithColors.map(p => {
-        const surveys = programSurveyMap[p.id];
-        const allScores = surveys.flatMap(s => s.scores);
-        const totalResponses = surveys.reduce((sum, s) => sum + s.responseCount, 0);
+        const programSurveys = allSurveysFlat.filter(s => s.programId === p.id);
+        const allScores = programSurveys.flatMap(s => s.scores);
+        const totalResponses = programSurveys.reduce((sum, s) => sum + s.responseCount, 0);
         const mean = allScores.length > 0 ? allScores.reduce((a, b) => a + b, 0) / allScores.length : 0;
         return {
           programName: p.name,
@@ -196,7 +309,7 @@ const ProgramComparison = () => {
           color: p.color,
           overallMean: parseFloat(mean.toFixed(2)),
           totalResponses,
-          totalSurveys: surveys.length,
+          totalSurveys: programSurveys.length,
           satisfactionRate: ((mean / 5) * 100).toFixed(1),
         };
       });
