@@ -393,6 +393,64 @@ const buildPDFDocument = async (
 
   yPos = (doc as any).lastAutoTable.finalY + 12;
 
+  // ============ COURSES SUMMARY TABLE (only when no filter / comprehensive report) ============
+  if (!filterInfo?.courseName && stats.coursesSummary && stats.coursesSummary.length > 0) {
+    yPos = checkNewPage(doc, yPos, 40, pageHeight);
+    yPos = drawSectionHeader(doc, yPos, 'ملخص المقررات الدراسية', COLORS.darkBlue, pageWidth, margin, fontLoaded);
+
+    const coursesTableData = stats.coursesSummary.map((course: any, idx: number) => {
+      const mean = Number(course.overallMean) || 0;
+      const level = getMeanLevel(mean);
+      return [
+        level.label,
+        mean > 0 ? mean.toFixed(2) : '-',
+        String(course.responseCount || 0),
+        course.courseName || '',
+        String(idx + 1),
+      ];
+    });
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [['مستوى الأداء', 'المتوسط العام', 'عدد الاستجابات', 'اسم المقرر', '#']],
+      body: coursesTableData,
+      styles: { font: fontLoaded ? 'Amiri' : 'helvetica', fontStyle: 'normal', fontSize: 9, cellPadding: 3, halign: 'center' },
+      headStyles: { fillColor: COLORS.darkBlue, halign: 'center', fontStyle: 'normal', textColor: [255, 255, 255] },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 28 },
+        1: { halign: 'center', cellWidth: 22 },
+        2: { halign: 'center', cellWidth: 25 },
+        3: { halign: 'right', cellWidth: 'auto' },
+        4: { halign: 'center', cellWidth: 12 },
+      },
+      alternateRowStyles: { fillColor: COLORS.lightGray },
+      margin: { left: margin, right: margin },
+      theme: 'grid',
+      didParseCell: (data: any) => {
+        // Color the mean column based on performance level
+        if (data.section === 'body' && data.column.index === 1) {
+          const meanVal = parseFloat(data.cell.raw);
+          if (!isNaN(meanVal) && meanVal > 0) {
+            const lvl = getMeanLevel(meanVal);
+            data.cell.styles.textColor = lvl.color;
+            data.cell.styles.fontStyle = 'bold';
+          }
+        }
+        // Color the performance level column
+        if (data.section === 'body' && data.column.index === 0) {
+          const rowIdx = data.row.index;
+          if (rowIdx < stats.coursesSummary.length) {
+            const mean = Number(stats.coursesSummary[rowIdx].overallMean) || 0;
+            const lvl = getMeanLevel(mean);
+            data.cell.styles.textColor = lvl.color;
+          }
+        }
+      }
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 12;
+  }
+
   // ============ SUMMARY CHART (programmatic horizontal bar chart) ============
   const summaryLikertStats = (stats.questionStats || []).filter((q: any) =>
     (q.type === 'likert' || q.type === 'rating') && typeof q.mean === 'number' && q.mean > 0
