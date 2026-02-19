@@ -217,12 +217,61 @@ const drawBarChart = (
   return yPos + maxBarHeight + 16;
 };
 
+// Texts considered "empty" (placeholder defaults from DB)
+const EMPTY_PLACEHOLDER_TEXTS = [
+  'لم يتم توليد ملخص',
+  'لم يتم توليد توصيات',
+  'لا يوجد ملخص تنفيذي',
+  'لا توجد توصيات',
+];
+
+const isEmptyText = (text: string | null | undefined): boolean => {
+  if (!text || typeof text !== 'string') return true;
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return true;
+  return EMPTY_PLACEHOLDER_TEXTS.some(p => trimmed.includes(p));
+};
+
+// Generate auto recommendations from stats
+const generateAutoRecommendations = (stats: any): string => {
+  const qs = stats.questionStats || [];
+  const likertQs = qs.filter((q: any) => (q.type === 'likert' || q.type === 'rating') && typeof q.mean === 'number' && q.mean > 0);
+  if (likertQs.length === 0) return 'لا توجد بيانات كافية لتوليد توصيات.';
+
+  const overallMean = stats.overallMean || 0;
+  const recs: string[] = [];
+
+  // Sort ascending by mean
+  const sorted = [...likertQs].sort((a: any, b: any) => (a.mean || 0) - (b.mean || 0));
+
+  // Low-scoring questions
+  sorted.forEach((q: any) => {
+    if (q.mean < 3.5) {
+      const shortQ = (q.question || '').substring(0, 60);
+      recs.push(`يوصى بتحسين جانب "${shortQ}" حيث بلغ المتوسط ${Number(q.mean).toFixed(2)} من 5`);
+    }
+  });
+
+  if (overallMean > 0 && overallMean < 3) {
+    recs.push('يوصى بمراجعة شاملة لجودة المقرر/البرنامج نظراً لانخفاض المتوسط العام');
+  } else if (overallMean >= 4) {
+    recs.push('النتائج تشير إلى مستوى رضا عالٍ مع ضرورة الحفاظ على هذا المستوى');
+  }
+
+  if (recs.length === 0) {
+    recs.push('مستوى الأداء العام مقبول. يوصى بمواصلة التطوير والتحسين المستمر');
+  }
+
+  return recs.map((r, i) => `${i + 1}. ${r}`).join('\n');
+};
+
 // Core PDF generation logic shared between export and preview
 const buildPDFDocument = async (
   report: any, survey: any, stats: any, collegeLogo?: string,
   chartImages?: ChartImage[], textResponses?: TextResponse[],
   collegeName: string = 'كلية العلوم الإنسانية والاجتماعية',
-  filterInfo?: FilterInfo
+  filterInfo?: FilterInfo,
+  coordinatorName?: string
 ): Promise<jsPDF> => {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', putOnlyUsedFonts: true });
 
@@ -315,6 +364,17 @@ const buildPDFDocument = async (
       report.academic_year ? `العام: ${report.academic_year}` : ''
     ].filter(Boolean).join('  |  ');
     doc.text(infoText, pageWidth / 2, yPos + 8, { align: 'center' });
+    yPos += 18;
+  }
+
+  // Coordinator name
+  if (coordinatorName) {
+    doc.setFillColor(...COLORS.lightGray);
+    doc.roundedRect(margin + 35, yPos, pageWidth - margin * 2 - 70, 12, 2, 2, 'F');
+    doc.setTextColor(...COLORS.text);
+    doc.setFontSize(10);
+    if (fontLoaded) doc.setFont('Amiri', 'normal');
+    doc.text(`إعداد: ${coordinatorName}`, pageWidth / 2, yPos + 8, { align: 'center' });
     yPos += 18;
   }
 
@@ -678,9 +738,11 @@ const buildPDFDocument = async (
   yPos = 15;
   yPos = drawSectionHeader(doc, yPos, 'الملخص التنفيذي', COLORS.green, pageWidth, margin, fontLoaded);
 
-  // Auto-generate executive summary if empty
-  let summaryText = (report?.summary && typeof report.summary === 'string' && report.summary.trim().length > 0) ? report.summary.trim() : '';
-  if (!summaryText) {
+  // Auto-generate executive summary if empty or placeholder
+  let summaryText = '';
+  if (!isEmptyText(report?.summary)) {
+    summaryText = report.summary.trim();
+  } else {
     const qs = stats.questionStats || [];
     const likertQs = qs.filter((q: any) => (q.type === 'likert' || q.type === 'rating') && typeof q.mean === 'number' && q.mean > 0);
     const parts: string[] = [];
@@ -724,9 +786,9 @@ const buildPDFDocument = async (
   yPos = checkNewPage(doc, yPos, 50, pageHeight);
   yPos = drawSectionHeader(doc, yPos, 'التوصيات', COLORS.red, pageWidth, margin, fontLoaded);
 
-  const recText = (report?.recommendations_text && typeof report.recommendations_text === 'string' && report.recommendations_text.trim().length > 0) 
+  const recText = !isEmptyText(report?.recommendations_text)
     ? report.recommendations_text.trim() 
-    : 'لا توجد توصيات. يمكنك توليد توصيات باستخدام زر "إعادة التحليل" بالذكاء الاصطناعي.';
+    : generateAutoRecommendations(stats);
   doc.setFontSize(10);
   const recLines = doc.splitTextToSize(recText, pageWidth - margin * 2 - 12);
   const recHeight = Math.max(recLines.length * 5 + 10, 25);
@@ -755,7 +817,8 @@ export const exportToPDF = async (
   report: any, survey: any, stats: any, collegeLogo?: string,
   chartImages?: ChartImage[], textResponses?: TextResponse[],
   collegeName: string = 'كلية العلوم الإنسانية والاجتماعية',
-  filterInfo?: FilterInfo
+  filterInfo?: FilterInfo,
+  coordinatorName?: string
 ) => {
   if (!stats || !survey) {
     toast({ title: 'خطأ', description: 'البيانات غير مكتملة.', variant: 'destructive' });
@@ -765,7 +828,7 @@ export const exportToPDF = async (
   toast({ title: 'جاري التصدير...', description: 'يتم إنشاء ملف PDF شامل، يرجى الانتظار.' });
 
   try {
-    const doc = await buildPDFDocument(report, survey, stats, collegeLogo, chartImages, textResponses, collegeName, filterInfo);
+    const doc = await buildPDFDocument(report, survey, stats, collegeLogo, chartImages, textResponses, collegeName, filterInfo, coordinatorName);
     const courseSuffix = filterInfo?.courseName ? `_${filterInfo.courseName.substring(0, 15)}` : '';
     const filename = `تقرير${courseSuffix}_${(survey?.title || 'استبيان').replace(/[^\u0600-\u06FFa-zA-Z0-9\s]/g, '').substring(0, 20)}_${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(filename);
@@ -785,11 +848,12 @@ export const generatePDFBlob = async (
   report: any, survey: any, stats: any, collegeLogo?: string,
   chartImages?: ChartImage[], textResponses?: TextResponse[],
   collegeName: string = 'كلية العلوم الإنسانية والاجتماعية',
-  filterInfo?: FilterInfo
+  filterInfo?: FilterInfo,
+  coordinatorName?: string
 ): Promise<Blob | null> => {
   if (!stats || !survey) return null;
   try {
-    const doc = await buildPDFDocument(report, survey, stats, collegeLogo, chartImages, textResponses, collegeName, filterInfo);
+    const doc = await buildPDFDocument(report, survey, stats, collegeLogo, chartImages, textResponses, collegeName, filterInfo, coordinatorName);
     return doc.output('blob');
   } catch (error) {
     console.error('PDF Preview Error:', error);

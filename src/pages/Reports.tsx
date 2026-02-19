@@ -64,6 +64,7 @@ const Reports = () => {
   const [manualEnrollment, setManualEnrollment] = useState<string>("");
   const [courseRecommendations, setCourseRecommendations] = useState<Record<string, string>>({});
   const [filteredResponseCount, setFilteredResponseCount] = useState(0);
+  const [coordinatorName, setCoordinatorName] = useState("");
 
   useEffect(() => {
     loadReport();
@@ -75,7 +76,7 @@ const Reports = () => {
     try {
       const { data: reportData, error } = await supabase
         .from("reports")
-        .select("*, surveys(title, program_id, target_enrollment, programs(name))")
+        .select("*, surveys(title, program_id, created_by, target_enrollment, programs(name))")
         .eq("survey_id", id)
         .order('generated_at', { ascending: false })
         .limit(1)
@@ -92,6 +93,27 @@ const Reports = () => {
         setAcademicYear(reportData.academic_year || "");
         setReportStatus(reportData.status || "responding");
         setEditedRecommendations(reportData.recommendations_text || "");
+
+        // Fetch coordinator name
+        const createdBy = reportData.surveys?.created_by;
+        if (createdBy) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("full_name, email")
+            .eq("id", createdBy)
+            .single();
+
+          if (profile) {
+            if (profile.full_name && profile.full_name.trim()) {
+              setCoordinatorName(profile.full_name.trim());
+            } else if (profile.email) {
+              // Extract name from email: part before @, replace . and _ with spaces
+              const namePart = profile.email.split('@')[0] || '';
+              const cleanName = namePart.replace(/[._]/g, ' ').replace(/\s+/g, ' ').trim();
+              setCoordinatorName(cleanName);
+            }
+          }
+        }
       }
     } catch (error) {
       console.error("Error loading report:", error);
@@ -578,7 +600,7 @@ const Reports = () => {
         }
       }
 
-      await exportToPDF(reportForPDF, survey, stats, collegeLogo, chartImages, textResponses, collegeName, filterInfo);
+      await exportToPDF(reportForPDF, survey, stats, collegeLogo, chartImages, textResponses, collegeName, filterInfo, coordinatorName || undefined);
       toast({ title: "تم التصدير", description: "تم تصدير التقرير بنجاح" });
     } catch (error) {
       console.error("Export error:", error);
@@ -598,7 +620,7 @@ const Reports = () => {
       const { stats, textResponses, reportForPDF } = preparePDFData();
       const filterInfo = buildFilterInfo();
 
-      const blob = await generatePDFBlob(reportForPDF, survey, stats, collegeLogo, [], textResponses, collegeName, filterInfo);
+      const blob = await generatePDFBlob(reportForPDF, survey, stats, collegeLogo, [], textResponses, collegeName, filterInfo, coordinatorName || undefined);
       setPdfBlob(blob);
     } catch (error) {
       console.error("Preview error:", error);
