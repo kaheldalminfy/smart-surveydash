@@ -375,7 +375,7 @@ const Surveys = () => {
                 </CardContent>
               </Card>
             ) : (
-              <Accordion type="multiple" defaultValue={groupedSurveys.map(([name]) => name)} className="space-y-4">
+              <Accordion type="multiple" defaultValue={[]} className="space-y-4">
                 {groupedSurveys.map(([programName, programSurveys]) => {
                   const filteredSurveys = getFilteredProgramSurveys(programName, programSurveys);
                   const currentFilter = programStatusFilters[programName] || "all";
