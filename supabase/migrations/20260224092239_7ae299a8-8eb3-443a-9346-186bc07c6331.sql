@@ -1,0 +1,1 @@
+CREATE POLICY "Coordinators and admins can update reports" ON public.reports FOR UPDATE TO authenticated USING (EXISTS (SELECT 1 FROM surveys WHERE surveys.id = reports.survey_id AND (has_role_in_program(auth.uid(), 'coordinator'::app_role, surveys.program_id) OR has_role(auth.uid(), 'admin'::app_role))));
