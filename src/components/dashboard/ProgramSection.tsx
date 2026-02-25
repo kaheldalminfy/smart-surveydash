@@ -2,6 +2,9 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { 
   Users, 
   MessageSquare, 
@@ -13,7 +16,9 @@ import {
   ChevronUp,
   ExternalLink,
   FileText,
-  Clock
+  Clock,
+  Lightbulb,
+  Pencil
 } from "lucide-react";
 import { 
   BarChart, 
@@ -31,11 +36,14 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { Link } from "react-router-dom";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import type { ProgramStats } from "./RoleBasedDashboard";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import type { ProgramStats, RecommendationDetail } from "./RoleBasedDashboard";
 
 interface ProgramSectionProps {
   stats: ProgramStats;
   isExpanded?: boolean;
+  userRole?: 'admin' | 'dean' | 'coordinator' | 'program_manager' | 'faculty';
 }
 
 const PROGRAM_COLORS = [
@@ -67,11 +75,18 @@ const getProgramInitial = (name: string): string => {
   return withoutAl.charAt(0) || stripped.charAt(0) || name.charAt(0);
 };
 
-const ProgramSection = ({ stats, isExpanded = true }: ProgramSectionProps) => {
+const ProgramSection = ({ stats, isExpanded = true, userRole }: ProgramSectionProps) => {
   const { language } = useLanguage();
   const programColor = PROGRAM_COLORS[stats.colorIndex % PROGRAM_COLORS.length];
   const [showSurveys, setShowSurveys] = useState(false);
   const [showComplaints, setShowComplaints] = useState(false);
+  const [showRecommendations, setShowRecommendations] = useState(false);
+  const [editingRec, setEditingRec] = useState<RecommendationDetail | null>(null);
+  const [editText, setEditText] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [localRecommendations, setLocalRecommendations] = useState<RecommendationDetail[]>(stats.recommendations || []);
+  
+  const canEdit = userRole === 'admin' || userRole === 'coordinator';
   
   const complaintStats = stats.complaintStats || { pending: 0, inProgress: 0, resolved: 0 };
   const totalComplaints = complaintStats.pending + complaintStats.inProgress + complaintStats.resolved;
@@ -88,6 +103,28 @@ const ProgramSection = ({ stats, isExpanded = true }: ProgramSectionProps) => {
     { name: language === 'ar' ? 'قيد الإجراء' : 'In Progress', value: complaintStats.inProgress, fill: '#3b82f6' },
     { name: language === 'ar' ? 'تم الحل' : 'Resolved', value: complaintStats.resolved, fill: '#22c55e' },
   ].filter(item => item.value > 0);
+
+  const handleSaveRecommendation = async () => {
+    if (!editingRec) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('reports')
+        .update({ recommendations_text: editText })
+        .eq('id', editingRec.reportId);
+      if (error) throw error;
+      setLocalRecommendations(prev => prev.map(r => 
+        r.reportId === editingRec.reportId ? { ...r, recommendationsText: editText } : r
+      ));
+      toast.success(language === 'ar' ? 'تم حفظ التوصيات بنجاح' : 'Recommendations saved successfully');
+      setEditingRec(null);
+    } catch (err) {
+      console.error(err);
+      toast.error(language === 'ar' ? 'حدث خطأ أثناء الحفظ' : 'Error saving recommendations');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '-';
@@ -307,6 +344,103 @@ const ProgramSection = ({ stats, isExpanded = true }: ProgramSectionProps) => {
               </Card>
             </CollapsibleContent>
           </Collapsible>
+
+          {/* Recommendations Section */}
+          {localRecommendations.length > 0 && (
+            <Collapsible open={showRecommendations} onOpenChange={setShowRecommendations}>
+              <CollapsibleTrigger asChild>
+                <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-2">
+                      <Lightbulb className="h-5 w-5 text-amber-500" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">
+                          {language === 'ar' ? 'التوصيات' : 'Recommendations'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {localRecommendations.length} {language === 'ar' ? 'توصية' : 'recommendation(s)'}
+                        </p>
+                      </div>
+                      {showRecommendations ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                    </div>
+                  </CardContent>
+                </Card>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Lightbulb className="h-4 w-4 text-amber-500" />
+                      {language === 'ar' ? 'التوصيات' : 'Recommendations'}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{language === 'ar' ? 'الاستبيان' : 'Survey'}</TableHead>
+                          <TableHead>{language === 'ar' ? 'التوصيات' : 'Recommendations'}</TableHead>
+                          {canEdit && <TableHead className="text-center w-20">{language === 'ar' ? 'تعديل' : 'Edit'}</TableHead>}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {localRecommendations.map(rec => (
+                          <TableRow key={rec.reportId}>
+                            <TableCell className="font-medium whitespace-nowrap">{rec.surveyTitle}</TableCell>
+                            <TableCell className="whitespace-pre-wrap text-sm max-w-md">{rec.recommendationsText}</TableCell>
+                            {canEdit && (
+                              <TableCell className="text-center">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingRec(rec);
+                                    setEditText(rec.recommendationsText);
+                                  }}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* Edit Recommendation Dialog */}
+          <Dialog open={!!editingRec} onOpenChange={(open) => !open && setEditingRec(null)}>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>
+                  {language === 'ar' ? 'تعديل التوصيات' : 'Edit Recommendations'}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">{editingRec?.surveyTitle}</p>
+                <Textarea
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  rows={8}
+                  dir={language === 'ar' ? 'rtl' : 'ltr'}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingRec(null)}>
+                  {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                </Button>
+                <Button onClick={handleSaveRecommendation} disabled={saving}>
+                  {saving 
+                    ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...') 
+                    : (language === 'ar' ? 'حفظ' : 'Save')}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
