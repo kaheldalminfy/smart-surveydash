@@ -40,6 +40,13 @@ export interface ComplaintDetail {
   complainantType: string | null;
 }
 
+export interface RecommendationDetail {
+  reportId: string;
+  surveyId: string;
+  surveyTitle: string;
+  recommendationsText: string;
+}
+
 export interface ProgramStats {
   programId: string;
   programName: string;
@@ -61,6 +68,7 @@ export interface ProgramStats {
   }>;
   surveyDetails: SurveyDetail[];
   complaintDetails: ComplaintDetail[];
+  recommendations: RecommendationDetail[];
 }
 
 interface RoleBasedDashboardProps {
@@ -268,6 +276,30 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
       }
     }
 
+    // Get recommendations from reports
+    const recommendations: RecommendationDetail[] = [];
+    if (surveyIds.length > 0) {
+      const { data: reports } = await supabase
+        .from('reports')
+        .select('id, survey_id, recommendations_text')
+        .in('survey_id', surveyIds)
+        .not('recommendations_text', 'is', null);
+
+      if (reports) {
+        for (const report of reports) {
+          if (report.recommendations_text && report.recommendations_text.trim()) {
+            const surveyTitle = surveys?.find(s => s.id === report.survey_id)?.title || '';
+            recommendations.push({
+              reportId: report.id,
+              surveyId: report.survey_id || '',
+              surveyTitle,
+              recommendationsText: report.recommendations_text,
+            });
+          }
+        }
+      }
+    }
+
     return {
       programId: program.id,
       programName: program.name,
@@ -281,6 +313,7 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
       courseSatisfaction,
       surveyDetails,
       complaintDetails,
+      recommendations,
     };
   };
 
@@ -427,7 +460,7 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
           filteredStats.map((stats) => (
             <Card key={stats.programId} className="overflow-hidden">
               <CardContent className="p-6">
-                <ProgramSection stats={stats} isExpanded={true} />
+                <ProgramSection stats={stats} isExpanded={true} userRole={userRole} />
               </CardContent>
             </Card>
           ))
