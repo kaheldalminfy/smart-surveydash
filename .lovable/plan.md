@@ -1,29 +1,35 @@
 
 
-# إضافة صلاحية تعديل التوصيات في التقارير
+# عرض التوصيات في لوحة تحكم البرامج مع إمكانية التعديل
 
 ## المشكلة
-جدول `reports` لا يحتوي على سياسة UPDATE، مما يمنع الجميع من حفظ أو تعديل التوصيات.
+لوحة التحكم في تبويب "البرامج" لا تعرض التوصيات المحفوظة في جدول `reports`. المطلوب إظهارها لكل برنامج مع إمكانية تعديلها للمنسقين ومدير النظام.
 
 ## الحل
 
-### 1. إضافة سياسة UPDATE على جدول reports (migration واحد فقط)
+### 1. تعديل `RoleBasedDashboard.tsx`
+- إضافة نوع بيانات جديد `RecommendationDetail` يحتوي على: `reportId`, `surveyId`, `surveyTitle`, `recommendationsText`
+- إضافة حقل `recommendations: RecommendationDetail[]` إلى `ProgramStats`
+- في دالة `loadProgramStats`: جلب التوصيات من جدول `reports` المرتبط باستبيانات البرنامج عبر `survey_id`
+- تمرير `userRole` كـ prop إلى `ProgramSection`
 
-سياسة RLS تسمح لمدير النظام (admin) والمنسقين (coordinator) فقط بتعديل التقارير:
+### 2. تعديل `ProgramSection.tsx`
+- استقبال `userRole` كـ prop جديد
+- إضافة قسم "التوصيات" كـ Collapsible (مشابه لأقسام الاستبيانات والشكاوى)
+- عرض كل توصية مع اسم الاستبيان المرتبط بها في جدول
+- زر "تعديل" يظهر فقط إذا كان `userRole === 'admin' || userRole === 'coordinator'`
+- عند الضغط على التعديل: نافذة Dialog تحتوي على Textarea لتعديل النص وزر حفظ
+- الحفظ يتم عبر `supabase.from('reports').update({ recommendations_text }).eq('id', reportId)`
+- عرض رسالة نجاح بعد الحفظ عبر toast
 
-- مدير النظام: يستطيع تعديل توصيات أي تقرير
-- المنسق: يستطيع تعديل توصيات تقارير برنامجه فقط
-- باقي الأدوار (مدير البرنامج / العميد / أعضاء هيئة التدريس): عرض فقط، لا يستطيعون التعديل
+### 3. لا تغيير في قاعدة البيانات
+- لا يتم إضافة أو حذف أو تعديل أي جداول أو بيانات
+- سياسة UPDATE الموجودة تدعم المنسقين والأدمن بالفعل
 
-### 2. لا تغيير في الكود ولا في البيانات
+## الملفات المتأثرة
 
-الكود الحالي في `src/pages/Reports.tsx` يستخدم بالفعل `upsert` لحفظ التوصيات وسيعمل تلقائيا بمجرد إضافة السياسة. لن يتم تعديل أي بيانات أو هيكل جداول - فقط إضافة سياسة أمان جديدة.
-
-## التفاصيل التقنية
-
-| التغيير | التفاصيل |
-|---------|----------|
-| Migration SQL | `CREATE POLICY "Coordinators and admins can update reports" ON public.reports FOR UPDATE TO authenticated USING (EXISTS (SELECT 1 FROM surveys WHERE surveys.id = reports.survey_id AND (has_role_in_program(auth.uid(), 'coordinator', surveys.program_id) OR has_role(auth.uid(), 'admin'))))` |
-| ملفات الكود | لا تعديل |
-| البيانات | لا تعديل |
+| الملف | التغيير |
+|-------|---------|
+| `src/components/dashboard/RoleBasedDashboard.tsx` | إضافة `RecommendationDetail` و `recommendations` إلى `ProgramStats`، جلب التوصيات من `reports`، تمرير `userRole` |
+| `src/components/dashboard/ProgramSection.tsx` | إضافة قسم التوصيات القابل للطي مع Dialog للتعديل |
 
