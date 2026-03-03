@@ -4,6 +4,7 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend, RadialBarChart, RadialBar } from "recharts";
 import { TrendingUp, TrendingDown, Minus, MessageSquare, ListChecks, Star, BarChart3, Users, Target } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface QuestionData {
   id: string;
@@ -29,16 +30,17 @@ interface ReportDashboardProps {
 const COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#16a34a'];
 const MCQ_COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#6366f1', '#84cc16'];
 
-const getMeanLevel = (mean: number) => {
-  if (mean >= 4.5) return { label: 'ممتاز', color: 'bg-green-500', icon: TrendingUp };
-  if (mean >= 3.5) return { label: 'جيد جداً', color: 'bg-green-400', icon: TrendingUp };
-  if (mean >= 2.5) return { label: 'متوسط', color: 'bg-yellow-500', icon: Minus };
-  if (mean >= 1.5) return { label: 'ضعيف', color: 'bg-orange-500', icon: TrendingDown };
-  return { label: 'ضعيف جداً', color: 'bg-red-500', icon: TrendingDown };
-};
-
 export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, programName }: ReportDashboardProps) => {
-  // Calculate overall statistics
+  const { t, language } = useLanguage();
+
+  const getMeanLevel = (mean: number) => {
+    if (mean >= 4.5) return { label: t('reportDash.excellent'), color: 'bg-green-500', icon: TrendingUp };
+    if (mean >= 3.5) return { label: t('reportDash.veryGood'), color: 'bg-green-400', icon: TrendingUp };
+    if (mean >= 2.5) return { label: t('reportDash.average'), color: 'bg-yellow-500', icon: Minus };
+    if (mean >= 1.5) return { label: t('reportDash.poor'), color: 'bg-orange-500', icon: TrendingDown };
+    return { label: t('reportDash.veryPoor'), color: 'bg-red-500', icon: TrendingDown };
+  };
+
   const likertRatingQuestions = detailedAnswers.filter(q => q.type === 'likert' || q.type === 'rating');
   const mcqQuestions = detailedAnswers.filter(q => q.type === 'mcq');
   const textQuestions = detailedAnswers.filter(q => q.type === 'text');
@@ -53,6 +55,16 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
 
   const totalTextResponses = textQuestions.reduce((sum, q) => sum + q.textResponses.length, 0);
 
+  const getQuestionTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      likert: t('reportDash.likert'),
+      rating: t('reportDash.ratingType'),
+      mcq: t('reportDash.mcqType'),
+      text: t('reportDash.textType'),
+    };
+    return labels[type] || type;
+  };
+
   return (
     <div className="space-y-8">
       {/* Overview Section */}
@@ -61,7 +73,7 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">إجمالي الاستجابات</p>
+                <p className="text-sm text-muted-foreground">{t('reportDash.totalResponses')}</p>
                 <p className="text-3xl font-bold text-blue-600">{totalResponses}</p>
               </div>
               <Users className="h-10 w-10 text-blue-500/30" />
@@ -73,9 +85,9 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">المتوسط العام</p>
+                <p className="text-sm text-muted-foreground">{t('reportDash.overallMean')}</p>
                 <p className="text-3xl font-bold text-green-600">{overallMean.toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground">من 5.0</p>
+                <p className="text-xs text-muted-foreground">{t('reportDash.outOf5')}</p>
               </div>
               <Target className="h-10 w-10 text-green-500/30" />
             </div>
@@ -86,7 +98,7 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">عدد الأسئلة</p>
+                <p className="text-sm text-muted-foreground">{t('reportDash.questionsCount')}</p>
                 <p className="text-3xl font-bold text-purple-600">{detailedAnswers.length}</p>
               </div>
               <ListChecks className="h-10 w-10 text-purple-500/30" />
@@ -98,7 +110,7 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">التعليقات النصية</p>
+                <p className="text-sm text-muted-foreground">{t('reportDash.textComments')}</p>
                 <p className="text-3xl font-bold text-amber-600">{totalTextResponses}</p>
               </div>
               <MessageSquare className="h-10 w-10 text-amber-500/30" />
@@ -111,7 +123,7 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
       <div className="space-y-6">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <BarChart3 className="h-6 w-6" />
-          تحليل كل سؤال
+          {t('reportDash.analyzeEachQuestion')}
         </h2>
 
         {detailedAnswers.map((question, index) => (
@@ -120,13 +132,11 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="default" className="text-sm">سؤال {index + 1}</Badge>
+                    <Badge variant="default" className="text-sm">{t('reportDash.question')} {index + 1}</Badge>
                     <Badge variant="outline">
-                      {question.type === 'likert' ? 'مقياس ليكرت' :
-                       question.type === 'rating' ? 'تقييم' :
-                       question.type === 'mcq' ? 'اختيار متعدد' : 'نص حر'}
+                      {getQuestionTypeLabel(question.type)}
                     </Badge>
-                    <Badge variant="secondary">{question.responseCount} استجابة</Badge>
+                    <Badge variant="secondary">{question.responseCount} {t('reportDash.response')}</Badge>
                   </div>
                   <CardTitle className="text-lg">{question.text}</CardTitle>
                 </div>
@@ -150,7 +160,7 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Bar Chart */}
                     <div>
-                      <h4 className="font-medium mb-3 text-sm text-muted-foreground">توزيع الاستجابات</h4>
+                      <h4 className="font-medium mb-3 text-sm text-muted-foreground">{t('reportDash.responseDistribution')}</h4>
                       <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={question.distribution}>
@@ -166,8 +176,8 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
                                   return (
                                     <div className="bg-card p-3 rounded-lg border shadow-lg">
                                       <p className="font-medium">{data.name}</p>
-                                      <p className="text-primary">العدد: {data.value}</p>
-                                      <p className="text-muted-foreground">النسبة: {percentage}%</p>
+                                      <p className="text-primary">{language === 'ar' ? 'العدد' : 'Count'}: {data.value}</p>
+                                      <p className="text-muted-foreground">{language === 'ar' ? 'النسبة' : 'Percentage'}: {percentage}%</p>
                                     </div>
                                   );
                                 }
@@ -186,7 +196,7 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
 
                     {/* Pie Chart */}
                     <div>
-                      <h4 className="font-medium mb-3 text-sm text-muted-foreground">النسب المئوية</h4>
+                      <h4 className="font-medium mb-3 text-sm text-muted-foreground">{t('reportDash.percentages')}</h4>
                       <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
@@ -214,29 +224,29 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
                   {/* Stats Summary */}
                   <div className="grid grid-cols-3 gap-4 pt-4 border-t">
                     <div className="text-center p-3 bg-muted/30 rounded-lg">
-                      <p className="text-sm text-muted-foreground">المتوسط</p>
+                      <p className="text-sm text-muted-foreground">{t('reportDash.mean')}</p>
                       <p className="text-xl font-bold text-primary">{question.mean}</p>
                     </div>
                     <div className="text-center p-3 bg-muted/30 rounded-lg">
-                      <p className="text-sm text-muted-foreground">الانحراف المعياري</p>
+                      <p className="text-sm text-muted-foreground">{t('reportDash.stdDev')}</p>
                       <p className="text-xl font-bold">{question.stdDev}</p>
                     </div>
                     <div className="text-center p-3 bg-muted/30 rounded-lg">
-                      <p className="text-sm text-muted-foreground">معدل الاستجابة</p>
+                      <p className="text-sm text-muted-foreground">{t('reportDash.responseRate')}</p>
                       <p className="text-xl font-bold">{totalResponses > 0 ? ((question.responseCount / totalResponses) * 100).toFixed(0) : 0}%</p>
                     </div>
                   </div>
 
                   {/* Detailed Table */}
                   <div className="pt-4">
-                    <h4 className="font-medium mb-3 text-sm text-muted-foreground">تفاصيل الاستجابات</h4>
+                    <h4 className="font-medium mb-3 text-sm text-muted-foreground">{t('reportDash.responseDetails')}</h4>
                     <div className="border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
                             <TableHead className="text-right w-20 sticky top-0 bg-card">#</TableHead>
-                            <TableHead className="text-right sticky top-0 bg-card">التقييم</TableHead>
-                            <TableHead className="text-right w-24 sticky top-0 bg-card">القيمة</TableHead>
+                            <TableHead className="text-right sticky top-0 bg-card">{language === 'ar' ? 'التقييم' : 'Rating'}</TableHead>
+                            <TableHead className="text-right w-24 sticky top-0 bg-card">{language === 'ar' ? 'القيمة' : 'Value'}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -266,7 +276,7 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
                       </Table>
                       {question.answers.length > 10 && (
                         <p className="text-center text-sm text-muted-foreground py-2 bg-muted/20">
-                          +{question.answers.length - 10} استجابة أخرى
+                          +{question.answers.length - 10} {t('reportDash.moreResponses')}
                         </p>
                       )}
                     </div>
@@ -279,7 +289,7 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div>
-                      <h4 className="font-medium mb-3 text-sm text-muted-foreground">توزيع الاختيارات</h4>
+                      <h4 className="font-medium mb-3 text-sm text-muted-foreground">{t('reportDash.choiceDistribution')}</h4>
                       <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={question.mcqDistribution} layout="vertical">
@@ -298,7 +308,7 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
                     </div>
 
                     <div>
-                      <h4 className="font-medium mb-3 text-sm text-muted-foreground">النسب المئوية</h4>
+                      <h4 className="font-medium mb-3 text-sm text-muted-foreground">{t('reportDash.percentages')}</h4>
                       <div className="space-y-3">
                         {question.mcqDistribution.map((item: any, i: number) => {
                           const total = question.mcqDistribution.reduce((sum: number, d: any) => sum + d.value, 0);
@@ -322,7 +332,7 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
               {/* Text Question */}
               {question.type === 'text' && (
                 <div className="space-y-4">
-                  <h4 className="font-medium text-sm text-muted-foreground">الردود النصية ({question.textResponses.length})</h4>
+                  <h4 className="font-medium text-sm text-muted-foreground">{t('reportDash.textResponses')} ({question.textResponses.length})</h4>
                   {question.textResponses.length > 0 ? (
                     <div className="space-y-3 max-h-96 overflow-y-auto">
                       {question.textResponses.map((response: string, i: number) => (
@@ -335,7 +345,7 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
                       ))}
                     </div>
                   ) : (
-                    <p className="text-center text-muted-foreground py-8">لا توجد ردود نصية</p>
+                    <p className="text-center text-muted-foreground py-8">{t('reportDash.noTextResponses')}</p>
                   )}
                 </div>
               )}
@@ -350,9 +360,9 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Target className="h-6 w-6" />
-              الملخص العام للتقييمات
+              {t('reportDash.overallSummary')}
             </CardTitle>
-            <CardDescription>متوسط جميع أسئلة مقياس ليكرت والتقييم</CardDescription>
+            <CardDescription>{t('reportDash.overallSummaryDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -360,7 +370,7 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
                 <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center ${getMeanLevel(overallMean).color} text-white mb-3`}>
                   <span className="text-2xl font-bold">{overallMean.toFixed(2)}</span>
                 </div>
-                <p className="font-medium">المتوسط العام</p>
+                <p className="font-medium">{t('reportDash.overallMean')}</p>
                 <p className="text-sm text-muted-foreground">{getMeanLevel(overallMean).label}</p>
               </div>
 
@@ -368,27 +378,27 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
                 <div className="w-20 h-20 mx-auto rounded-full flex items-center justify-center bg-blue-500 text-white mb-3">
                   <span className="text-2xl font-bold">{overallStdDev.toFixed(2)}</span>
                 </div>
-                <p className="font-medium">الانحراف المعياري</p>
-                <p className="text-sm text-muted-foreground">تجانس الاستجابات</p>
+                <p className="font-medium">{t('reportDash.stdDev')}</p>
+                <p className="text-sm text-muted-foreground">{language === 'ar' ? 'تجانس الاستجابات' : 'Response consistency'}</p>
               </div>
 
               <div className="text-center p-6 bg-card rounded-xl shadow-sm">
                 <div className="w-20 h-20 mx-auto rounded-full flex items-center justify-center bg-purple-500 text-white mb-3">
                   <span className="text-2xl font-bold">{likertRatingQuestions.length}</span>
                 </div>
-                <p className="font-medium">عدد أسئلة التقييم</p>
-                <p className="text-sm text-muted-foreground">مقياس ليكرت + تقييم</p>
+                <p className="font-medium">{t('reportDash.questionsCount')}</p>
+                <p className="text-sm text-muted-foreground">{t('reportDash.likert')} + {t('reportDash.ratingType')}</p>
               </div>
             </div>
 
             {/* Questions Overview Chart */}
             <div className="mt-8">
-              <h4 className="font-medium mb-4">مقارنة متوسطات جميع الأسئلة</h4>
+              <h4 className="font-medium mb-4">{language === 'ar' ? 'مقارنة متوسطات جميع الأسئلة' : 'All Questions Mean Comparison'}</h4>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={likertRatingQuestions.map((q, i) => ({
-                      name: `س${i + 1}`,
+                      name: `${language === 'ar' ? 'س' : 'Q'}${i + 1}`,
                       fullName: q.text,
                       mean: parseFloat(q.mean) || 0,
                       responses: q.responseCount,
@@ -406,8 +416,8 @@ export const ReportDashboard = ({ detailedAnswers, totalResponses, surveyTitle, 
                           return (
                             <div className="bg-card p-3 rounded-lg border shadow-lg max-w-xs">
                               <p className="font-medium text-sm mb-1">{data.fullName}</p>
-                              <p className="text-primary font-bold">المتوسط: {data.mean.toFixed(2)}</p>
-                              <p className="text-muted-foreground text-xs">عدد الاستجابات: {data.responses}</p>
+                              <p className="text-primary font-bold">{t('reportDash.mean')}: {data.mean.toFixed(2)}</p>
+                              <p className="text-muted-foreground text-xs">{t('reportDash.totalResponses')}: {data.responses}</p>
                             </div>
                           );
                         }

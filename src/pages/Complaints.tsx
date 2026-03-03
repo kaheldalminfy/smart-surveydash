@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -67,6 +68,7 @@ interface Program {
 const Complaints = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t, language } = useLanguage();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [programs, setPrograms] = useState<Program[]>([]);
   const [academicCalendar, setAcademicCalendar] = useState<any[]>([]);
@@ -807,7 +809,7 @@ const Complaints = () => {
           <DashboardButton />
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold">إدارة الشكاوى</h1>
+              <h1 className="text-3xl font-bold">{t('complaints.title')}</h1>
               {isAdmin && <Badge variant="default" className="bg-purple-600">مدير النظام</Badge>}
               {isDean && !isAdmin && <Badge variant="default" className="bg-blue-600">العميد</Badge>}
               {isProgramManager && !isAdmin && !isDean && <Badge variant="default" className="bg-green-600">مدير البرنامج</Badge>}
