@@ -13,6 +13,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { UserPlus, Eye, EyeOff } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface AddUserDialogProps {
   open: boolean;
@@ -22,6 +23,7 @@ interface AddUserDialogProps {
 
 export default function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialogProps) {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -35,8 +37,8 @@ export default function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUs
     
     if (!formData.email || !formData.fullName) {
       toast({
-        title: "خطأ",
-        description: "يرجى ملء جميع الحقول المطلوبة",
+        title: t('common.error'),
+        description: t('addUser.fillRequired'),
         variant: "destructive",
       });
       return;
@@ -58,8 +60,8 @@ export default function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUs
       if (data.error) throw new Error(data.error);
 
       toast({
-        title: "تم إضافة المستخدم",
-        description: `تم إنشاء حساب ${formData.fullName} بنجاح. كلمة المرور المؤقتة: ${formData.password}`,
+        title: t('addUser.success'),
+        description: `${t('addUser.success')} ${formData.fullName}. ${t('addUser.password')}: ${formData.password}`,
       });
 
       setFormData({ email: "", fullName: "", password: "123456789" });
@@ -68,8 +70,8 @@ export default function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUs
     } catch (error: any) {
       console.error("Error creating user:", error);
       toast({
-        title: "خطأ",
-        description: error.message || "فشل إنشاء المستخدم",
+        title: t('common.error'),
+        description: error.message || t('addUser.fillRequired'), // Fallback generic message
         variant: "destructive",
       });
     } finally {
@@ -83,26 +85,26 @@ export default function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUs
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserPlus className="h-5 w-5" />
-            إضافة مستخدم جديد
+            {t('addUser.title')}
           </DialogTitle>
           <DialogDescription>
-            أضف مستخدماً جديداً للنظام. سيُطلب منه تغيير كلمة المرور عند أول تسجيل دخول.
+            {t('addUser.description')}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="fullName">الاسم الكامل *</Label>
+              <Label htmlFor="fullName">{t('addUser.fullName')} *</Label>
               <Input
                 id="fullName"
                 value={formData.fullName}
                 onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                placeholder="أدخل الاسم الكامل"
+                placeholder={t('addUser.fullName')}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">البريد الإلكتروني *</Label>
+              <Label htmlFor="email">{t('addUser.email')} *</Label>
               <Input
                 id="email"
                 type="email"
@@ -113,14 +115,14 @@ export default function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUs
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">كلمة المرور المؤقتة</Label>
+              <Label htmlFor="password">{t('addUser.password')}</Label>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="كلمة المرور"
+                  placeholder={t('auth.password')}
                 />
                 <Button
                   type="button"
@@ -133,16 +135,16 @@ export default function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUs
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                كلمة المرور الافتراضية: 123456789
+                {t('addUser.defaultPassword')}
               </p>
             </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
-              إلغاء
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? "جارٍ الإضافة..." : "إضافة المستخدم"}
+              {isLoading ? t('addUser.adding') : t('addUser.add')}
             </Button>
           </DialogFooter>
         </form>
