@@ -1,35 +1,82 @@
 
-
-# عرض التوصيات في لوحة تحكم البرامج مع إمكانية التعديل
+# تفعيل دعم اللغة الإنجليزية الشامل في جميع صفحات المنظومة
 
 ## المشكلة
-لوحة التحكم في تبويب "البرامج" لا تعرض التوصيات المحفوظة في جدول `reports`. المطلوب إظهارها لكل برنامج مع إمكانية تعديلها للمنسقين ومدير النظام.
+حالياً نظام الترجمة (`LanguageContext`) مطبق فقط في 7 صفحات من أصل 21 صفحة. الصفحات التالية تحتوي على نصوص عربية ثابتة بدون دعم للإنجليزية:
+
+**صفحات بدون ترجمة (14 صفحة):**
+- `Surveys.tsx` - إدارة الاستبيانات
+- `Reports.tsx` - التقارير
+- `Complaints.tsx` - الشكاوى
+- `Recommendations.tsx` - التوصيات
+- `Archives.tsx` - الأرشيف
+- `Users.tsx` - المستخدمين
+- `SystemSettings.tsx` - الإعدادات
+- `SurveyDesigner.tsx` - تصميم الاستبيان
+- `TakeSurvey.tsx` - تعبئة الاستبيان
+- `SurveyComplete.tsx` - إكمال الاستبيان
+- `ComplaintSubmitted.tsx` - تأكيد الشكوى
+- `ProgramComparison.tsx` - مقارنة البرامج
+- `AcademicCalendar.tsx` - الأجندة الأكاديمية
+- `NotFound.tsx` - صفحة غير موجودة
+
+**مكونات بدون ترجمة:**
+- `SurveyAnalytics.tsx`, `QRCodeDialog.tsx`, `ComplaintsDashboard.tsx`, `SurveyTemplates.tsx`, `ReportDashboard.tsx`, `PDFPreviewDialog.tsx`, `AddUserDialog.tsx`, وغيرها
 
 ## الحل
 
-### 1. تعديل `RoleBasedDashboard.tsx`
-- إضافة نوع بيانات جديد `RecommendationDetail` يحتوي على: `reportId`, `surveyId`, `surveyTitle`, `recommendationsText`
-- إضافة حقل `recommendations: RecommendationDetail[]` إلى `ProgramStats`
-- في دالة `loadProgramStats`: جلب التوصيات من جدول `reports` المرتبط باستبيانات البرنامج عبر `survey_id`
-- تمرير `userRole` كـ prop إلى `ProgramSection`
+### المبدأ الأساسي
+- جميع عناصر الواجهة (أزرار، عناوين، تسميات، رسائل) تتحول للإنجليزية عند تغيير اللغة
+- البيانات المخزنة في قاعدة البيانات (عناوين الاستبيانات، نصوص التقارير، التوصيات، الشكاوى) تبقى كما هي بلغتها الأصلية
+- لا تغيير في قاعدة البيانات إطلاقاً
 
-### 2. تعديل `ProgramSection.tsx`
-- استقبال `userRole` كـ prop جديد
-- إضافة قسم "التوصيات" كـ Collapsible (مشابه لأقسام الاستبيانات والشكاوى)
-- عرض كل توصية مع اسم الاستبيان المرتبط بها في جدول
-- زر "تعديل" يظهر فقط إذا كان `userRole === 'admin' || userRole === 'coordinator'`
-- عند الضغط على التعديل: نافذة Dialog تحتوي على Textarea لتعديل النص وزر حفظ
-- الحفظ يتم عبر `supabase.from('reports').update({ recommendations_text }).eq('id', reportId)`
-- عرض رسالة نجاح بعد الحفظ عبر toast
+### خطوات التنفيذ
 
-### 3. لا تغيير في قاعدة البيانات
-- لا يتم إضافة أو حذف أو تعديل أي جداول أو بيانات
-- سياسة UPDATE الموجودة تدعم المنسقين والأدمن بالفعل
+#### 1. توسيع ملف الترجمة `LanguageContext.tsx`
+إضافة مفاتيح ترجمة جديدة تغطي جميع النصوص الثابتة في الصفحات غير المترجمة. تقريباً 150-200 مفتاح جديد تشمل:
+- نصوص مصمم الاستبيان (أنواع الأسئلة، أزرار الحفظ، تعليمات)
+- نصوص صفحة التقارير (أزرار التصدير، عناوين الأقسام)
+- نصوص صفحة الشكاوى (أعمدة الجدول، حالات الشكوى)
+- نصوص الأرشيف والتوصيات والمقارنة والتقويم
+- رسائل Toast (نجاح/خطأ)
+
+#### 2. تحديث كل صفحة لاستخدام `t()` أو `language === 'ar'`
+لكل صفحة من الـ 14 صفحة + المكونات المساعدة:
+- إضافة `import { useLanguage } from "@/contexts/LanguageContext"`
+- استبدال النصوص العربية الثابتة بـ `t('key')` أو `language === 'ar' ? 'عربي' : 'English'`
+- إضافة `LanguageToggle` في الصفحات التي لا تحتوي عليه
+
+#### 3. لا تغيير في:
+- قاعدة البيانات
+- ملفات التقارير PDF/Excel (تبقى بلغة المحتوى الأصلي)
+- بيانات الاستبيانات والتوصيات المخزنة
 
 ## الملفات المتأثرة
 
 | الملف | التغيير |
 |-------|---------|
-| `src/components/dashboard/RoleBasedDashboard.tsx` | إضافة `RecommendationDetail` و `recommendations` إلى `ProgramStats`، جلب التوصيات من `reports`، تمرير `userRole` |
-| `src/components/dashboard/ProgramSection.tsx` | إضافة قسم التوصيات القابل للطي مع Dialog للتعديل |
+| `src/contexts/LanguageContext.tsx` | إضافة ~200 مفتاح ترجمة جديد |
+| `src/pages/Surveys.tsx` | تطبيق `t()` على جميع النصوص الثابتة |
+| `src/pages/Reports.tsx` | تطبيق `t()` على جميع النصوص الثابتة |
+| `src/pages/Complaints.tsx` | تطبيق `t()` على جميع النصوص الثابتة |
+| `src/pages/Recommendations.tsx` | تطبيق `t()` على جميع النصوص الثابتة |
+| `src/pages/Archives.tsx` | تطبيق `t()` على جميع النصوص الثابتة |
+| `src/pages/Users.tsx` | تطبيق `t()` على جميع النصوص الثابتة |
+| `src/pages/SystemSettings.tsx` | تطبيق `t()` على جميع النصوص الثابتة |
+| `src/pages/SurveyDesigner.tsx` | تطبيق `t()` على جميع النصوص الثابتة |
+| `src/pages/TakeSurvey.tsx` | تطبيق `t()` على جميع النصوص الثابتة |
+| `src/pages/SurveyComplete.tsx` | تطبيق `t()` |
+| `src/pages/ComplaintSubmitted.tsx` | تطبيق `t()` |
+| `src/pages/ProgramComparison.tsx` | تطبيق `t()` |
+| `src/pages/AcademicCalendar.tsx` | تطبيق `t()` |
+| `src/pages/NotFound.tsx` | تطبيق `t()` |
+| `src/components/SurveyAnalytics.tsx` | تطبيق `t()` |
+| `src/components/QRCodeDialog.tsx` | تطبيق `t()` |
+| `src/components/ComplaintsDashboard.tsx` | تطبيق `t()` |
+| `src/components/SurveyTemplates.tsx` | تطبيق `t()` |
+| `src/components/ReportDashboard.tsx` | تطبيق `t()` |
+| `src/components/AddUserDialog.tsx` | تطبيق `t()` |
+| مكونات أخرى حسب الحاجة | تطبيق `t()` |
 
+## ملاحظة مهمة
+هذا تغيير كبير يشمل ~20+ ملف. يُفضل تنفيذه على مراحل (مثلاً 4-5 ملفات في كل مرة) لتجنب الأخطاء. هل تريد البدء بمجموعة معينة من الصفحات أولاً؟
