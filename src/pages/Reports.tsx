@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download, FileSpreadsheet, Sparkles, ArrowRight, Save, Trash2, Edit as EditIcon, BarChart3, Users, Filter, Target, MessageSquare, ListChecks, AlertTriangle, Loader2, Eye } from "lucide-react";
+import { Download, FileSpreadsheet, Sparkles, ArrowRight, Save, Trash2, Edit as EditIcon, BarChart3, Users, Filter, Target, MessageSquare, ListChecks, AlertTriangle, Loader2, Eye, Send } from "lucide-react";
 import DashboardButton from "@/components/DashboardButton";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -412,6 +412,82 @@ const Reports = () => {
     }
 
     toast({ title: "تم الحفظ", description: courseName ? `تم حفظ التوصيات لمقرر "${courseName}"` : "تم حفظ التوصيات بنجاح" });
+    setEditRecommendationsOpen(false);
+    loadReport();
+  };
+
+  const handleSaveAndTransferRecommendations = async () => {
+    if (!editedRecommendations.trim()) {
+      toast({ title: "تنبيه", description: "لا توجد توصيات لنقلها", variant: "destructive" });
+      return;
+    }
+
+    // First save recommendations to report
+    const courseName = getSelectedCourseName();
+    if (courseName) {
+      setCourseRecommendations(prev => ({ ...prev, [courseName]: editedRecommendations }));
+    }
+
+    const { error: saveError } = await supabase
+      .from("reports")
+      .update({ recommendations_text: editedRecommendations })
+      .eq("id", report.id);
+
+    if (saveError) {
+      toast({ title: "خطأ", description: "فشل في حفظ التوصيات", variant: "destructive" });
+      return;
+    }
+
+    // Check if already transferred
+    const { data: existing } = await supabase
+      .from("recommendations")
+      .select("id")
+      .eq("source_id", report.id)
+      .eq("source_type", "survey")
+      .maybeSingle();
+
+    if (existing) {
+      // Update existing recommendation
+      const { error: updateError } = await supabase
+        .from("recommendations")
+        .update({
+          description: editedRecommendations,
+          title: `${survey?.title || ''}${courseName ? ` - ${courseName}` : ''}`,
+          academic_year: academicYear || null,
+          semester: semester || null,
+        })
+        .eq("id", existing.id);
+
+      if (updateError) {
+        toast({ title: "خطأ", description: "فشل في تحديث التوصيات في المتابعة", variant: "destructive" });
+        return;
+      }
+
+      toast({ title: "تم التحديث", description: "تم تحديث التوصيات في صفحة المتابعة" });
+    } else {
+      // Insert new recommendation
+      const { error: insertError } = await supabase
+        .from("recommendations")
+        .insert({
+          title: `${survey?.title || ''}${courseName ? ` - ${courseName}` : ''}`,
+          description: editedRecommendations,
+          program_id: survey?.program_id || null,
+          source_type: "survey",
+          source_id: report.id,
+          academic_year: academicYear || null,
+          semester: semester || null,
+          status: "pending",
+          priority: "medium",
+        });
+
+      if (insertError) {
+        toast({ title: "خطأ", description: "فشل في نقل التوصيات", variant: "destructive" });
+        return;
+      }
+
+      toast({ title: "تم النقل", description: "تم نقل التوصيات إلى صفحة متابعة التوصيات بنجاح" });
+    }
+
     setEditRecommendationsOpen(false);
     loadReport();
   };
@@ -1376,11 +1452,15 @@ const Reports = () => {
               className="resize-none"
             />
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={() => setEditRecommendationsOpen(false)}>إلغاء</Button>
             <Button onClick={handleSaveRecommendations}>
               <Save className="h-4 w-4 ml-2" />
               حفظ التوصيات
+            </Button>
+            <Button variant="secondary" onClick={handleSaveAndTransferRecommendations}>
+              <Send className="h-4 w-4 ml-2" />
+              حفظ ونقل لمتابعة التوصيات
             </Button>
           </DialogFooter>
         </DialogContent>
