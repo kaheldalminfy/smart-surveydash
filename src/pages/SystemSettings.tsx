@@ -8,10 +8,12 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Settings, Upload, Image } from "lucide-react";
 import DashboardButton from "@/components/DashboardButton";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function SystemSettings() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [collegeLogo, setCollegeLogo] = useState("");
@@ -39,8 +41,8 @@ export default function SystemSettings() {
 
     if (!roles) {
       toast({
-        title: "غير مصرح",
-        description: "هذه الصفحة متاحة للمديرين فقط",
+        title: t('common.unauthorized'),
+        description: t('common.adminOnly'),
         variant: "destructive",
       });
       navigate("/dashboard");
@@ -83,13 +85,13 @@ export default function SystemSettings() {
 
     if (error) {
       toast({
-        title: "خطأ",
+        title: t('common.error'),
         description: "فشل حفظ الإعدادات",
         variant: "destructive",
       });
     } else {
       toast({
-        title: "تم الحفظ",
+        title: t('common.saved'),
         description: "تم حفظ الإعدادات بنجاح",
       });
       setLogoPreview(collegeLogo);
@@ -117,8 +119,8 @@ export default function SystemSettings() {
         <div className="flex items-center gap-4 mb-6">
           <DashboardButton />
           <div>
-            <h1 className="text-3xl font-bold">إعدادات النظام</h1>
-            <p className="text-muted-foreground mt-1">إدارة إعدادات النظام العامة</p>
+            <h1 className="text-3xl font-bold">{t('settings.title')}</h1>
+            <p className="text-muted-foreground mt-1">{t('settings.subtitle')}</p>
           </div>
         </div>
 
@@ -127,12 +129,12 @@ export default function SystemSettings() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Settings className="h-5 w-5" />
-              شعار الكلية
+              {t('settings.collegeLogo')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="logo">رابط الشعار (URL)</Label>
+              <Label htmlFor="logo">{t('settings.logoUrl')}</Label>
               <div className="flex gap-2 mt-2">
                 <Input
                   id="logo"
@@ -142,11 +144,11 @@ export default function SystemSettings() {
                   onChange={(e) => setCollegeLogo(e.target.value)}
                 />
                 <Button onClick={handleSave} disabled={saving}>
-                  {saving ? "جاري الحفظ..." : "حفظ"}
+                  {saving ? t('settings.saving') : t('settings.save')}
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                أدخل رابط شعار الكلية. سيظهر في جميع التقارير المُصدرة.
+                {t('settings.logoDesc')}
               </p>
             </div>
 
@@ -155,7 +157,7 @@ export default function SystemSettings() {
               <div className="border rounded-lg p-4">
                 <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
                   <Image className="h-4 w-4" />
-                  معاينة الشعار
+                  {t('settings.logoPreview')}
                 </h3>
                 <div className="flex justify-center p-4 bg-muted rounded">
                   <img
@@ -165,7 +167,7 @@ export default function SystemSettings() {
                     onError={(e) => {
                       e.currentTarget.src = "/placeholder.svg";
                       toast({
-                        title: "خطأ",
+                        title: t('common.error'),
                         description: "فشل تحميل الصورة. تأكد من صحة الرابط.",
                         variant: "destructive",
                       });
@@ -176,11 +178,11 @@ export default function SystemSettings() {
             )}
 
             <div className="bg-muted p-4 rounded-lg">
-              <h4 className="font-medium mb-2">نصائح:</h4>
+              <h4 className="font-medium mb-2">{t('settings.tips')}</h4>
               <ul className="text-sm space-y-1 list-disc list-inside text-muted-foreground">
-                <li>استخدم صورة بخلفية شفافة (PNG) للحصول على أفضل نتيجة</li>
-                <li>الحجم الموصى به: 200x200 بكسل أو أكبر</li>
-                <li>تأكد من أن الرابط يعمل ويمكن الوصول إليه</li>
+                <li>{t('settings.tip1')}</li>
+                <li>{t('settings.tip2')}</li>
+                <li>{t('settings.tip3')}</li>
               </ul>
             </div>
           </CardContent>

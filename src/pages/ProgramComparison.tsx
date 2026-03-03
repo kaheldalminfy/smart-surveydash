@@ -1,7 +1,9 @@
 import ProgramComparison from "@/components/ProgramComparison";
 import DashboardButton from "@/components/DashboardButton";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const ProgramComparisonPage = () => {
+  const { t } = useLanguage();
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <header className="bg-card border-b shadow-sm">
@@ -9,9 +11,9 @@ const ProgramComparisonPage = () => {
           <div className="flex items-center gap-4">
             <DashboardButton />
             <div>
-              <h1 className="text-2xl font-bold">مقارنة البرامج</h1>
+              <h1 className="text-2xl font-bold">{t('comparison.title')}</h1>
               <p className="text-sm text-muted-foreground">
-                قارن أداء البرامج الأكاديمية المختلفة
+                {t('comparison.subtitle')}
               </p>
             </div>
           </div>

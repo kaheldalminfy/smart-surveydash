@@ -12,10 +12,12 @@ import DashboardButton from "@/components/DashboardButton";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import QRCodeDialog from "@/components/QRCodeDialog";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const Surveys = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t, language } = useLanguage();
   const [surveys, setSurveys] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,12 +38,12 @@ const Surveys = () => {
     );
     const groups: Record<string, any[]> = {};
     filtered.forEach(survey => {
-      const programName = survey.programs?.name || "بدون برنامج";
+      const programName = survey.programs?.name || (language === 'ar' ? "بدون برنامج" : "No Program");
       if (!groups[programName]) groups[programName] = [];
       groups[programName].push(survey);
     });
-    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b, 'ar'));
-  }, [surveys, searchQuery]);
+    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b, language === 'ar' ? 'ar' : 'en'));
+  }, [surveys, searchQuery, language]);
 
   const getFilteredProgramSurveys = (programName: string, programSurveys: any[]) => {
     const localSearch = programSearchQueries[programName] || "";
@@ -96,8 +98,8 @@ const Surveys = () => {
 
     if (error) {
       toast({
-        title: "خطأ",
-        description: "فشل في تحميل الاستبيانات",
+        title: t('common.error'),
+        description: t('surveys.loadError') || "فشل في تحميل الاستبيانات",
         variant: "destructive",
       });
     } else if (data) {
@@ -124,17 +126,17 @@ const Surveys = () => {
   };
 
   const getSurveyStatus = (survey: any) => {
-    if (survey.status === "active") return { label: "نشط", variant: "default" as const };
-    if (survey.status === "closed") return { label: "مغلق", variant: "secondary" as const };
-    return { label: "مسودة", variant: "outline" as const };
+    if (survey.status === "active") return { label: t('surveys.active'), variant: "default" as const };
+    if (survey.status === "closed") return { label: t('surveys.closed'), variant: "secondary" as const };
+    return { label: t('surveys.draft'), variant: "outline" as const };
   };
 
   const copyLink = (surveyId: string) => {
     const link = `${window.location.origin}/take/${surveyId}`;
     navigator.clipboard.writeText(link);
     toast({
-      title: "تم النسخ",
-      description: "تم نسخ رابط الاستبيان",
+      title: t('common.copied'),
+      description: t('surveys.linkCopied') || "تم نسخ رابط الاستبيان",
     });
   };
 
@@ -142,8 +144,8 @@ const Surveys = () => {
     // تحذير إذا لم يكن الاستبيان نشطاً
     if (survey.status !== "active") {
       toast({
-        title: "تحذير",
-        description: "هذا الاستبيان غير نشط. يجب تفعيل الاستبيان أولاً حتى يتمكن المستخدمون من الوصول إليه عبر رمز QR",
+        title: t('common.warning') || "تحذير",
+        description: t('surveys.inactiveWarning') || "هذا الاستبيان غير نشط. يجب تفعيل الاستبيان أولاً حتى يتمكن المستخدمون من الوصول إليه عبر رمز QR",
         variant: "destructive",
       });
       return;
@@ -176,8 +178,8 @@ const Surveys = () => {
     } catch (error) {
       console.error('Error generating QR code:', error);
       toast({
-        title: "خطأ",
-        description: "فشل في إنشاء رمز الاستجابة السريع",
+        title: t('common.error'),
+        description: t('qr.error') || "فشل في إنشاء رمز الاستجابة السريع",
         variant: "destructive",
       });
       return;
@@ -199,14 +201,14 @@ const Surveys = () => {
 
     if (error) {
       toast({
-        title: "خطأ",
-        description: "فشل في تغيير حالة الاستبيان",
+        title: t('common.error'),
+        description: t('surveys.statusError') || "فشل في تغيير حالة الاستبيان",
         variant: "destructive",
       });
     } else {
       toast({
-        title: "تم التحديث",
-        description: `تم ${newStatus === "active" ? "تفعيل" : "إيقاف"} الاستبيان بنجاح`,
+        title: t('common.updated'),
+        description: `${t('surveys.statusUpdated') || "تم تحديث حالة الاستبيان"}`,
       });
       loadSurveys();
     }
@@ -244,15 +246,15 @@ const Surveys = () => {
       }
 
       toast({
-        title: "تم التحديث",
-        description: "تم تحديث جميع رموز QR بنجاح",
+        title: t('common.updated'),
+        description: t('surveys.qrUpdated') || "تم تحديث جميع رموز QR بنجاح",
       });
       loadSurveys();
     } catch (error) {
       console.error('Error regenerating QR codes:', error);
       toast({
-        title: "خطأ",
-        description: "فشل في تحديث رموز QR",
+        title: t('common.error'),
+        description: t('qr.error') || "فشل في تحديث رموز QR",
         variant: "destructive",
       });
     }
@@ -266,14 +268,14 @@ const Surveys = () => {
 
     if (error) {
       toast({
-        title: "خطأ",
-        description: "فشل في حذف الاستبيان",
+        title: t('common.error'),
+        description: t('surveys.deleteError') || "فشل في حذف الاستبيان",
         variant: "destructive",
       });
     } else {
       toast({
-        title: "تم الحذف",
-        description: "تم حذف الاستبيان بنجاح",
+        title: t('common.deleted'),
+        description: t('surveys.deleteSuccess') || "تم حذف الاستبيان بنجاح",
       });
       loadSurveys();
     }
@@ -288,14 +290,14 @@ const Surveys = () => {
 
     if (error) {
       toast({
-        title: "خطأ",
-        description: "فشل في حذف النموذج",
+        title: t('common.error'),
+        description: t('surveys.deleteTemplateError') || "فشل في حذف النموذج",
         variant: "destructive",
       });
     } else {
       toast({
-        title: "تم الحذف",
-        description: "تم حذف النموذج بنجاح",
+        title: t('common.deleted'),
+        description: t('surveys.deleteTemplateSuccess') || "تم حذف النموذج بنجاح",
       });
       loadTemplates();
     }
@@ -310,8 +312,8 @@ const Surveys = () => {
             <div className="flex items-center gap-4">
               <DashboardButton />
               <div>
-                <h1 className="text-2xl font-bold">إدارة الاستبيانات</h1>
-                <p className="text-sm text-muted-foreground">عرض وإدارة الاستبيانات والنماذج</p>
+                <h1 className="text-2xl font-bold">{t('surveys.title')}</h1>
+                <p className="text-sm text-muted-foreground">{t('surveys.subtitle')}</p>
               </div>
             </div>
             <div className="flex gap-3">
@@ -323,12 +325,12 @@ const Surveys = () => {
                     onClick={regenerateAllQRCodes}
                   >
                     <QrCode className="h-5 w-5 ml-2" />
-                    تحديث رموز QR
+                    {t('surveys.updateQR')}
                   </Button>
                   <Link to="/surveys/new">
                     <Button variant="hero" size="lg">
                       <Plus className="h-5 w-5 ml-2" />
-                      استبيان جديد
+                      {t('surveys.create')}
                     </Button>
                   </Link>
                 </>
@@ -341,8 +343,8 @@ const Surveys = () => {
       <main className="container mx-auto px-4 py-8">
         <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
           <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="surveys">الاستبيانات</TabsTrigger>
-            <TabsTrigger value="templates">النماذج</TabsTrigger>
+            <TabsTrigger value="surveys">{t('surveys.title')}</TabsTrigger>
+            <TabsTrigger value="templates">{t('surveys.templates')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="surveys" className="space-y-6">
@@ -350,7 +352,7 @@ const Surveys = () => {
               <div className="relative">
                 <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
-                  placeholder="البحث في الاستبيانات..."
+                  placeholder={t('surveys.searchPlaceholder')}
                   className="pr-10"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -365,11 +367,11 @@ const Surveys = () => {
             ) : groupedSurveys.length === 0 ? (
               <Card>
                 <CardContent className="text-center py-12">
-                  <p className="text-muted-foreground mb-4">لا توجد استبيانات حالياً</p>
+                  <p className="text-muted-foreground mb-4">{t('surveys.noSurveys')}</p>
                   <Link to="/surveys/new">
                     <Button variant="hero">
                       <Plus className="h-4 w-4 ml-2" />
-                      إنشاء أول استبيان
+                      {t('surveys.createFirst')}
                     </Button>
                   </Link>
                 </CardContent>
@@ -393,7 +395,7 @@ const Surveys = () => {
                           <div className="relative flex-1 w-full sm:max-w-xs">
                             <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
-                              placeholder="بحث داخل البرنامج..."
+                              placeholder={t('common.search')}
                               className="pr-10 h-9"
                               value={programSearchQueries[programName] || ""}
                               onChange={(e) => setProgramSearchQueries(prev => ({ ...prev, [programName]: e.target.value }))}
@@ -401,10 +403,10 @@ const Surveys = () => {
                           </div>
                           <div className="flex gap-1 flex-wrap">
                             {([
-                              { key: 'all' as const, label: 'الكل' },
-                              { key: 'active' as const, label: 'نشط' },
-                              { key: 'draft' as const, label: 'مسودة' },
-                              { key: 'closed' as const, label: 'مغلق' },
+                              { key: 'all' as const, label: t('analytics.all') },
+                              { key: 'active' as const, label: t('surveys.active') },
+                              { key: 'draft' as const, label: t('surveys.draft') },
+                              { key: 'closed' as const, label: t('surveys.closed') },
                             ]).map(({ key, label }) => (
                               <Button
                                 key={key}
@@ -420,7 +422,7 @@ const Surveys = () => {
                         </div>
 
                         {filteredSurveys.length === 0 ? (
-                          <p className="text-sm text-muted-foreground text-center py-4">لا توجد نتائج</p>
+                          <p className="text-sm text-muted-foreground text-center py-4">{t('common.noData')}</p>
                         ) : (
                           <div className="grid grid-cols-1 gap-4">
                             {filteredSurveys.map((survey) => {
@@ -437,8 +439,8 @@ const Surveys = () => {
                                           <Badge variant={status.variant}>{status.label}</Badge>
                                         </div>
                                         <CardDescription>
-                                          {survey.start_date && `${new Date(survey.start_date).toLocaleDateString('ar-SA')}`}
-                                          {survey.end_date && ` إلى ${new Date(survey.end_date).toLocaleDateString('ar-SA')}`}
+                                          {survey.start_date && `${new Date(survey.start_date).toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US')}`}
+                                          {survey.end_date && ` - ${new Date(survey.end_date).toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US')}`}
                                         </CardDescription>
                                       </div>
                                     </div>

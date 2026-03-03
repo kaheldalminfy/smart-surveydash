@@ -2,10 +2,12 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle2, RotateCcw } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const SurveyComplete = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useLanguage();
   
   // Get survey ID from state passed during navigation
   const surveyId = location.state?.surveyId;
@@ -29,9 +31,9 @@ const SurveyComplete = () => {
             </div>
           </div>
           <div className="space-y-2">
-            <h2 className="text-2xl font-bold">شكراً لمشاركتك!</h2>
+            <h2 className="text-2xl font-bold">{t('surveyComplete.title')}</h2>
             <p className="text-muted-foreground">
-              تم إرسال إجاباتك بنجاح. نقدر وقتك ومساهمتك في تحسين جودة التعليم.
+              {t('surveyComplete.description')}
             </p>
           </div>
           <div className="space-y-3">
@@ -42,7 +44,7 @@ const SurveyComplete = () => {
               onClick={handleRetakeSurvey}
             >
               <RotateCcw className="h-5 w-5 ml-2" />
-              تعبئة الاستبيان مرة أخرى
+              {t('surveyComplete.retake')}
             </Button>
           </div>
         </CardContent>
