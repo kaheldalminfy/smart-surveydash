@@ -186,6 +186,14 @@ const translations: Record<Language, Record<string, string>> = {
     'recommendations.firstSem': 'الفصل الأول',
     'recommendations.secondSem': 'الفصل الثاني',
     'recommendations.summerSemester': 'الفصل الصيفي',
+    'recommendations.recommendationText': 'التوصية',
+    'recommendations.noCourses': 'لا يوجد مقرر',
+    'recommendations.viewFull': 'عرض الكامل',
+    'recommendations.reportStatus': 'حالة التقرير',
+    'recommendations.responding': 'قيد الرد',
+    'recommendations.completedReport': 'مكتمل',
+    'recommendations.noResponse': 'بدون رد',
+    'recommendations.cancelled': 'ملغي',
     
     // Reports
     'reports.title': 'التقارير والتحليلات',
@@ -1036,6 +1044,14 @@ const translations: Record<Language, Record<string, string>> = {
     'recommendations.firstSem': 'First Semester',
     'recommendations.secondSem': 'Second Semester',
     'recommendations.summerSemester': 'Summer Semester',
+    'recommendations.recommendationText': 'Recommendation',
+    'recommendations.noCourses': 'No Course',
+    'recommendations.viewFull': 'View Full',
+    'recommendations.reportStatus': 'Report Status',
+    'recommendations.responding': 'Responding',
+    'recommendations.completedReport': 'Completed',
+    'recommendations.noResponse': 'No Response',
+    'recommendations.cancelled': 'Cancelled',
     
     // Reports
     'reports.title': 'Reports & Analytics',

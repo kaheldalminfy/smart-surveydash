@@ -80,7 +80,7 @@ const Recommendations = () => {
     // Fetch reports with recommendations_text, joined with surveys
     const { data: reports } = await supabase
       .from("reports")
-      .select("id, recommendations_text, academic_year, semester, survey_id, surveys(id, title, program_id, programs(id, name))")
+      .select("id, recommendations_text, academic_year, semester, survey_id, status, surveys(id, title, program_id, programs(id, name))")
       .not("recommendations_text", "is", null)
       .neq("recommendations_text", "");
 
@@ -113,6 +113,7 @@ const Recommendations = () => {
       program_id: r.surveys?.program_id || null,
       program_name: r.surveys?.programs?.name || "",
       courses: courseMap.get(r.survey_id) || [],
+      report_status: r.status || null,
     }));
 
     setReportRecs(items);
