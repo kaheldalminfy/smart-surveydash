@@ -1,82 +1,55 @@
 
-# تفعيل دعم اللغة الإنجليزية الشامل في جميع صفحات المنظومة
 
-## المشكلة
-حالياً نظام الترجمة (`LanguageContext`) مطبق فقط في 7 صفحات من أصل 21 صفحة. الصفحات التالية تحتوي على نصوص عربية ثابتة بدون دعم للإنجليزية:
+# ترجمة شاملة لجميع الصفحات والمكونات المتبقية
 
-**صفحات بدون ترجمة (14 صفحة):**
-- `Surveys.tsx` - إدارة الاستبيانات
-- `Reports.tsx` - التقارير
-- `Complaints.tsx` - الشكاوى
-- `Recommendations.tsx` - التوصيات
-- `Archives.tsx` - الأرشيف
-- `Users.tsx` - المستخدمين
-- `SystemSettings.tsx` - الإعدادات
-- `SurveyDesigner.tsx` - تصميم الاستبيان
-- `TakeSurvey.tsx` - تعبئة الاستبيان
-- `SurveyComplete.tsx` - إكمال الاستبيان
-- `ComplaintSubmitted.tsx` - تأكيد الشكوى
-- `ProgramComparison.tsx` - مقارنة البرامج
-- `AcademicCalendar.tsx` - الأجندة الأكاديمية
-- `NotFound.tsx` - صفحة غير موجودة
+## الوضع الحالي
+- مفاتيح الترجمة (AR + EN) موجودة بالفعل في `LanguageContext.tsx` وتغطي جميع الصفحات
+- **12 صفحة** و **~10 مكونات** لا تستخدم نظام الترجمة وتعرض نصوص عربية ثابتة
 
-**مكونات بدون ترجمة:**
-- `SurveyAnalytics.tsx`, `QRCodeDialog.tsx`, `ComplaintsDashboard.tsx`, `SurveyTemplates.tsx`, `ReportDashboard.tsx`, `PDFPreviewDialog.tsx`, `AddUserDialog.tsx`, وغيرها
+## الملفات التي تحتاج تعديل
 
-## الحل
+### المجموعة 1 - الصفحات الرئيسية (الأكثر استخداماً)
+| الملف | حجمه | التغيير |
+|-------|-------|---------|
+| `Reports.tsx` | 1410 سطر | إضافة `useLanguage` + استبدال ~80 نص ثابت بـ `t()` |
+| `Complaints.tsx` | 1586 سطر | إضافة `useLanguage` + استبدال ~60 نص ثابت |
+| `Recommendations.tsx` | 438 سطر | إضافة `useLanguage` + استبدال ~40 نص |
+| `Archives.tsx` | 593 سطر | إضافة `useLanguage` + استبدال ~35 نص |
+| `Users.tsx` | 448 سطر | إضافة `useLanguage` + استبدال ~30 نص |
 
-### المبدأ الأساسي
-- جميع عناصر الواجهة (أزرار، عناوين، تسميات، رسائل) تتحول للإنجليزية عند تغيير اللغة
-- البيانات المخزنة في قاعدة البيانات (عناوين الاستبيانات، نصوص التقارير، التوصيات، الشكاوى) تبقى كما هي بلغتها الأصلية
-- لا تغيير في قاعدة البيانات إطلاقاً
-
-### خطوات التنفيذ
-
-#### 1. توسيع ملف الترجمة `LanguageContext.tsx`
-إضافة مفاتيح ترجمة جديدة تغطي جميع النصوص الثابتة في الصفحات غير المترجمة. تقريباً 150-200 مفتاح جديد تشمل:
-- نصوص مصمم الاستبيان (أنواع الأسئلة، أزرار الحفظ، تعليمات)
-- نصوص صفحة التقارير (أزرار التصدير، عناوين الأقسام)
-- نصوص صفحة الشكاوى (أعمدة الجدول، حالات الشكوى)
-- نصوص الأرشيف والتوصيات والمقارنة والتقويم
-- رسائل Toast (نجاح/خطأ)
-
-#### 2. تحديث كل صفحة لاستخدام `t()` أو `language === 'ar'`
-لكل صفحة من الـ 14 صفحة + المكونات المساعدة:
-- إضافة `import { useLanguage } from "@/contexts/LanguageContext"`
-- استبدال النصوص العربية الثابتة بـ `t('key')` أو `language === 'ar' ? 'عربي' : 'English'`
-- إضافة `LanguageToggle` في الصفحات التي لا تحتوي عليه
-
-#### 3. لا تغيير في:
-- قاعدة البيانات
-- ملفات التقارير PDF/Excel (تبقى بلغة المحتوى الأصلي)
-- بيانات الاستبيانات والتوصيات المخزنة
-
-## الملفات المتأثرة
-
+### المجموعة 2 - صفحات الاستبيان
 | الملف | التغيير |
 |-------|---------|
-| `src/contexts/LanguageContext.tsx` | إضافة ~200 مفتاح ترجمة جديد |
-| `src/pages/Surveys.tsx` | تطبيق `t()` على جميع النصوص الثابتة |
-| `src/pages/Reports.tsx` | تطبيق `t()` على جميع النصوص الثابتة |
-| `src/pages/Complaints.tsx` | تطبيق `t()` على جميع النصوص الثابتة |
-| `src/pages/Recommendations.tsx` | تطبيق `t()` على جميع النصوص الثابتة |
-| `src/pages/Archives.tsx` | تطبيق `t()` على جميع النصوص الثابتة |
-| `src/pages/Users.tsx` | تطبيق `t()` على جميع النصوص الثابتة |
-| `src/pages/SystemSettings.tsx` | تطبيق `t()` على جميع النصوص الثابتة |
-| `src/pages/SurveyDesigner.tsx` | تطبيق `t()` على جميع النصوص الثابتة |
-| `src/pages/TakeSurvey.tsx` | تطبيق `t()` على جميع النصوص الثابتة |
-| `src/pages/SurveyComplete.tsx` | تطبيق `t()` |
-| `src/pages/ComplaintSubmitted.tsx` | تطبيق `t()` |
-| `src/pages/ProgramComparison.tsx` | تطبيق `t()` |
-| `src/pages/AcademicCalendar.tsx` | تطبيق `t()` |
-| `src/pages/NotFound.tsx` | تطبيق `t()` |
-| `src/components/SurveyAnalytics.tsx` | تطبيق `t()` |
-| `src/components/QRCodeDialog.tsx` | تطبيق `t()` |
-| `src/components/ComplaintsDashboard.tsx` | تطبيق `t()` |
-| `src/components/SurveyTemplates.tsx` | تطبيق `t()` |
-| `src/components/ReportDashboard.tsx` | تطبيق `t()` |
-| `src/components/AddUserDialog.tsx` | تطبيق `t()` |
-| مكونات أخرى حسب الحاجة | تطبيق `t()` |
+| `SurveyDesigner.tsx` | استبدال نصوص التصميم والأسئلة |
+| `TakeSurvey.tsx` | استبدال نصوص تعبئة الاستبيان |
+| `ComplaintSubmitted.tsx` | استبدال نصوص التأكيد |
+| `AcademicCalendar.tsx` | استبدال نصوص الأجندة |
+
+### المجموعة 3 - المكونات
+| الملف | التغيير |
+|-------|---------|
+| `ComplaintsDashboard.tsx` | ترجمة لوحة تحكم الشكاوى |
+| `ComplaintsStatistics.tsx` | ترجمة الإحصائيات |
+| `SurveyAnalytics.tsx` | ترجمة التحليلات |
+| `SurveyTemplates.tsx` | ترجمة القوالب |
+| `SurveyPreview.tsx` | ترجمة المعاينة |
+| `ReportDashboard.tsx` | ترجمة لوحة التقارير |
+| `PDFPreviewDialog.tsx` | ترجمة معاينة PDF |
+| `QRCodeDialog.tsx` | ترجمة حوار QR |
+| `UserRolesDialog.tsx` | ترجمة حوار الصلاحيات |
+| `ResetPasswordDialog.tsx` | ترجمة إعادة تعيين كلمة المرور |
+| `ForcePasswordChange.tsx` | ترجمة تغيير كلمة المرور |
+| `SurveyDistribution.tsx` | ترجمة التوزيع |
+
+## النهج التقني
+لكل ملف:
+1. إضافة `import { useLanguage } from "@/contexts/LanguageContext"`
+2. إضافة `const { t, language } = useLanguage()` في بداية المكون
+3. استبدال كل نص عربي ثابت بـ `t('key')` باستخدام المفاتيح الموجودة
+4. بعض النصوص المحلية (مثل `getMeanLevel` في Reports.tsx) تُستبدل بمنطق `language === 'ar' ? ... : ...`
 
 ## ملاحظة مهمة
-هذا تغيير كبير يشمل ~20+ ملف. يُفضل تنفيذه على مراحل (مثلاً 4-5 ملفات في كل مرة) لتجنب الأخطاء. هل تريد البدء بمجموعة معينة من الصفحات أولاً؟
+- البيانات من قاعدة البيانات (عناوين الاستبيانات، نصوص التقارير، أسماء البرامج) **لن تتغير** - تبقى بلغتها الأصلية
+- ملفات PDF/Excel المُصدَّرة تبقى بلغة المحتوى الأصلي
+- التغيير يشمل ~20+ ملف - سيتم تنفيذه على دفعات (5-6 ملفات لكل دفعة)
+
