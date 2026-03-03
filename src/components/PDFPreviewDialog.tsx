@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from "@/components/ui/button";
 import { Download, X, Loader2, FileText, ZoomIn, ZoomOut } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface PDFPreviewDialogProps {
   open: boolean;
@@ -18,9 +19,10 @@ export const PDFPreviewDialog = ({
   onOpenChange,
   pdfBlob,
   onDownload,
-  title = "معاينة التقرير",
+  title,
   isGenerating = false
 }: PDFPreviewDialogProps) => {
+  const { t } = useLanguage();
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [zoom, setZoom] = useState(100);
 
@@ -44,27 +46,17 @@ export const PDFPreviewDialog = ({
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              {title}
+              {title || t('pdfPreview.title')}
             </DialogTitle>
             <DialogDescription className="sr-only">
-              معاينة ملف PDF قبل التحميل
+              {t('pdfPreview.title')}
             </DialogDescription>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleZoomOut}
-                disabled={zoom <= 50}
-              >
+              <Button variant="outline" size="icon" onClick={handleZoomOut} disabled={zoom <= 50}>
                 <ZoomOut className="h-4 w-4" />
               </Button>
               <span className="text-sm min-w-[60px] text-center">{zoom}%</span>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleZoomIn}
-                disabled={zoom >= 200}
-              >
+              <Button variant="outline" size="icon" onClick={handleZoomIn} disabled={zoom >= 200}>
                 <ZoomIn className="h-4 w-4" />
               </Button>
             </div>
@@ -76,24 +68,17 @@ export const PDFPreviewDialog = ({
             <div className="flex items-center justify-center h-full">
               <div className="text-center space-y-4">
                 <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
-                <p className="text-lg font-medium">جاري إنشاء التقرير...</p>
-                <p className="text-sm text-muted-foreground">يرجى الانتظار</p>
+                <p className="text-lg font-medium">{t('pdfPreview.generating')}</p>
+                <p className="text-sm text-muted-foreground">{t('pdfPreview.pleaseWait')}</p>
               </div>
             </div>
           ) : pdfUrl ? (
             <ScrollArea className="h-full">
-              <div 
-                className="flex justify-center p-4"
-                style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
-              >
+              <div className="flex justify-center p-4" style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}>
                 <iframe
                   src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0`}
                   className="w-full border rounded-lg shadow-lg bg-white"
-                  style={{ 
-                    height: `${Math.max(800, 800 * (zoom / 100))}px`,
-                    minWidth: '600px',
-                    maxWidth: '900px'
-                  }}
+                  style={{ height: `${Math.max(800, 800 * (zoom / 100))}px`, minWidth: '600px', maxWidth: '900px' }}
                   title="PDF Preview"
                 />
               </div>
@@ -102,7 +87,7 @@ export const PDFPreviewDialog = ({
             <div className="flex items-center justify-center h-full">
               <div className="text-center space-y-4">
                 <FileText className="h-16 w-16 mx-auto text-muted-foreground/50" />
-                <p className="text-muted-foreground">لا يوجد ملف للمعاينة</p>
+                <p className="text-muted-foreground">{t('pdfPreview.noFile')}</p>
               </div>
             </div>
           )}
@@ -111,11 +96,11 @@ export const PDFPreviewDialog = ({
         <DialogFooter className="p-4 border-t bg-muted/30">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             <X className="h-4 w-4 ml-2" />
-            إغلاق
+            {t('common.close')}
           </Button>
           <Button onClick={onDownload} disabled={!pdfBlob || isGenerating}>
             <Download className="h-4 w-4 ml-2" />
-            تحميل PDF
+            {t('pdfPreview.download')}
           </Button>
         </DialogFooter>
       </DialogContent>
