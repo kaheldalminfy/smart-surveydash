@@ -1,10 +1,12 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { FileText, ExternalLink, BookOpen } from "lucide-react";
+import { FileText, ExternalLink, Eye } from "lucide-react";
 
 interface ReportRecommendation {
   report_id: string;
@@ -16,6 +18,7 @@ interface ReportRecommendation {
   program_id: string | null;
   program_name: string;
   courses: { name: string; code: string }[];
+  report_status: string | null;
 }
 
 interface GroupedByProgram {
@@ -31,6 +34,7 @@ interface Props {
 const ReportRecommendationsSection = ({ reportRecommendations }: Props) => {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
+  const [selectedText, setSelectedText] = useState<string | null>(null);
 
   // Group by program
   const grouped: GroupedByProgram[] = [];
@@ -51,11 +55,27 @@ const ReportRecommendationsSection = ({ reportRecommendations }: Props) => {
   }
 
   const getSemesterLabel = (sem: string | null) => {
-    if (!sem) return "";
+    if (!sem) return "-";
     if (sem === "first") return t("recommendations.firstSem");
     if (sem === "second") return t("recommendations.secondSem");
     if (sem === "summer") return t("recommendations.summerSemester");
     return sem;
+  };
+
+  const getStatusBadge = (status: string | null) => {
+    const map: Record<string, { label: string; className: string }> = {
+      responding: { label: t("recommendations.responding"), className: "bg-blue-100 text-blue-800 border-blue-200" },
+      completed: { label: t("recommendations.completedReport"), className: "bg-green-100 text-green-800 border-green-200" },
+      no_response: { label: t("recommendations.noResponse"), className: "bg-orange-100 text-orange-800 border-orange-200" },
+      cancelled: { label: t("recommendations.cancelled"), className: "bg-red-100 text-red-800 border-red-200" },
+    };
+    const s = map[status || "responding"] || map.responding;
+    return <Badge variant="outline" className={s.className}>{s.label}</Badge>;
+  };
+
+  const truncate = (text: string, max = 80) => {
+    if (text.length <= max) return text;
+    return text.slice(0, max) + "...";
   };
 
   if (grouped.length === 0) {
@@ -70,75 +90,102 @@ const ReportRecommendationsSection = ({ reportRecommendations }: Props) => {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="h-5 w-5" />
-          {t("recommendations.reportRecommendations")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Accordion type="multiple" className="w-full">
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            {t("recommendations.reportRecommendations")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
           {grouped.map((group) => (
-            <AccordionItem key={group.program_id} value={group.program_id}>
-              <AccordionTrigger className="text-base">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">{group.program_name}</span>
-                  <Badge variant="secondary">{group.items.length}</Badge>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent>
-                <div className="space-y-4">
-                  {group.items.map((rec) => (
-                    <div
-                      key={rec.report_id}
-                      className="border rounded-lg p-4 space-y-3 bg-muted/30"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="space-y-1 flex-1">
-                          <div className="font-medium flex items-center gap-2">
-                            <BookOpen className="h-4 w-4 text-muted-foreground" />
-                            {rec.survey_title}
-                          </div>
-                          <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                            {rec.academic_year && (
-                              <Badge variant="outline">{rec.academic_year}</Badge>
+            <div key={group.program_id}>
+              <div className="flex items-center gap-2 mb-3">
+                <h3 className="font-semibold text-base">{group.program_name}</h3>
+                <Badge variant="secondary">{group.items.length}</Badge>
+              </div>
+              <div className="rounded-md border overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("recommendations.surveyTitle")}</TableHead>
+                      <TableHead>{t("recommendations.courseName")}</TableHead>
+                      <TableHead>{t("recommendations.recommendationText")}</TableHead>
+                      <TableHead>{t("recommendations.reportStatus")}</TableHead>
+                      <TableHead>{t("common.academicYear")}</TableHead>
+                      <TableHead>{t("common.semester")}</TableHead>
+                      <TableHead className="text-center">{t("recommendations.actions")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {group.items.map((rec) => (
+                      <TableRow key={rec.report_id}>
+                        <TableCell className="font-medium whitespace-nowrap">{rec.survey_title || "-"}</TableCell>
+                        <TableCell>
+                          {rec.courses.length > 0
+                            ? rec.courses.map((c, i) => (
+                                <Badge key={i} variant="secondary" className="text-xs mr-1 mb-1">
+                                  {c.code} - {c.name}
+                                </Badge>
+                              ))
+                            : <span className="text-muted-foreground text-xs">{t("recommendations.noCourses")}</span>}
+                        </TableCell>
+                        <TableCell className="max-w-[250px]">
+                          <div className="flex items-start gap-1">
+                            <span className="text-sm leading-relaxed">{truncate(rec.recommendations_text)}</span>
+                            {rec.recommendations_text.length > 80 && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 shrink-0"
+                                onClick={() => setSelectedText(rec.recommendations_text)}
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </Button>
                             )}
-                            {rec.semester && (
-                              <Badge variant="outline">{getSemesterLabel(rec.semester)}</Badge>
-                            )}
-                            {rec.courses.map((c, i) => (
-                              <Badge key={i} variant="secondary" className="text-xs">
-                                {c.code} - {c.name}
-                              </Badge>
-                            ))}
                           </div>
-                        </div>
-                        {rec.survey_id && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate(`/reports/${rec.survey_id}`)}
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                            <span className={language === "ar" ? "mr-1" : "ml-1"}>
-                              {t("recommendations.viewReport")}
-                            </span>
-                          </Button>
-                        )}
-                      </div>
-                      <div className="text-sm whitespace-pre-wrap leading-relaxed bg-background rounded p-3 border">
-                        {rec.recommendations_text}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
+                        </TableCell>
+                        <TableCell>{getStatusBadge(rec.report_status)}</TableCell>
+                        <TableCell className="whitespace-nowrap">{rec.academic_year || "-"}</TableCell>
+                        <TableCell className="whitespace-nowrap">{getSemesterLabel(rec.semester)}</TableCell>
+                        <TableCell className="text-center">
+                          {rec.survey_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => navigate(`/reports/${rec.survey_id}`)}
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              <span className={language === "ar" ? "mr-1" : "ml-1"}>
+                                {t("recommendations.viewReport")}
+                              </span>
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
           ))}
-        </Accordion>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      {/* Full text dialog */}
+      <Dialog open={!!selectedText} onOpenChange={(open) => !open && setSelectedText(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t("recommendations.recommendationText")}</DialogTitle>
+            <DialogDescription>{t("recommendations.viewFull")}</DialogDescription>
+          </DialogHeader>
+          <div className="whitespace-pre-wrap text-sm leading-relaxed p-4 bg-muted rounded-md">
+            {selectedText}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
