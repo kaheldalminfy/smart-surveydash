@@ -14,9 +14,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Edit } from "lucide-react";
 import DashboardButton from "@/components/DashboardButton";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const Recommendations = () => {
   const navigate = useNavigate();
+  const { t, language } = useLanguage();
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [programs, setPrograms] = useState<any[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -85,11 +87,11 @@ const Recommendations = () => {
           .update(formData)
           .eq("id", editingId);
         if (error) throw error;
-        toast({ title: "تم تحديث التوصية بنجاح" });
+        toast({ title: t('common.updated') });
       } else {
         const { error } = await supabase.from("recommendations").insert(formData);
         if (error) throw error;
-        toast({ title: "تم إضافة التوصية بنجاح" });
+        toast({ title: t('common.saved') });
       }
 
       setIsDialogOpen(false);
@@ -97,8 +99,8 @@ const Recommendations = () => {
       loadRecommendations();
     } catch (error) {
       toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء حفظ التوصية",
+        title: t('common.error'),
+        description: language === 'ar' ? "حدث خطأ أثناء حفظ التوصية" : "Error saving recommendation",
         variant: "destructive",
       });
     } finally {
@@ -137,9 +139,9 @@ const Recommendations = () => {
 
   const getStatusBadge = (status: string) => {
     const statusMap = {
-      pending: { label: "معلقة", variant: "secondary" as const },
-      in_progress: { label: "قيد التنفيذ", variant: "default" as const },
-      completed: { label: "مكتملة", variant: "default" as const },
+      pending: { label: t('recommendations.pending'), variant: "secondary" as const },
+      in_progress: { label: t('recommendations.inProgress'), variant: "default" as const },
+      completed: { label: t('recommendations.completed'), variant: "default" as const },
     };
     const s = statusMap[status as keyof typeof statusMap] || statusMap.pending;
     return <Badge variant={s.variant}>{s.label}</Badge>;
@@ -147,9 +149,9 @@ const Recommendations = () => {
 
   const getPriorityBadge = (priority: string) => {
     const priorityMap = {
-      low: { label: "منخفضة", variant: "outline" as const },
-      medium: { label: "متوسطة", variant: "secondary" as const },
-      high: { label: "عالية", variant: "destructive" as const },
+      low: { label: t('recommendations.low'), variant: "outline" as const },
+      medium: { label: t('recommendations.medium'), variant: "secondary" as const },
+      high: { label: t('recommendations.high'), variant: "destructive" as const },
     };
     const p = priorityMap[priority as keyof typeof priorityMap] || priorityMap.medium;
     return <Badge variant={p.variant}>{p.label}</Badge>;
@@ -163,9 +165,9 @@ const Recommendations = () => {
             <div className="flex items-center gap-4">
               <DashboardButton />
               <div>
-                <h1 className="text-2xl font-bold">إدارة التوصيات</h1>
+                <h1 className="text-2xl font-bold">{t('recommendations.title')}</h1>
                 <p className="text-sm text-muted-foreground">
-                  متابعة وتنفيذ التوصيات التحسينية
+                  {t('recommendations.subtitle')}
                 </p>
               </div>
             </div>
@@ -173,19 +175,19 @@ const Recommendations = () => {
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="h-4 w-4 ml-2" />
-                  إضافة توصية
+                  {t('recommendations.add')}
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>{editingId ? "تعديل التوصية" : "إضافة توصية جديدة"}</DialogTitle>
+                  <DialogTitle>{editingId ? t('recommendations.editTitle') : t('recommendations.addNew')}</DialogTitle>
                   <DialogDescription>
-                    {editingId ? "قم بتعديل بيانات التوصية" : "أضف توصية تحسينية جديدة"}
+                    {editingId ? t('recommendations.editDescription') : t('recommendations.addDescription')}
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="title">عنوان التوصية *</Label>
+                    <Label htmlFor="title">{t('recommendations.recommendationTitle')} *</Label>
                     <Input
                       id="title"
                       required
@@ -195,7 +197,7 @@ const Recommendations = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="description">التفاصيل *</Label>
+                    <Label htmlFor="description">{t('recommendations.details')} *</Label>
                     <Textarea
                       id="description"
                       required
@@ -207,14 +209,14 @@ const Recommendations = () => {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="program_id">البرنامج *</Label>
+                      <Label htmlFor="program_id">{t('recommendations.programLabel')} *</Label>
                       <Select
                         value={formData.program_id}
                         onValueChange={(value) => setFormData({ ...formData, program_id: value })}
                         required
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="اختر البرنامج" />
+                          <SelectValue placeholder={t('recommendations.selectProgram')} />
                         </SelectTrigger>
                         <SelectContent>
                           {programs.map((program) => (
@@ -227,7 +229,7 @@ const Recommendations = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="priority">الأولوية *</Label>
+                      <Label htmlFor="priority">{t('recommendations.priority')} *</Label>
                       <Select
                         value={formData.priority}
                         onValueChange={(value) => setFormData({ ...formData, priority: value })}
@@ -237,9 +239,9 @@ const Recommendations = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="low">منخفضة</SelectItem>
-                          <SelectItem value="medium">متوسطة</SelectItem>
-                          <SelectItem value="high">عالية</SelectItem>
+                          <SelectItem value="low">{t('recommendations.low')}</SelectItem>
+                          <SelectItem value="medium">{t('recommendations.medium')}</SelectItem>
+                          <SelectItem value="high">{t('recommendations.high')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -247,7 +249,7 @@ const Recommendations = () => {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="status">الحالة *</Label>
+                      <Label htmlFor="status">{t('recommendations.status')} *</Label>
                       <Select
                         value={formData.status}
                         onValueChange={(value) => setFormData({ ...formData, status: value })}
@@ -257,15 +259,15 @@ const Recommendations = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="pending">معلقة</SelectItem>
-                          <SelectItem value="in_progress">قيد التنفيذ</SelectItem>
-                          <SelectItem value="completed">مكتملة</SelectItem>
+                          <SelectItem value="pending">{t('recommendations.pending')}</SelectItem>
+                          <SelectItem value="in_progress">{t('recommendations.inProgress')}</SelectItem>
+                          <SelectItem value="completed">{t('recommendations.completed')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="source_type">المصدر *</Label>
+                      <Label htmlFor="source_type">{t('recommendations.source')} *</Label>
                       <Select
                         value={formData.source_type}
                         onValueChange={(value) => setFormData({ ...formData, source_type: value })}
@@ -275,9 +277,9 @@ const Recommendations = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="survey">استبيان</SelectItem>
-                          <SelectItem value="complaint">شكوى</SelectItem>
-                          <SelectItem value="manual">يدوي</SelectItem>
+                          <SelectItem value="survey">{t('recommendations.survey')}</SelectItem>
+                          <SelectItem value="complaint">{t('recommendations.complaint')}</SelectItem>
+                          <SelectItem value="manual">{t('recommendations.manual')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -285,7 +287,7 @@ const Recommendations = () => {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="academic_year">السنة الأكاديمية *</Label>
+                      <Label htmlFor="academic_year">{t('common.academicYear')} *</Label>
                       <Input
                         id="academic_year"
                         required
@@ -294,19 +296,19 @@ const Recommendations = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="semester">الفصل الدراسي *</Label>
+                      <Label htmlFor="semester">{t('common.semester')} *</Label>
                       <Select
                         value={formData.semester}
                         onValueChange={(value) => setFormData({ ...formData, semester: value })}
                         required
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="اختر الفصل" />
+                          <SelectValue placeholder={t('recommendations.selectSemester')} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="first">الأول</SelectItem>
-                          <SelectItem value="second">الثاني</SelectItem>
-                          <SelectItem value="summer">الصيفي</SelectItem>
+                          <SelectItem value="first">{t('recommendations.first')}</SelectItem>
+                          <SelectItem value="second">{t('recommendations.second')}</SelectItem>
+                          <SelectItem value="summer">{t('recommendations.summerSem')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -314,10 +316,10 @@ const Recommendations = () => {
 
                   <div className="flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={() => { setIsDialogOpen(false); resetForm(); }}>
-                      إلغاء
+                      {t('common.cancel')}
                     </Button>
                     <Button type="submit" disabled={isSubmitting}>
-                      {isSubmitting ? "جاري الحفظ..." : editingId ? "تحديث" : "إضافة"}
+                      {isSubmitting ? t('recommendations.saving') : editingId ? t('recommendations.update') : t('common.add')}
                     </Button>
                   </div>
                 </form>
@@ -332,7 +334,7 @@ const Recommendations = () => {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                إجمالي التوصيات
+                {t('recommendations.total')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -343,7 +345,7 @@ const Recommendations = () => {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                مكتملة
+                {t('recommendations.completed')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -354,7 +356,7 @@ const Recommendations = () => {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                قيد التنفيذ
+                {t('recommendations.inProgress')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -365,7 +367,7 @@ const Recommendations = () => {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                معلقة
+                {t('recommendations.pending')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -376,7 +378,7 @@ const Recommendations = () => {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                معدل الإنجاز
+                {t('recommendations.completionRate')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -388,32 +390,32 @@ const Recommendations = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>قائمة التوصيات</CardTitle>
+            <CardTitle>{t('recommendations.list')}</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>التاريخ</TableHead>
-                  <TableHead>العنوان</TableHead>
-                  <TableHead>البرنامج</TableHead>
-                  <TableHead>المصدر</TableHead>
-                  <TableHead>الأولوية</TableHead>
-                  <TableHead>الحالة</TableHead>
-                  <TableHead>الإجراءات</TableHead>
+                  <TableHead>{t('recommendations.date')}</TableHead>
+                  <TableHead>{t('recommendations.titleLabel')}</TableHead>
+                  <TableHead>{t('recommendations.programLabel')}</TableHead>
+                  <TableHead>{t('recommendations.source')}</TableHead>
+                  <TableHead>{t('recommendations.priority')}</TableHead>
+                  <TableHead>{t('recommendations.status')}</TableHead>
+                  <TableHead>{t('recommendations.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {recommendations.map((rec) => (
                   <TableRow key={rec.id}>
                     <TableCell>
-                      {new Date(rec.created_at).toLocaleDateString("ar-SA")}
+                      {new Date(rec.created_at).toLocaleDateString(language === 'ar' ? "ar-SA" : "en-US")}
                     </TableCell>
                     <TableCell className="font-medium">{rec.title}</TableCell>
                     <TableCell>{rec.programs?.name}</TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {rec.source_type === "survey" ? "استبيان" : rec.source_type === "complaint" ? "شكوى" : "يدوي"}
+                        {rec.source_type === "survey" ? t('recommendations.survey') : rec.source_type === "complaint" ? t('recommendations.complaint') : t('recommendations.manual')}
                       </Badge>
                     </TableCell>
                     <TableCell>{getPriorityBadge(rec.priority)}</TableCell>
@@ -421,7 +423,7 @@ const Recommendations = () => {
                     <TableCell>
                       <Button variant="outline" size="sm" onClick={() => handleEdit(rec)}>
                         <Edit className="h-4 w-4 ml-2" />
-                        تعديل
+                        {t('recommendations.edit')}
                       </Button>
                     </TableCell>
                   </TableRow>

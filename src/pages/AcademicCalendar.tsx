@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface AcademicPeriod {
   id: string;
@@ -28,6 +29,7 @@ interface AcademicPeriod {
 const AcademicCalendar = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t, language } = useLanguage();
   const [periods, setPeriods] = useState<AcademicPeriod[]>([]);
   const [loading, setLoading] = useState(true);
   const [canManage, setCanManage] = useState(false);
@@ -35,60 +37,29 @@ const AcademicCalendar = () => {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<AcademicPeriod | null>(null);
-  const [formData, setFormData] = useState({
-    academic_year: "",
-    semester: "",
-    start_date: "",
-    end_date: "",
-  });
+  const [formData, setFormData] = useState({ academic_year: "", semester: "", start_date: "", end_date: "" });
 
-  useEffect(() => {
-    checkPermissions();
-    loadPeriods();
-  }, []);
+  useEffect(() => { checkPermissions(); loadPeriods(); }, []);
 
   const checkPermissions = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      navigate("/auth");
-      return;
-    }
-
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id);
-
+    if (!user) { navigate("/auth"); return; }
+    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
     const isAdmin = roles?.some(r => r.role === "admin");
     const isCoordinator = roles?.some(r => r.role === "coordinator");
-    
     if (!isAdmin && !isCoordinator) {
-      toast({
-        title: "غير مصرح",
-        description: "ليس لديك صلاحية للوصول إلى هذه الصفحة",
-        variant: "destructive",
-      });
+      toast({ title: t('common.unauthorized'), description: language === 'ar' ? "ليس لديك صلاحية للوصول إلى هذه الصفحة" : "You don't have permission to access this page", variant: "destructive" });
       navigate("/dashboard");
       return;
     }
-    
     setCanManage(true);
   };
 
   const loadPeriods = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("academic_calendar")
-      .select("*")
-      .order("academic_year", { ascending: false })
-      .order("start_date", { ascending: false });
-
+    const { data, error } = await supabase.from("academic_calendar").select("*").order("academic_year", { ascending: false }).order("start_date", { ascending: false });
     if (error) {
-      toast({
-        title: "خطأ",
-        description: "فشل تحميل الأجندة الأكاديمية",
-        variant: "destructive",
-      });
+      toast({ title: t('common.error'), description: language === 'ar' ? "فشل تحميل الأجندة الأكاديمية" : "Failed to load academic calendar", variant: "destructive" });
     } else {
       setPeriods(data || []);
     }
@@ -97,46 +68,15 @@ const AcademicCalendar = () => {
 
   const handleAdd = async () => {
     if (!formData.academic_year || !formData.semester || !formData.start_date || !formData.end_date) {
-      toast({
-        title: "خطأ",
-        description: "الرجاء تعبئة جميع الحقول",
-        variant: "destructive",
-      });
+      toast({ title: t('common.error'), description: t('calendar.fillAllFields'), variant: "destructive" });
       return;
     }
-
-    const { error } = await supabase
-      .from("academic_calendar")
-      .insert({
-        academic_year: formData.academic_year,
-        semester: formData.semester,
-        start_date: formData.start_date,
-        end_date: formData.end_date,
-        is_current: false,
-      });
-
+    const { error } = await supabase.from("academic_calendar").insert({ ...formData, is_current: false });
     if (error) {
-      if (error.code === "23505") {
-        toast({
-          title: "خطأ",
-          description: "هذا الفصل الدراسي موجود مسبقًا لهذه السنة الأكاديمية",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "خطأ",
-          description: "فشل إضافة الفصل الدراسي",
-          variant: "destructive",
-        });
-      }
+      toast({ title: t('common.error'), description: error.code === "23505" ? t('calendar.duplicateError') : (language === 'ar' ? "فشل إضافة الفصل الدراسي" : "Failed to add semester"), variant: "destructive" });
       return;
     }
-
-    toast({
-      title: "تمت الإضافة",
-      description: "تم إضافة الفصل الدراسي بنجاح",
-    });
-    
+    toast({ title: t('calendar.added'), description: t('calendar.addSuccess') });
     setShowAddDialog(false);
     setFormData({ academic_year: "", semester: "", start_date: "", end_date: "" });
     loadPeriods();
@@ -144,38 +84,15 @@ const AcademicCalendar = () => {
 
   const handleEdit = async () => {
     if (!selectedPeriod || !formData.academic_year || !formData.semester || !formData.start_date || !formData.end_date) {
-      toast({
-        title: "خطأ",
-        description: "الرجاء تعبئة جميع الحقول",
-        variant: "destructive",
-      });
+      toast({ title: t('common.error'), description: t('calendar.fillAllFields'), variant: "destructive" });
       return;
     }
-
-    const { error } = await supabase
-      .from("academic_calendar")
-      .update({
-        academic_year: formData.academic_year,
-        semester: formData.semester,
-        start_date: formData.start_date,
-        end_date: formData.end_date,
-      })
-      .eq("id", selectedPeriod.id);
-
+    const { error } = await supabase.from("academic_calendar").update(formData).eq("id", selectedPeriod.id);
     if (error) {
-      toast({
-        title: "خطأ",
-        description: "فشل تحديث الفصل الدراسي",
-        variant: "destructive",
-      });
+      toast({ title: t('common.error'), description: language === 'ar' ? "فشل تحديث الفصل الدراسي" : "Failed to update semester", variant: "destructive" });
       return;
     }
-
-    toast({
-      title: "تم التحديث",
-      description: "تم تحديث الفصل الدراسي بنجاح",
-    });
-    
+    toast({ title: t('common.updated'), description: t('calendar.updateSuccess') });
     setShowEditDialog(false);
     setSelectedPeriod(null);
     setFormData({ academic_year: "", semester: "", start_date: "", end_date: "" });
@@ -184,102 +101,73 @@ const AcademicCalendar = () => {
 
   const handleDelete = async () => {
     if (!selectedPeriod) return;
-
-    const { error } = await supabase
-      .from("academic_calendar")
-      .delete()
-      .eq("id", selectedPeriod.id);
-
+    const { error } = await supabase.from("academic_calendar").delete().eq("id", selectedPeriod.id);
     if (error) {
-      toast({
-        title: "خطأ",
-        description: "فشل حذف الفصل الدراسي",
-        variant: "destructive",
-      });
+      toast({ title: t('common.error'), description: language === 'ar' ? "فشل حذف الفصل الدراسي" : "Failed to delete semester", variant: "destructive" });
       return;
     }
-
-    toast({
-      title: "تم الحذف",
-      description: "تم حذف الفصل الدراسي بنجاح",
-    });
-    
+    toast({ title: t('common.deleted'), description: t('calendar.deleteSuccess') });
     setShowDeleteDialog(false);
     setSelectedPeriod(null);
     loadPeriods();
   };
 
   const handleSetCurrent = async (period: AcademicPeriod) => {
-    // First, unset all current
-    await supabase
-      .from("academic_calendar")
-      .update({ is_current: false })
-      .neq("id", "00000000-0000-0000-0000-000000000000"); // Update all
-
-    // Then set the selected one as current
-    const { error } = await supabase
-      .from("academic_calendar")
-      .update({ is_current: true })
-      .eq("id", period.id);
-
+    await supabase.from("academic_calendar").update({ is_current: false }).neq("id", "00000000-0000-0000-0000-000000000000");
+    const { error } = await supabase.from("academic_calendar").update({ is_current: true }).eq("id", period.id);
     if (error) {
-      toast({
-        title: "خطأ",
-        description: "فشل تحديث الفصل الدراسي الحالي",
-        variant: "destructive",
-      });
+      toast({ title: t('common.error'), description: language === 'ar' ? "فشل تحديث الفصل الدراسي الحالي" : "Failed to set current semester", variant: "destructive" });
       return;
     }
-
-    toast({
-      title: "تم التحديث",
-      description: "تم تعيين الفصل الدراسي الحالي بنجاح",
-    });
-    
+    toast({ title: t('common.updated'), description: t('calendar.setCurrentSuccess') });
     loadPeriods();
   };
 
   const openEditDialog = (period: AcademicPeriod) => {
     setSelectedPeriod(period);
-    setFormData({
-      academic_year: period.academic_year,
-      semester: period.semester,
-      start_date: period.start_date,
-      end_date: period.end_date,
-    });
+    setFormData({ academic_year: period.academic_year, semester: period.semester, start_date: period.start_date, end_date: period.end_date });
     setShowEditDialog(true);
   };
 
-  const openDeleteDialog = (period: AcademicPeriod) => {
-    setSelectedPeriod(period);
-    setShowDeleteDialog(true);
-  };
+  const openDeleteDialog = (period: AcademicPeriod) => { setSelectedPeriod(period); setShowDeleteDialog(true); };
 
-  // Predefined semesters
-  const semesterOptions = [
-    "الفصل الأول",
-    "الفصل الثاني",
-    "الفصل الصيفي",
-  ];
+  const semesterOptions = [t('calendar.first'), t('calendar.second'), t('calendar.summer')];
 
-  // Generate academic year options
   const currentYear = new Date().getFullYear();
-  const academicYearOptions = Array.from({ length: 5 }, (_, i) => {
-    const year = currentYear - 2 + i;
-    return `${year}-${year + 1}`;
-  });
+  const academicYearOptions = Array.from({ length: 5 }, (_, i) => { const year = currentYear - 2 + i; return `${year}-${year + 1}`; });
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
+    return (<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>);
   }
 
-  if (!canManage) {
-    return null;
-  }
+  if (!canManage) return null;
+
+  const renderForm = () => (
+    <div className="space-y-4">
+      <div>
+        <Label>{t('calendar.academicYear')}</Label>
+        <select className="w-full rounded-md border border-input bg-background px-3 py-2 mt-1" value={formData.academic_year} onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}>
+          <option value="">{t('calendar.selectYear')}</option>
+          {academicYearOptions.map((year) => (<option key={year} value={year}>{year}</option>))}
+        </select>
+      </div>
+      <div>
+        <Label>{t('calendar.semester')}</Label>
+        <select className="w-full rounded-md border border-input bg-background px-3 py-2 mt-1" value={formData.semester} onChange={(e) => setFormData({ ...formData, semester: e.target.value })}>
+          <option value="">{t('calendar.selectSemester')}</option>
+          {semesterOptions.map((sem) => (<option key={sem} value={sem}>{sem}</option>))}
+        </select>
+      </div>
+      <div>
+        <Label>{t('calendar.startDate')}</Label>
+        <Input type="date" value={formData.start_date} onChange={(e) => setFormData({ ...formData, start_date: e.target.value })} className="mt-1" />
+      </div>
+      <div>
+        <Label>{t('calendar.endDate')}</Label>
+        <Input type="date" value={formData.end_date} onChange={(e) => setFormData({ ...formData, end_date: e.target.value })} className="mt-1" />
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
@@ -291,75 +179,21 @@ const AcademicCalendar = () => {
               <div>
                 <h1 className="text-2xl font-bold flex items-center gap-2">
                   <Calendar className="h-6 w-6" />
-                  الأجندة الأكاديمية
+                  {t('calendar.title')}
                 </h1>
-                <p className="text-muted-foreground">إدارة الفصول الدراسية والسنوات الأكاديمية</p>
+                <p className="text-muted-foreground">{t('calendar.subtitle')}</p>
               </div>
             </div>
             <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
               <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 ml-2" />
-                  إضافة فصل دراسي
-                </Button>
+                <Button><Plus className="h-4 w-4 ml-2" />{t('calendar.addSemester')}</Button>
               </DialogTrigger>
               <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>إضافة فصل دراسي جديد</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label>السنة الأكاديمية</Label>
-                    <select
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 mt-1"
-                      value={formData.academic_year}
-                      onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
-                    >
-                      <option value="">اختر السنة الأكاديمية</option>
-                      {academicYearOptions.map((year) => (
-                        <option key={year} value={year}>{year}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label>الفصل الدراسي</Label>
-                    <select
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 mt-1"
-                      value={formData.semester}
-                      onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
-                    >
-                      <option value="">اختر الفصل الدراسي</option>
-                      {semesterOptions.map((sem) => (
-                        <option key={sem} value={sem}>{sem}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label>تاريخ البداية</Label>
-                    <Input
-                      type="date"
-                      value={formData.start_date}
-                      onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label>تاريخ النهاية</Label>
-                    <Input
-                      type="date"
-                      value={formData.end_date}
-                      onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setShowAddDialog(false)}>
-                      إلغاء
-                    </Button>
-                    <Button onClick={handleAdd}>
-                      إضافة
-                    </Button>
-                  </div>
+                <DialogHeader><DialogTitle>{t('calendar.addNew')}</DialogTitle></DialogHeader>
+                {renderForm()}
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setShowAddDialog(false)}>{t('common.cancel')}</Button>
+                  <Button onClick={handleAdd}>{t('common.add')}</Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -370,26 +204,26 @@ const AcademicCalendar = () => {
       <main className="container mx-auto px-4 py-8">
         <Card>
           <CardHeader>
-            <CardTitle>الفصول الدراسية</CardTitle>
-            <CardDescription>قائمة بجميع الفصول الدراسية والسنوات الأكاديمية المسجلة</CardDescription>
+            <CardTitle>{t('calendar.semesters')}</CardTitle>
+            <CardDescription>{t('calendar.semestersDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
             {periods.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>لا توجد فصول دراسية مسجلة</p>
-                <p className="text-sm">قم بإضافة فصل دراسي جديد للبدء</p>
+                <p>{t('calendar.noSemesters')}</p>
+                <p className="text-sm">{t('calendar.addToStart')}</p>
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-right">السنة الأكاديمية</TableHead>
-                    <TableHead className="text-right">الفصل الدراسي</TableHead>
-                    <TableHead className="text-right">تاريخ البداية</TableHead>
-                    <TableHead className="text-right">تاريخ النهاية</TableHead>
-                    <TableHead className="text-right">الحالة</TableHead>
-                    <TableHead className="text-right">الإجراءات</TableHead>
+                    <TableHead className="text-right">{t('calendar.academicYear')}</TableHead>
+                    <TableHead className="text-right">{t('calendar.semester')}</TableHead>
+                    <TableHead className="text-right">{t('calendar.startDate')}</TableHead>
+                    <TableHead className="text-right">{t('calendar.endDate')}</TableHead>
+                    <TableHead className="text-right">{t('calendar.status')}</TableHead>
+                    <TableHead className="text-right">{t('calendar.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -397,46 +231,24 @@ const AcademicCalendar = () => {
                     <TableRow key={period.id}>
                       <TableCell className="font-medium">{period.academic_year}</TableCell>
                       <TableCell>{period.semester}</TableCell>
-                      <TableCell>
-                        {format(new Date(period.start_date), "dd/MM/yyyy", { locale: ar })}
-                      </TableCell>
-                      <TableCell>
-                        {format(new Date(period.end_date), "dd/MM/yyyy", { locale: ar })}
-                      </TableCell>
+                      <TableCell>{format(new Date(period.start_date), "dd/MM/yyyy", { locale: language === 'ar' ? ar : undefined })}</TableCell>
+                      <TableCell>{format(new Date(period.end_date), "dd/MM/yyyy", { locale: language === 'ar' ? ar : undefined })}</TableCell>
                       <TableCell>
                         {period.is_current ? (
-                          <Badge className="bg-green-600">الفصل الحالي</Badge>
+                          <Badge className="bg-green-600">{t('calendar.current')}</Badge>
                         ) : (
-                          <Badge variant="outline">غير نشط</Badge>
+                          <Badge variant="outline">{t('calendar.inactive')}</Badge>
                         )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {!period.is_current && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleSetCurrent(period)}
-                              title="تعيين كفصل حالي"
-                            >
+                            <Button variant="outline" size="sm" onClick={() => handleSetCurrent(period)} title={t('calendar.setCurrent')}>
                               <Check className="h-4 w-4" />
                             </Button>
                           )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openEditDialog(period)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openDeleteDialog(period)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => openEditDialog(period)}><Edit className="h-4 w-4" /></Button>
+                          <Button variant="outline" size="sm" onClick={() => openDeleteDialog(period)} className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -448,84 +260,26 @@ const AcademicCalendar = () => {
         </Card>
       </main>
 
-      {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>تعديل الفصل الدراسي</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>السنة الأكاديمية</Label>
-              <select
-                className="w-full rounded-md border border-input bg-background px-3 py-2 mt-1"
-                value={formData.academic_year}
-                onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
-              >
-                <option value="">اختر السنة الأكاديمية</option>
-                {academicYearOptions.map((year) => (
-                  <option key={year} value={year}>{year}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label>الفصل الدراسي</Label>
-              <select
-                className="w-full rounded-md border border-input bg-background px-3 py-2 mt-1"
-                value={formData.semester}
-                onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
-              >
-                <option value="">اختر الفصل الدراسي</option>
-                {semesterOptions.map((sem) => (
-                  <option key={sem} value={sem}>{sem}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label>تاريخ البداية</Label>
-              <Input
-                type="date"
-                value={formData.start_date}
-                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label>تاريخ النهاية</Label>
-              <Input
-                type="date"
-                value={formData.end_date}
-                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                className="mt-1"
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowEditDialog(false)}>
-                إلغاء
-              </Button>
-              <Button onClick={handleEdit}>
-                حفظ التغييرات
-              </Button>
-            </div>
+          <DialogHeader><DialogTitle>{t('calendar.editSemester')}</DialogTitle></DialogHeader>
+          {renderForm()}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleEdit}>{t('common.save')}</Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
-            <AlertDialogDescription>
-              هل أنت متأكد من حذف الفصل الدراسي "{selectedPeriod?.semester}" للسنة "{selectedPeriod?.academic_year}"؟
-              هذا الإجراء لا يمكن التراجع عنه.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('calendar.confirmDelete')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('calendar.confirmDeleteDesc')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              حذف
-            </AlertDialogAction>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{t('common.delete')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

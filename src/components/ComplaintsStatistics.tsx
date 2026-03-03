@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ interface ComplaintsStatisticsProps {
 
 const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) => {
   const { toast } = useToast();
+  const { t, language } = useLanguage();
   const [programs, setPrograms] = useState<Program[]>([]);
   const [selectedProgram, setSelectedProgram] = useState<string>("all");
   const [complaints, setComplaints] = useState<any[]>([]);
@@ -349,9 +351,9 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-6 w-6" />
-                  تقارير إحصائيات الشكاوى
+                  {t('complaintStats.title')}
                 </CardTitle>
-                <CardDescription>إحصائيات شاملة للشكاوى مع إمكانية التصفية والتصدير</CardDescription>
+                <CardDescription>{t('complaintStats.subtitle')}</CardDescription>
               </div>
               <div className="flex gap-2 flex-wrap">
                 <Button variant="outline" onClick={exportToPDF}>
