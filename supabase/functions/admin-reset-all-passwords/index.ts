@@ -5,37 +5,59 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Generate a cryptographically strong temporary password
+function generateTempPassword(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+  const array = new Uint8Array(16);
+  crypto.getRandomValues(array);
+  return Array.from(array, (b) => chars[b % chars.length]).join('');
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Verify admin secret key for this sensitive operation
-    const { adminSecret } = await req.json();
-    
-    // Simple secret check - in production use a more secure method
-    const expectedSecret = Deno.env.get("ADMIN_RESET_SECRET") || "limu-admin-2024";
-    
-    if (adminSecret !== expectedSecret) {
-      return new Response(
-        JSON.stringify({ error: "Invalid admin secret" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
+      { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    const defaultPassword = "123456789";
+    // Verify the requesting user is an admin via JWT
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: requestingUser }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+    if (userError || !requestingUser) {
+      return new Response(
+        JSON.stringify({ error: "Invalid token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check if requesting user is admin
+    const { data: adminRole } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", requestingUser.id)
+      .eq("role", "admin")
+      .maybeSingle();
+
+    if (!adminRole) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized - Admin access required" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Get all users
     const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
@@ -47,11 +69,12 @@ Deno.serve(async (req) => {
     const results = [];
     const errors = [];
 
-    // Reset password for each user
+    // Reset password for each user with a unique strong password
     for (const user of users) {
       try {
+        const tempPassword = generateTempPassword();
         const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
-          password: defaultPassword,
+          password: tempPassword,
         });
 
         if (updateError) {
@@ -75,8 +98,6 @@ Deno.serve(async (req) => {
       console.error("Error updating profiles:", profileError);
     }
 
-    console.log(`Password reset completed. Success: ${results.length}, Errors: ${errors.length}`);
-
     return new Response(
       JSON.stringify({ 
         success: true, 
@@ -84,15 +105,13 @@ Deno.serve(async (req) => {
         totalUsers: users.length,
         successCount: results.length,
         errorCount: errors.length,
-        results,
-        errors 
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error("Error in admin-reset-all-passwords function:", error);
+    console.error("Error in admin-reset-all-passwords function:", errorMessage);
     return new Response(
       JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

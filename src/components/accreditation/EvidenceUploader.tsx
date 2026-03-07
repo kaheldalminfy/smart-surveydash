@@ -91,10 +91,8 @@ export const EvidenceUploader = ({ responseId, indicatorId }: EvidenceUploaderPr
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('accreditation-files')
-        .getPublicUrl(fileName);
+      // Store the file path (not a public URL) - use signed URLs for access
+      const filePath = fileName;
 
       // Create evidence record
       const { error: insertError } = await supabase
@@ -102,7 +100,7 @@ export const EvidenceUploader = ({ responseId, indicatorId }: EvidenceUploaderPr
         .insert({
           response_id: responseId,
           title: file.name,
-          file_url: urlData.publicUrl,
+          file_url: filePath,
           file_type: file.type,
           evidence_type: getEvidenceType(file.type),
           uploaded_by: user?.id,
@@ -251,7 +249,14 @@ export const EvidenceUploader = ({ responseId, indicatorId }: EvidenceUploaderPr
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => window.open(item.file_url!, '_blank')}
+                      onClick={async () => {
+                        const { data } = await supabase.storage
+                          .from('accreditation-files')
+                          .createSignedUrl(item.file_url!, 3600);
+                        if (data?.signedUrl) {
+                          window.open(data.signedUrl, '_blank');
+                        }
+                      }}
                     >
                       <Download className="h-4 w-4" />
                     </Button>
