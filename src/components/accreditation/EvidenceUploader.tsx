@@ -249,7 +249,14 @@ export const EvidenceUploader = ({ responseId, indicatorId }: EvidenceUploaderPr
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => window.open(item.file_url!, '_blank')}
+                      onClick={async () => {
+                        const { data } = await supabase.storage
+                          .from('accreditation-files')
+                          .createSignedUrl(item.file_url!, 3600);
+                        if (data?.signedUrl) {
+                          window.open(data.signedUrl, '_blank');
+                        }
+                      }}
                     >
                       <Download className="h-4 w-4" />
                     </Button>
