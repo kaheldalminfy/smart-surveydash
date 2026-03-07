@@ -100,7 +100,7 @@ export const EvidenceUploader = ({ responseId, indicatorId }: EvidenceUploaderPr
         .insert({
           response_id: responseId,
           title: file.name,
-          file_url: urlData.publicUrl,
+          file_url: filePath,
           file_type: file.type,
           evidence_type: getEvidenceType(file.type),
           uploaded_by: user?.id,
