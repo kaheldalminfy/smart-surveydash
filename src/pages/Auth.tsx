@@ -23,13 +23,10 @@ const Auth = () => {
   const { toast } = useToast();
   const { t, language } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
-  const [programs, setPrograms] = useState<any[]>([]);
   const [forcePasswordChange, setForcePasswordChange] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    fullName: "",
-    programId: ""
   });
 
   useEffect(() => {
@@ -38,14 +35,7 @@ const Auth = () => {
         navigate("/dashboard");
       }
     });
-
-    loadPrograms();
   }, [navigate]);
-
-  const loadPrograms = async () => {
-    const { data } = await supabase.from("programs").select("*").order("name");
-    if (data) setPrograms(data);
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,58 +99,6 @@ const Auth = () => {
     } catch (error: any) {
       toast({
         title: language === 'ar' ? "خطأ في تسجيل الدخول" : "Login error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: formData.fullName,
-          },
-          emailRedirectTo: `${window.location.origin}/`
-        }
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        if (formData.programId) {
-          await supabase
-            .from("profiles")
-            .update({ program_id: formData.programId })
-            .eq("id", data.user.id);
-        }
-
-        await supabase
-          .from("user_roles")
-          .insert({
-            user_id: data.user.id,
-            role: "user",
-            program_id: formData.programId || null
-          });
-      }
-
-      toast({
-        title: language === 'ar' ? "تم إنشاء الحساب بنجاح" : "Account created successfully",
-        description: language === 'ar' ? "يمكنك الآن تسجيل الدخول" : "You can now log in",
-      });
-
-      navigate("/dashboard");
-    } catch (error: any) {
-      toast({
-        title: language === 'ar' ? "خطأ في إنشاء الحساب" : "Registration error",
         description: error.message,
         variant: "destructive",
       });

@@ -20,17 +20,16 @@ export default function ResetPasswordDialog({ open, onOpenChange, userId, userNa
   const { toast } = useToast();
   const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
-  const defaultPassword = "123456789";
 
   const handleReset = async () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("manage-user", {
-        body: { action: "reset_password", userId, newPassword: defaultPassword },
+        body: { action: "reset_password", userId },
       });
       if (error) throw error;
       if (data.error) throw new Error(data.error);
-      toast({ title: t('resetPassword.success'), description: `${userName}: ${defaultPassword}` });
+      toast({ title: t('resetPassword.success'), description: `${userName}: ${data.tempPassword}` });
       onOpenChange(false);
       onPasswordReset();
     } catch (error: any) {
@@ -50,9 +49,6 @@ export default function ResetPasswordDialog({ open, onOpenChange, userId, userNa
           </AlertDialogTitle>
           <AlertDialogDescription className="space-y-2">
             <p>{t('resetPassword.confirm')} "<strong>{userName}</strong>"?</p>
-            <p className="bg-muted p-2 rounded-md text-center font-mono">
-              {t('resetPassword.newPassword')} <strong>{defaultPassword}</strong>
-            </p>
             <p className="text-amber-600">{t('resetPassword.note')}</p>
           </AlertDialogDescription>
         </AlertDialogHeader>
