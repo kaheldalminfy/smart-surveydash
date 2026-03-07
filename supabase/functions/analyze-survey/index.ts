@@ -1,17 +1,33 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Verify caller is authenticated
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const supabaseAuth = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: userData, error: authError } = await supabaseAuth.auth.getUser();
+    if (authError || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const { surveyId, courseName } = await req.json();
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -89,15 +105,12 @@ serve(async (req) => {
     let aiSummary = "";
     let aiRecommendations = "";
 
-    // Build course context for AI prompts
     const courseContext = courseName ? ` للمقرر الدراسي "${courseName}"` : "";
 
-    // Always generate AI analysis - even without text responses, use numeric stats
     const hasTextResponses = textResponses.length > 0;
     const hasNumericStats = stats.questions_stats.some((q: any) => q.type === "likert" || q.type === "rating");
 
     if (hasTextResponses || hasNumericStats) {
-      // Generate summary
       const summaryPrompt = hasTextResponses
         ? `قم بتحليل هذه الردود النصية من استبيان "${survey.title}"${courseContext}:\n\n${textResponses.join("\n\n")}\n\nالإحصائيات الرقمية:\n${JSON.stringify(stats.questions_stats.filter((q: any) => q.mean), null, 2)}`
         : `قم بتحليل نتائج استبيان "${survey.title}"${courseContext} بناءً على الإحصائيات الرقمية التالية:\n\n${JSON.stringify(stats.questions_stats, null, 2)}\n\nعدد الاستجابات الكلي: ${stats.total_responses}`;
@@ -129,7 +142,6 @@ serve(async (req) => {
         aiSummary = aiData.choices[0].message.content;
       }
 
-      // Generate recommendations - always generate based on stats
       const recPrompt = `بناءً على نتائج الاستبيان التالي${courseContext}:\n\nالإحصائيات: ${JSON.stringify(stats)}\n\n${aiSummary ? `التحليل: ${aiSummary}\n\n` : ''}قدم 3-5 توصيات قابلة للتنفيذ لتحسين الأداء${courseName ? ` في مقرر "${courseName}"` : ''}. يجب أن تكون التوصيات محددة وعملية ومرتبطة بنتائج الاستبيان.`;
 
       const recResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -166,6 +178,7 @@ serve(async (req) => {
       .insert({
         survey_id: surveyId,
         generated_by_ai: true,
+        generated_by: userData.user.id,
         summary: aiSummary || "لم يتم توليد ملخص",
         recommendations_text: aiRecommendations || "لم يتم توليد توصيات",
         statistics: stats,
@@ -186,8 +199,8 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error("Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error("Error in analyze-survey:", errorMessage);
     return new Response(
       JSON.stringify({ error: errorMessage }),
       {

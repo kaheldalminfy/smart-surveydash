@@ -5,6 +5,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Generate a cryptographically strong temporary password
+function generateTempPassword(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+  const array = new Uint8Array(16);
+  crypto.getRandomValues(array);
+  return Array.from(array, (b) => chars[b % chars.length]).join('');
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -14,17 +22,12 @@ Deno.serve(async (req) => {
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
+      { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
     // Verify the requesting user is an admin
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return new Response(
         JSON.stringify({ error: "No authorization header" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -56,9 +59,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { defaultPassword } = await req.json();
-    const password = defaultPassword || "123456789";
-
     // Get all users
     const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
 
@@ -69,11 +69,12 @@ Deno.serve(async (req) => {
     const results = [];
     const errors = [];
 
-    // Reset password for each user
+    // Reset password for each user with unique strong passwords
     for (const user of users) {
       try {
+        const tempPassword = generateTempPassword();
         const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
-          password: password,
+          password: tempPassword,
         });
 
         if (updateError) {
@@ -91,23 +92,21 @@ Deno.serve(async (req) => {
     await supabaseAdmin
       .from("profiles")
       .update({ force_password_change: true })
-      .neq("id", "00000000-0000-0000-0000-000000000000"); // Update all
-
-    console.log(`Password reset completed. Success: ${results.length}, Errors: ${errors.length}`);
+      .neq("id", "00000000-0000-0000-0000-000000000000");
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         message: `تم إعادة تعيين كلمات المرور لـ ${results.length} مستخدم`,
-        results,
-        errors 
+        successCount: results.length,
+        errorCount: errors.length,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error("Error in reset-all-passwords function:", error);
+    console.error("Error in reset-all-passwords:", errorMessage);
     return new Response(
       JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

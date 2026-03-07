@@ -1,16 +1,33 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Verify caller is authenticated
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data?.user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     const { surveyTitle, surveyDescription, questionType } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
@@ -71,10 +88,9 @@ ${questionType === 'mcq' ? 'قدم 4 خيارات مناسبة لكل سؤال.'
       throw new Error(`AI API error: ${response.status}`);
     }
 
-    const data = await response.json();
-    const content = data.choices[0].message.content;
+    const aiData = await response.json();
+    const content = aiData.choices[0].message.content;
     
-    // Parse JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error('Failed to parse AI response');
@@ -87,10 +103,11 @@ ${questionType === 'mcq' ? 'قدم 4 خيارات مناسبة لكل سؤال.'
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error: any) {
-    console.error('Error in suggest-questions:', error);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'حدث خطأ في معالجة الطلب';
+    console.error('Error in suggest-questions:', msg);
     return new Response(
-      JSON.stringify({ error: error.message || 'حدث خطأ في معالجة الطلب' }),
+      JSON.stringify({ error: msg }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
