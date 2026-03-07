@@ -91,10 +91,8 @@ export const EvidenceUploader = ({ responseId, indicatorId }: EvidenceUploaderPr
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('accreditation-files')
-        .getPublicUrl(fileName);
+      // Store the file path (not a public URL) - use signed URLs for access
+      const filePath = fileName;
 
       // Create evidence record
       const { error: insertError } = await supabase
