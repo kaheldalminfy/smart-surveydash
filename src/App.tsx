@@ -25,6 +25,7 @@ import AcademicCalendar from "./pages/AcademicCalendar";
 import Accreditation from "./pages/Accreditation";
 import AccreditationFramework from "./pages/AccreditationFramework";
 import IndicatorDetails from "./pages/IndicatorDetails";
+import BackupExport from "./pages/BackupExport";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
