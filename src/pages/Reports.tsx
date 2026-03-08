@@ -826,6 +826,7 @@ const Reports = () => {
         onOpenChange={setPreviewOpen}
         pdfBlob={pdfBlob}
         isGenerating={isGeneratingPreview}
+        onDownload={handleExportPDF}
       />
     </div>
   );
