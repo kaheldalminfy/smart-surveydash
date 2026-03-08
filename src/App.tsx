@@ -50,7 +50,7 @@ const App = () => (
             <Route path="/reports/:id" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
             <Route path="/complaints" element={<ProtectedRoute><Complaints /></ProtectedRoute>} />
             <Route path="/recommendations" element={<ProtectedRoute><Recommendations /></ProtectedRoute>} />
-            <Route path="/archives" element={<ProtectedRoute><Archives /></ProtectedRoute>} />
+            <Route path="/archives" element={<ProtectedRoute allowedRoles={["admin", "dean", "coordinator", "program_manager"]}><Archives /></ProtectedRoute>} />
             <Route path="/comparison" element={<ProtectedRoute allowedRoles={["admin", "dean", "coordinator", "program_manager"]}><ProgramComparison /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute allowedRoles={["admin"]}><Users /></ProtectedRoute>} />
             <Route path="/system-settings" element={<ProtectedRoute allowedRoles={["admin"]}><SystemSettings /></ProtectedRoute>} />
