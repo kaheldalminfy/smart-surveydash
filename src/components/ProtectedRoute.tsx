@@ -19,14 +19,17 @@ export const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) 
   useEffect(() => {
     let cancelled = false;
 
-    const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+    const validate = async (sessionUser: User | null) => {
       if (cancelled) return;
+      setUser(sessionUser);
 
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
+      if (!sessionUser) {
+        setAuthorized(null);
+        setLoading(false);
+        return;
+      }
 
-      if (!currentUser || !allowedRoles || allowedRoles.length === 0) {
+      if (!allowedRoles || allowedRoles.length === 0) {
         setAuthorized(true);
         setLoading(false);
         return;
@@ -35,7 +38,7 @@ export const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) 
       const { data: roles } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", currentUser.id)
+        .eq("user_id", sessionUser.id)
         .in("role", allowedRoles);
 
       if (cancelled) return;
@@ -43,19 +46,24 @@ export const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) 
       setLoading(false);
     };
 
-    init();
+    // Initial check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      validate(session?.user ?? null);
+    });
 
+    // Re-validate on any auth state change
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      setLoading(true);
+      validate(session?.user ?? null);
     });
 
     return () => {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [allowedRoles]);
 
   if (loading) {
     return (
