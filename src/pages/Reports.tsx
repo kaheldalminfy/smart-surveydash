@@ -1,40 +1,21 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Download, FileSpreadsheet, Sparkles, ArrowRight, Save, Trash2, Edit as EditIcon, BarChart3, Users, Filter, Target, MessageSquare, ListChecks, AlertTriangle, Loader2, Eye, Send } from "lucide-react";
-import DashboardButton from "@/components/DashboardButton";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from "recharts";
+import { Sparkles, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { exportToPDF, exportToExcel, captureChartAsImage, generatePDFBlob } from "@/utils/exportReport";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Progress } from "@/components/ui/progress";
 import { PDFPreviewDialog } from "@/components/PDFPreviewDialog";
-
-const COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#16a34a'];
-const MCQ_COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#6366f1', '#84cc16'];
-
-const getMeanLevel = (mean: number) => {
-  if (mean >= 4.5) return { label: 'ممتاز', color: 'bg-green-500' };
-  if (mean >= 3.5) return { label: 'جيد جداً', color: 'bg-green-400' };
-  if (mean >= 2.5) return { label: 'متوسط', color: 'bg-yellow-500' };
-  if (mean >= 1.5) return { label: 'ضعيف', color: 'bg-orange-500' };
-  return { label: 'ضعيف جداً', color: 'bg-red-500' };
-};
+import { MCQ_COLORS } from "@/components/reports/reportConstants";
+import { ReportHeader } from "@/components/reports/ReportHeader";
+import { ReportMetadataCard } from "@/components/reports/ReportMetadataCard";
+import { ReportStatisticsCards } from "@/components/reports/ReportStatisticsCards";
+import { ReportFilterCard } from "@/components/reports/ReportFilterCard";
+import { QuestionsSummaryChart } from "@/components/reports/QuestionsSummaryChart";
+import { QuestionAnalysisSection } from "@/components/reports/QuestionAnalysisSection";
+import { RecommendationsCard } from "@/components/reports/RecommendationsCard";
+import { ReportDeleteDialog } from "@/components/reports/ReportDeleteDialog";
 
 const Reports = () => {
   const { id } = useParams();
@@ -94,7 +75,6 @@ const Reports = () => {
         setReportStatus(reportData.status || "responding");
         setEditedRecommendations(reportData.recommendations_text || "");
 
-        // Fetch coordinator name
         const createdBy = reportData.surveys?.created_by;
         if (createdBy) {
           const { data: profile } = await supabase
@@ -107,7 +87,6 @@ const Reports = () => {
             if (profile.full_name && profile.full_name.trim()) {
               setCoordinatorName(profile.full_name.trim());
             } else if (profile.email) {
-              // Extract name from email: part before @, replace . and _ with spaces
               const namePart = profile.email.split('@')[0] || '';
               const cleanName = namePart.replace(/[._]/g, ' ').replace(/\s+/g, ' ').trim();
               setCoordinatorName(cleanName);
@@ -164,7 +143,7 @@ const Reports = () => {
 
       setAllQuestions(questions || []);
       setAllResponses(responses || []);
-      
+
       processDataWithFilter(questions || [], responses || [], "", []);
     } catch (error) {
       console.error("Error loading detailed answers:", error);
@@ -172,31 +151,28 @@ const Reports = () => {
   };
 
   const processDataWithFilter = (
-    questions: any[], 
-    responses: any[], 
-    filterQ: string, 
+    questions: any[],
+    responses: any[],
+    filterQ: string,
     filterVals: string[]
   ) => {
     let filteredResponses = responses;
-    
+
     if (filterQ && filterVals.length > 0) {
-      // Normalize filter values for comparison (trim whitespace)
       const normalizedFilterVals = filterVals.map(v => String(v).trim());
-      
+
       filteredResponses = filteredResponses.filter(response => {
         const answer = response.answers?.find((a: any) => a.question_id === filterQ);
         if (!answer) return false;
-        
-        // Normalize stored answer values for comparison
+
         const answerValueNormalized = String(answer.value || '').trim();
         const numericValueNormalized = String(answer.numeric_value || '').trim();
-        
-        return normalizedFilterVals.includes(answerValueNormalized) || 
+
+        return normalizedFilterVals.includes(answerValueNormalized) ||
                normalizedFilterVals.includes(numericValueNormalized);
       });
     }
 
-    // Save the actual filtered response count
     setFilteredResponseCount(filteredResponses.length);
 
     const processedData = questions.map((question) => {
@@ -236,7 +212,7 @@ const Reports = () => {
         const numericValues = answersForQuestion
           .filter((a: any) => a.numeric_value !== null)
           .map((a: any) => a.numeric_value);
-        
+
         if (numericValues.length > 0) {
           mean = numericValues.reduce((sum: number, val: number) => sum + val, 0) / numericValues.length;
           const variance = numericValues.reduce((sum: number, val: number) => sum + Math.pow(val - mean, 2), 0) / numericValues.length;
@@ -247,10 +223,10 @@ const Reports = () => {
       let mcqDistribution: any[] = [];
       if (question.type === 'mcq' && question.options) {
         const rawOptions = question.options;
-        const options = Array.isArray(rawOptions) 
-          ? rawOptions 
-          : (rawOptions?.choices && Array.isArray(rawOptions.choices)) 
-            ? rawOptions.choices 
+        const options = Array.isArray(rawOptions)
+          ? rawOptions
+          : (rawOptions?.choices && Array.isArray(rawOptions.choices))
+            ? rawOptions.choices
             : [];
         const counts: Record<string, number> = {};
         options.forEach((opt: string) => { counts[String(opt).trim()] = 0; });
@@ -291,7 +267,7 @@ const Reports = () => {
 
   const getFilterOptions = () => {
     if (!filterQuestion) return [];
-    
+
     const question = allQuestions.find(q => q.id === filterQuestion);
     if (!question) return [];
 
@@ -322,21 +298,19 @@ const Reports = () => {
 
   const hasAnswersData = allResponses.some(r => r.answers && r.answers.length > 0);
 
-  // Get current course name from filter
   const getSelectedCourseName = (): string => {
     if (!filterQuestion || filterValues.length === 0) return '';
     return filterValues[0] || '';
   };
 
   const handleFilterValueChange = (value: string) => {
-    const newValues = filterValues.includes(value) 
+    const newValues = filterValues.includes(value)
       ? filterValues.filter(v => v !== value)
       : [...filterValues, value];
-    
+
     setFilterValues(newValues);
     processDataWithFilter(allQuestions, allResponses, filterQuestion, newValues);
-    
-    // Load saved recommendations for the selected course
+
     const courseName = newValues.length > 0 ? newValues[0] : '';
     if (courseName && courseRecommendations[courseName]) {
       setEditedRecommendations(courseRecommendations[courseName]);
@@ -357,7 +331,6 @@ const Reports = () => {
     setFilterValues([]);
     setManualEnrollment("");
     processDataWithFilter(allQuestions, allResponses, "", []);
-    // Reset recommendations to report default
     if (report?.recommendations_text) {
       setEditedRecommendations(report.recommendations_text);
     }
@@ -395,7 +368,6 @@ const Reports = () => {
   };
 
   const handleSaveRecommendations = async () => {
-    // Save per-course if filter is active
     const courseName = getSelectedCourseName();
     if (courseName) {
       setCourseRecommendations(prev => ({ ...prev, [courseName]: editedRecommendations }));
@@ -422,7 +394,6 @@ const Reports = () => {
       return;
     }
 
-    // First save recommendations to report
     const courseName = getSelectedCourseName();
     if (courseName) {
       setCourseRecommendations(prev => ({ ...prev, [courseName]: editedRecommendations }));
@@ -438,7 +409,6 @@ const Reports = () => {
       return;
     }
 
-    // Check if already transferred
     const { data: existing } = await supabase
       .from("recommendations")
       .select("id")
@@ -447,7 +417,6 @@ const Reports = () => {
       .maybeSingle();
 
     if (existing) {
-      // Update existing recommendation
       const { error: updateError } = await supabase
         .from("recommendations")
         .update({
@@ -465,7 +434,6 @@ const Reports = () => {
 
       toast({ title: "تم التحديث", description: "تم تحديث التوصيات في صفحة المتابعة" });
     } else {
-      // Insert new recommendation
       const { error: insertError } = await supabase
         .from("recommendations")
         .insert({
@@ -492,7 +460,6 @@ const Reports = () => {
     loadReport();
   };
 
-  // Helper to build filter info for PDF
   const buildFilterInfo = () => {
     const courseName = getSelectedCourseName();
     const manualNum = parseInt(manualEnrollment);
@@ -500,14 +467,12 @@ const Reports = () => {
     return {
       courseName,
       manualEnrollment: !isNaN(manualNum) && manualNum > 0 ? manualNum : undefined,
-      filteredCount: filteredResponsesCount,
+      filteredCount: computedFilteredResponsesCount,
     };
   };
 
-  // Helper to prepare PDF data (excludes filter question, includes distribution)
   const preparePDFData = () => {
     const courseName = getSelectedCourseName();
-    // Exclude the filter question from the PDF
     const pdfAnswers = filterQuestion
       ? detailedAnswers.filter(q => q.id !== filterQuestion)
       : detailedAnswers;
@@ -522,7 +487,7 @@ const Reports = () => {
 
     const manualNum = parseInt(manualEnrollment);
     const targetEnrollment = (!isNaN(manualNum) && manualNum > 0) ? manualNum : (survey?.target_enrollment || 0);
-    const responsesCount = filterQuestion && filterValues.length > 0 ? filteredResponsesCount : allResponses.length;
+    const responsesCount = filterQuestion && filterValues.length > 0 ? computedFilteredResponsesCount : allResponses.length;
     const responseRate = targetEnrollment > 0
       ? Math.min(100, Math.round((responsesCount / targetEnrollment) * 100))
       : 0;
@@ -548,10 +513,8 @@ const Reports = () => {
       })),
     };
 
-    // When no filter is selected, calculate coursesSummary for comprehensive report
     if (!courseName && allQuestions.length > 0 && allResponses.length > 0) {
-      // Find the MCQ question that represents courses
-      const courseQuestion = allQuestions.find(q => 
+      const courseQuestion = allQuestions.find(q =>
         q.type === 'mcq' && (
           (q.text && (q.text.includes('مقرر') || q.text.includes('المقرر') || q.text.includes('المادة'))) ||
           false
@@ -559,7 +522,6 @@ const Reports = () => {
       ) || allQuestions.find(q => q.type === 'mcq');
 
       if (courseQuestion) {
-        // Get all unique course names from answers
         const courseNames = new Set<string>();
         allResponses.forEach((response: any) => {
           const answer = response.answers?.find((a: any) => a.question_id === courseQuestion.id);
@@ -568,8 +530,7 @@ const Reports = () => {
           }
         });
 
-        // Get likert/rating questions (excluding the course question)
-        const likertQuestions = allQuestions.filter(q => 
+        const likertQuestions = allQuestions.filter(q =>
           (q.type === 'likert' || q.type === 'rating') && q.id !== courseQuestion.id
         );
 
@@ -581,7 +542,6 @@ const Reports = () => {
         }> = [];
 
         courseNames.forEach(cName => {
-          // Filter responses for this course
           const courseResponses = allResponses.filter((response: any) => {
             const answer = response.answers?.find((a: any) => a.question_id === courseQuestion.id);
             return answer && String(answer.value || '').trim() === cName;
@@ -617,13 +577,11 @@ const Reports = () => {
           });
         });
 
-        // Sort by mean descending
         coursesSummary.sort((a, b) => b.overallMean - a.overallMean);
         stats.coursesSummary = coursesSummary;
       }
     }
 
-    // Use per-course recommendations if available
     const reportForPDF = { ...report };
     if (courseName && courseRecommendations[courseName]) {
       reportForPDF.recommendations_text = courseRecommendations[courseName];
@@ -651,7 +609,6 @@ const Reports = () => {
     }
   };
 
-  // Enhanced PDF Export with Charts
   const handleExportPDF = async () => {
     setIsExporting(true);
     toast({ title: "جاري التصدير", description: "يتم التقاط الرسوم البيانية..." });
@@ -660,7 +617,6 @@ const Reports = () => {
       const { stats, textResponses, pdfAnswers, reportForPDF } = preparePDFData();
       const filterInfo = buildFilterInfo();
 
-      // Capture chart images
       const chartImages: Array<{ id: string; dataUrl: string; title: string; type: 'likert' | 'mcq' | 'summary' }> = [];
       const summaryChart = await captureChartAsImage('summary-chart', 'ملخص متوسطات الأسئلة', 'summary');
       if (summaryChart) chartImages.push(summaryChart);
@@ -686,7 +642,6 @@ const Reports = () => {
     }
   };
 
-  // PDF Preview Handler
   const handlePreviewPDF = async () => {
     setIsGeneratingPreview(true);
     setPreviewOpen(true);
@@ -706,20 +661,18 @@ const Reports = () => {
     }
   };
 
-  // Enhanced Excel Export
   const handleExportExcel = () => {
     const likertRatingQuestions = detailedAnswers.filter(q => q.type === 'likert' || q.type === 'rating');
     const overallMean = likertRatingQuestions.length > 0
       ? likertRatingQuestions.reduce((sum, q) => sum + (parseFloat(q.mean) || 0), 0) / likertRatingQuestions.length
       : 0;
-    
+
     const overallStdDev = likertRatingQuestions.length > 0
       ? likertRatingQuestions.reduce((sum, q) => sum + (parseFloat(q.stdDev) || 0), 0) / likertRatingQuestions.length
       : 0;
 
-    // Calculate response rate
     const targetEnrollment = survey?.target_enrollment || 0;
-    const responseRate = targetEnrollment > 0 
+    const responseRate = targetEnrollment > 0
       ? Math.min(100, Math.round((allResponses.length / targetEnrollment) * 100))
       : 0;
 
@@ -780,9 +733,7 @@ const Reports = () => {
     );
   }
 
-  const stats = report.statistics || {};
   const totalResponses = allResponses.length;
-
   const likertRatingQuestions = detailedAnswers.filter(q => q.type === 'likert' || q.type === 'rating');
   const overallMean = likertRatingQuestions.length > 0
     ? likertRatingQuestions.reduce((sum, q) => sum + (parseFloat(q.mean) || 0), 0) / likertRatingQuestions.length
@@ -790,699 +741,93 @@ const Reports = () => {
   const totalTextResponses = detailedAnswers
     .filter(q => q.type === 'text')
     .reduce((sum, q) => sum + q.textResponses.length, 0);
-
-  const filteredResponsesCount = filterQuestion && filterValues.length > 0 
-    ? filteredResponseCount 
+  const computedFilteredResponsesCount = filterQuestion && filterValues.length > 0
+    ? filteredResponseCount
     : totalResponses;
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
-      {/* Header */}
-      <header className="bg-card border-b shadow-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex justify-between items-center flex-wrap gap-4">
-            <div>
-              <h1 className="text-2xl font-bold">تقرير الاستبيان</h1>
-              <p className="text-sm text-muted-foreground">
-                {survey?.title} - {survey?.programs?.name}
-              </p>
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              <DashboardButton />
-              <Button variant="outline" onClick={generateReport} disabled={isGenerating}>
-                <Sparkles className="h-4 w-4 ml-2" />
-                {isGenerating ? "جاري التحليل..." : "إعادة التحليل"}
-              </Button>
-              <Button variant="outline" onClick={handlePreviewPDF} disabled={isGeneratingPreview}>
-                <Eye className="h-4 w-4 ml-2" />
-                معاينة
-              </Button>
-              <Button variant="accent" onClick={handleExportPDF} disabled={isExporting}>
-                {isExporting ? (
-                  <Loader2 className="h-4 w-4 ml-2 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4 ml-2" />
-                )}
-                {isExporting ? "جاري التصدير..." : "PDF"}
-              </Button>
-              <Button variant="secondary" onClick={handleExportExcel}>
-                <FileSpreadsheet className="h-4 w-4 ml-2" />
-                Excel
-              </Button>
-              <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
-                <Trash2 className="h-4 w-4 ml-2" />
-                حذف
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <ReportHeader
+        surveyTitle={survey?.title}
+        programName={survey?.programs?.name}
+        isGenerating={isGenerating}
+        isExporting={isExporting}
+        isGeneratingPreview={isGeneratingPreview}
+        onRegenerate={generateReport}
+        onPreviewPDF={handlePreviewPDF}
+        onExportPDF={handleExportPDF}
+        onExportExcel={handleExportExcel}
+        onDelete={() => setDeleteDialogOpen(true)}
+      />
 
       <main className="container mx-auto px-4 py-8 space-y-6">
-        {/* بيانات التقرير */}
-        <Card>
-          <CardHeader>
-            <CardTitle>بيانات التقرير</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>الفصل الدراسي</Label>
-                <Input placeholder="الفصل الأول" value={semester} onChange={(e) => setSemester(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>العام الأكاديمي</Label>
-                <Input placeholder="2024-2025" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>حالة التقرير</Label>
-                <Select value={reportStatus} onValueChange={setReportStatus}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="responding">تحت الاستجابة</SelectItem>
-                    <SelectItem value="completed">منتهي</SelectItem>
-                    <SelectItem value="no_response">لم يتم الاستجابة</SelectItem>
-                    <SelectItem value="cancelled">ملغي</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <Button onClick={saveReportMetadata} className="mt-4">
-              <Save className="h-4 w-4 ml-2" />
-              حفظ البيانات
-            </Button>
-          </CardContent>
-        </Card>
+        <ReportMetadataCard
+          semester={semester}
+          academicYear={academicYear}
+          reportStatus={reportStatus}
+          onSemesterChange={setSemester}
+          onAcademicYearChange={setAcademicYear}
+          onReportStatusChange={setReportStatus}
+          onSave={saveReportMetadata}
+        />
 
-        {/* الإحصائيات العامة */}
-        {(() => {
-          const targetEnrollment = survey?.target_enrollment || 0;
-          const responseRate = targetEnrollment > 0 
-            ? Math.min(100, Math.round((filteredResponsesCount / targetEnrollment) * 100))
-            : null;
-          const rateColor = responseRate === null 
-            ? 'text-muted-foreground' 
-            : responseRate >= 70 
-              ? 'text-green-600' 
-              : responseRate >= 50 
-                ? 'text-yellow-600' 
-                : 'text-orange-600';
-          const rateBgColor = responseRate === null 
-            ? 'from-gray-500/10 to-gray-600/5 border-gray-200' 
-            : responseRate >= 70 
-              ? 'from-green-500/10 to-green-600/5 border-green-200' 
-              : responseRate >= 50 
-                ? 'from-yellow-500/10 to-yellow-600/5 border-yellow-200' 
-                : 'from-orange-500/10 to-orange-600/5 border-orange-200';
-          
-          return (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-200">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">إجمالي الاستجابات</p>
-                      <p className="text-3xl font-bold text-blue-600">{filteredResponsesCount}</p>
-                      {targetEnrollment > 0 && (
-                        <p className="text-xs text-muted-foreground">من {targetEnrollment} طالب</p>
-                      )}
-                      {filterQuestion && filterValues.length > 0 && (
-                        <p className="text-xs text-muted-foreground">مفلتر من {totalResponses}</p>
-                      )}
-                    </div>
-                    <Users className="h-10 w-10 text-blue-500/30" />
-                  </div>
-                </CardContent>
-              </Card>
+        <ReportStatisticsCards
+          filteredResponsesCount={computedFilteredResponsesCount}
+          totalResponses={totalResponses}
+          targetEnrollment={survey?.target_enrollment || 0}
+          overallMean={overallMean}
+          questionsCount={detailedAnswers.length}
+          totalTextResponses={totalTextResponses}
+          hasFilter={!!(filterQuestion && filterValues.length > 0)}
+          hasAnswersData={hasAnswersData}
+        />
 
-              {/* بطاقة معدل الاستجابة */}
-              <Card className={`bg-gradient-to-br ${rateBgColor}`}>
-                <CardContent className="p-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-muted-foreground">معدل الاستجابة</p>
-                      <Target className={`h-6 w-6 ${rateColor} opacity-30`} />
-                    </div>
-                    <p className={`text-3xl font-bold ${rateColor}`}>
-                      {responseRate !== null ? `${responseRate}%` : 'غير محدد'}
-                    </p>
-                    {targetEnrollment > 0 && (
-                      <div className="space-y-1">
-                        <Progress 
-                          value={responseRate || 0} 
-                          className="h-2"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          {responseRate && responseRate < 50 ? '⚠️ نسبة منخفضة' : responseRate && responseRate >= 70 ? '✓ نسبة جيدة' : ''}
-                        </p>
-                      </div>
-                    )}
-                    {!targetEnrollment && (
-                      <p className="text-xs text-muted-foreground">
-                        أضف عدد الطلبة في الاستبيان
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+        <ReportFilterCard
+          allQuestions={allQuestions}
+          hasAnswersData={hasAnswersData}
+          filterQuestion={filterQuestion}
+          filterValues={filterValues}
+          filteredResponsesCount={computedFilteredResponsesCount}
+          manualEnrollment={manualEnrollment}
+          onFilterQuestionChange={handleFilterQuestionChange}
+          onFilterValueChange={handleFilterValueChange}
+          onClearFilter={clearFilter}
+          onManualEnrollmentChange={setManualEnrollment}
+          getFilterOptions={getFilterOptions}
+        />
 
-              <Card className="bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-200">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">المتوسط العام</p>
-                      <p className="text-3xl font-bold text-green-600">{overallMean.toFixed(2)}</p>
-                      <p className="text-xs text-muted-foreground">من 5.0</p>
-                    </div>
-                    <BarChart3 className="h-10 w-10 text-green-500/30" />
-                  </div>
-                </CardContent>
-              </Card>
+        <QuestionsSummaryChart likertRatingQuestions={likertRatingQuestions} />
 
-              <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-200">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">عدد الأسئلة</p>
-                      <p className="text-3xl font-bold text-purple-600">{detailedAnswers.length}</p>
-                    </div>
-                    <ListChecks className="h-10 w-10 text-purple-500/30" />
-                  </div>
-                </CardContent>
-              </Card>
+        <QuestionAnalysisSection
+          detailedAnswers={detailedAnswers}
+          totalResponses={totalResponses}
+        />
 
-              <Card className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 border-amber-200">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">التعليقات النصية</p>
-                      <p className="text-3xl font-bold text-amber-600">{totalTextResponses}</p>
-                    </div>
-                    <MessageSquare className="h-10 w-10 text-amber-500/30" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          );
-        })()}
-
-        {/* تنبيه عدم وجود إجابات */}
-        {!hasAnswersData && totalResponses > 0 && (
-          <Card className="border-destructive/50 bg-destructive/5">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-full bg-destructive/10">
-                  <AlertTriangle className="h-5 w-5 text-destructive" />
-                </div>
-                <div>
-                  <p className="font-semibold text-destructive">تنبيه: لا توجد إجابات محفوظة</p>
-                  <p className="text-sm text-muted-foreground">
-                    يوجد {totalResponses} استجابة لكن بدون إجابات مفصلة. قد تكون هناك مشكلة في حفظ الإجابات عند تعبئة الاستبيان.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* الفلتر */}
-        {allQuestions.length > 0 && hasAnswersData && (
-          <Card className="border-primary/20">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Filter className="h-5 w-5" />
-                فلترة التقرير
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm">اختر السؤال للفلترة</Label>
-                  <Select value={filterQuestion} onValueChange={handleFilterQuestionChange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="اختر سؤالاً..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allQuestions.filter(q => q.type !== 'text').map((q, i) => (
-                        <SelectItem key={q.id} value={q.id}>
-                          <span className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-xs">
-                              {q.type === 'mcq' ? 'اختيار' : q.type === 'likert' ? 'ليكرت' : 'تقييم'}
-                            </Badge>
-                            س{i + 1}: {q.text.substring(0, 35)}{q.text.length > 35 ? '...' : ''}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label className="text-sm">اختر القيم (يتم تطبيق الفلتر تلقائياً)</Label>
-                  <div className={`border rounded-lg p-3 max-h-40 overflow-y-auto ${!filterQuestion ? 'opacity-50 pointer-events-none' : ''}`}>
-                    {!filterQuestion ? (
-                      <p className="text-sm text-muted-foreground text-center">اختر سؤالاً أولاً</p>
-                    ) : getFilterOptions().length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center">لا توجد خيارات</p>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {getFilterOptions().map((opt: string, i: number) => {
-                          const selectedQuestion = allQuestions.find(q => q.id === filterQuestion);
-                          const isLikert = selectedQuestion?.type === 'likert' || selectedQuestion?.type === 'rating';
-                          const isSelected = filterValues.includes(opt);
-                          
-                          return (
-                            <Badge
-                              key={i}
-                              variant={isSelected ? "default" : "outline"}
-                              className="cursor-pointer px-3 py-1"
-                              onClick={() => handleFilterValueChange(opt)}
-                            >
-                              {isLikert ? `${opt}/5` : opt}
-                            </Badge>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              {(filterQuestion || filterValues.length > 0) && (
-                <Button variant="ghost" size="sm" onClick={clearFilter} className="mt-3">
-                  مسح الفلتر
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* حقل نسبة الاستجابة اليدوي - يظهر عند اختيار قيمة من الفلتر */}
-        {filterQuestion && filterValues.length > 0 && (
-          <Card className="border-primary/20 bg-gradient-to-br from-indigo-500/5 to-blue-500/5">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Target className="h-5 w-5 text-primary" />
-                حساب نسبة الاستجابة
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">العدد الفعلي للطلاب في المقرر</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    placeholder="أدخل عدد الطلاب المسجلين..."
-                    value={manualEnrollment}
-                    onChange={(e) => setManualEnrollment(e.target.value)}
-                    className="text-lg"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">عدد الطلاب الذين قيّموا (من النظام)</Label>
-                  <div className="flex items-center gap-2 h-10 px-3 rounded-md border bg-muted/50">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-lg font-bold">{filteredResponsesCount}</span>
-                    <span className="text-sm text-muted-foreground">طالب</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">نسبة الاستجابة</Label>
-                  {(() => {
-                    const manualNum = parseInt(manualEnrollment);
-                    if (!manualEnrollment || isNaN(manualNum) || manualNum <= 0) {
-                      return (
-                        <div className="flex items-center gap-2 h-10 px-3 rounded-md border bg-muted/30">
-                          <span className="text-sm text-muted-foreground">أدخل عدد الطلاب لحساب النسبة</span>
-                        </div>
-                      );
-                    }
-                    const rate = Math.min(100, Math.round((filteredResponsesCount / manualNum) * 100));
-                    const rateColor = rate >= 70 ? 'text-green-600' : rate >= 50 ? 'text-yellow-600' : 'text-orange-600';
-                    const rateBg = rate >= 70 ? 'bg-green-500' : rate >= 50 ? 'bg-yellow-500' : 'bg-orange-500';
-                    return (
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 h-10 px-3 rounded-md border bg-muted/50">
-                          <span className={`text-2xl font-bold ${rateColor}`}>{rate}%</span>
-                          <span className="text-sm text-muted-foreground">
-                            ({filteredResponsesCount} / {manualNum})
-                          </span>
-                        </div>
-                        <Progress value={rate} className="h-2" />
-                        <p className="text-xs text-muted-foreground">
-                          {rate < 50 ? '⚠️ نسبة استجابة منخفضة' : rate >= 70 ? '✓ نسبة استجابة جيدة' : '⚡ نسبة استجابة مقبولة'}
-                        </p>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ملخص متوسطات الأسئلة */}
-        {likertRatingQuestions.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                ملخص متوسطات الأسئلة
-              </CardTitle>
-              <CardDescription>مقارنة متوسطات جميع الأسئلة (ليكرت والتقييم)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div id="summary-chart" className="min-h-[400px] bg-white p-4 rounded-lg" style={{ height: Math.max(400, likertRatingQuestions.length * 50) }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={likertRatingQuestions.map((q, i) => ({
-                      name: q.text.length > 40 ? q.text.substring(0, 40) + '...' : q.text,
-                      fullName: q.text,
-                      shortName: `س${i + 1}`,
-                      mean: parseFloat(q.mean) || 0,
-                      responses: q.responseCount,
-                    }))}
-                    layout="horizontal"
-                    margin={{ top: 20, right: 30, left: 20, bottom: 120 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      type="category" 
-                      dataKey="shortName" 
-                      tick={{ fontSize: 12, fontWeight: 'bold' }}
-                      interval={0}
-                    />
-                    <YAxis type="number" domain={[0, 5]} />
-                    <Tooltip 
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          const level = getMeanLevel(data.mean);
-                          return (
-                            <div className="bg-card p-3 rounded-lg border shadow-lg max-w-sm" style={{ direction: 'rtl' }}>
-                              <p className="font-medium text-sm mb-2 leading-relaxed">{data.fullName}</p>
-                              <p className="text-primary font-bold">المتوسط: {data.mean.toFixed(2)}</p>
-                              <p className="text-muted-foreground text-xs">التقييم: {level.label}</p>
-                              <p className="text-muted-foreground text-xs">عدد الاستجابات: {data.responses}</p>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Bar dataKey="mean" radius={[4, 4, 0, 0]} maxBarSize={60}>
-                      {likertRatingQuestions.map((q, i) => {
-                        const mean = parseFloat(q.mean) || 0;
-                        const color = mean >= 4 ? '#22c55e' : mean >= 3 ? '#eab308' : '#ef4444';
-                        return <Cell key={`cell-${i}`} fill={color} />;
-                      })}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              {/* Legend for question numbers */}
-              <div className="mt-4 p-4 bg-muted/30 rounded-lg">
-                <h4 className="font-medium mb-3 text-sm">دليل الأسئلة:</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                  {likertRatingQuestions.map((q, i) => (
-                    <div key={q.id} className="flex gap-2">
-                      <Badge variant="outline" className="shrink-0">س{i + 1}</Badge>
-                      <span className="text-muted-foreground truncate" title={q.text}>{q.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* تحليل كل سؤال */}
-        <div className="space-y-6">
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <BarChart3 className="h-6 w-6" />
-            تحليل الأسئلة
-          </h2>
-
-          {detailedAnswers.map((question, index) => (
-            <Card key={question.id}>
-              <CardHeader className="bg-muted/30 border-b">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge variant="default">سؤال {index + 1}</Badge>
-                      <Badge variant="outline">
-                        {question.type === 'likert' ? 'مقياس ليكرت' :
-                         question.type === 'rating' ? 'تقييم' :
-                         question.type === 'mcq' ? 'اختيار متعدد' : 'نص حر'}
-                      </Badge>
-                      <Badge variant="secondary">{question.responseCount} استجابة</Badge>
-                    </div>
-                    <CardTitle className="text-lg">{question.text}</CardTitle>
-                  </div>
-
-                  {(question.type === 'likert' || question.type === 'rating') && parseFloat(question.mean) > 0 && (
-                    <div className="text-center">
-                      <div className={`px-4 py-2 rounded-lg ${getMeanLevel(parseFloat(question.mean)).color} text-white`}>
-                        <p className="text-2xl font-bold">{question.mean}</p>
-                        <p className="text-xs">{getMeanLevel(parseFloat(question.mean)).label}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardHeader>
-
-              <CardContent className="p-6">
-                {/* Likert/Rating */}
-                {(question.type === 'likert' || question.type === 'rating') && (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div id={`chart-likert-${question.id}`} className="bg-white p-4 rounded-lg">
-                        <h4 className="font-medium mb-3 text-sm text-muted-foreground">توزيع الاستجابات</h4>
-                        <div className="h-64">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={question.distribution}>
-                              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                              <YAxis />
-                              <Tooltip
-                                content={({ active, payload }) => {
-                                  if (active && payload && payload.length) {
-                                    const data = payload[0].payload;
-                                    const total = question.distribution.reduce((sum: number, d: any) => sum + d.value, 0);
-                                    const percentage = total > 0 ? ((data.value / total) * 100).toFixed(1) : 0;
-                                    return (
-                                      <div className="bg-card p-3 rounded-lg border shadow-lg">
-                                        <p className="font-medium">{data.name}</p>
-                                        <p className="text-primary">العدد: {data.value}</p>
-                                        <p className="text-muted-foreground">النسبة: {percentage}%</p>
-                                      </div>
-                                    );
-                                  }
-                                  return null;
-                                }}
-                              />
-                              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                                {question.distribution.map((entry: any, i: number) => (
-                                  <Cell key={`cell-${i}`} fill={entry.fill} />
-                                ))}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="font-medium mb-3 text-sm text-muted-foreground">جدول التوزيع</h4>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="text-right">الاستجابة</TableHead>
-                              <TableHead className="text-right w-20">العدد</TableHead>
-                              <TableHead className="text-right w-24">النسبة</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {question.distribution.map((item: any, i: number) => {
-                              const total = question.distribution.reduce((sum: number, d: any) => sum + d.value, 0);
-                              const percentage = total > 0 ? ((item.value / total) * 100).toFixed(1) : '0';
-                              return (
-                                <TableRow key={i}>
-                                  <TableCell className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.fill }} />
-                                    {item.name}
-                                  </TableCell>
-                                  <TableCell>{item.value}</TableCell>
-                                  <TableCell>{percentage}%</TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4 pt-4 border-t">
-                      <div className="text-center p-3 bg-muted/30 rounded-lg">
-                        <p className="text-sm text-muted-foreground">المتوسط</p>
-                        <p className="text-xl font-bold text-primary">{question.mean}</p>
-                      </div>
-                      <div className="text-center p-3 bg-muted/30 rounded-lg">
-                        <p className="text-sm text-muted-foreground">الانحراف المعياري</p>
-                        <p className="text-xl font-bold">{question.stdDev}</p>
-                      </div>
-                      <div className="text-center p-3 bg-muted/30 rounded-lg">
-                        <p className="text-sm text-muted-foreground">معدل الاستجابة</p>
-                        <p className="text-xl font-bold">{totalResponses > 0 ? ((question.responseCount / totalResponses) * 100).toFixed(0) : 0}%</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* MCQ */}
-                {question.type === 'mcq' && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div id={`chart-mcq-${question.id}`} className="bg-white p-4 rounded-lg">
-                      <h4 className="font-medium mb-3 text-sm text-muted-foreground">توزيع الاختيارات</h4>
-                      <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={question.mcqDistribution} layout="vertical">
-                            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                            <XAxis type="number" />
-                            <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11 }} />
-                            <Tooltip />
-                            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                              {question.mcqDistribution.map((entry: any, i: number) => (
-                                <Cell key={`cell-${i}`} fill={MCQ_COLORS[i % MCQ_COLORS.length]} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h4 className="font-medium mb-3 text-sm text-muted-foreground">النسب المئوية</h4>
-                      <div className="space-y-3">
-                        {question.mcqDistribution.map((item: any, i: number) => {
-                          const total = question.mcqDistribution.reduce((sum: number, d: any) => sum + d.value, 0);
-                          const percentage = total > 0 ? (item.value / total) * 100 : 0;
-                          return (
-                            <div key={i}>
-                              <div className="flex justify-between text-sm mb-1">
-                                <span>{item.name}</span>
-                                <span className="font-medium">{item.value} ({percentage.toFixed(1)}%)</span>
-                              </div>
-                              <Progress value={percentage} className="h-2" />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Text */}
-                {question.type === 'text' && (
-                  <div>
-                    <h4 className="font-medium text-sm text-muted-foreground mb-3">الردود النصية ({question.textResponses.length})</h4>
-                    {question.textResponses.length > 0 ? (
-                      <div className="space-y-3 max-h-96 overflow-y-auto">
-                        {question.textResponses.map((response: string, i: number) => (
-                          <div key={i} className="p-4 bg-muted/30 rounded-lg border-r-4 border-primary">
-                            <div className="flex items-start gap-3">
-                              <Badge variant="outline" className="shrink-0">{i + 1}</Badge>
-                              <p className="text-sm leading-relaxed">{response}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-center text-muted-foreground py-8">لا توجد ردود نصية</p>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* التوصيات */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5" />
-                التوصيات
-              </CardTitle>
-              <Button variant="outline" size="sm" onClick={() => setEditRecommendationsOpen(true)}>
-                <EditIcon className="h-4 w-4 ml-2" />
-                تعديل التوصيات
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {report.recommendations_text ? (
-              <div className="p-4 bg-accent/5 rounded-lg border border-accent/20">
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                  {report.recommendations_text}
-                </p>
-              </div>
-            ) : (
-              <p className="text-center text-muted-foreground py-8">لا توجد توصيات بعد. اضغط على "تعديل التوصيات" لإضافة توصيات.</p>
-            )}
-          </CardContent>
-        </Card>
+        <RecommendationsCard
+          recommendationsText={report.recommendations_text}
+          editRecommendationsOpen={editRecommendationsOpen}
+          editedRecommendations={editedRecommendations}
+          onOpenEdit={() => setEditRecommendationsOpen(true)}
+          onCloseEdit={() => setEditRecommendationsOpen(false)}
+          onEditedRecommendationsChange={setEditedRecommendations}
+          onSave={handleSaveRecommendations}
+          onSaveAndTransfer={handleSaveAndTransferRecommendations}
+        />
       </main>
 
-      {/* Dialog تعديل التوصيات */}
-      <Dialog open={editRecommendationsOpen} onOpenChange={setEditRecommendationsOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>تعديل التوصيات</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Textarea
-              value={editedRecommendations}
-              onChange={(e) => setEditedRecommendations(e.target.value)}
-              placeholder="اكتب التوصيات هنا..."
-              rows={10}
-              className="resize-none"
-            />
-          </div>
-          <DialogFooter className="flex flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={() => setEditRecommendationsOpen(false)}>إلغاء</Button>
-            <Button onClick={handleSaveRecommendations}>
-              <Save className="h-4 w-4 ml-2" />
-              حفظ التوصيات
-            </Button>
-            <Button variant="secondary" onClick={handleSaveAndTransferRecommendations}>
-              <Send className="h-4 w-4 ml-2" />
-              حفظ ونقل لمتابعة التوصيات
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ReportDeleteDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteReport}
+      />
 
-      {/* Dialog حذف التقرير */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>هل أنت متأكد من حذف التقرير؟</AlertDialogTitle>
-            <AlertDialogDescription>
-              سيتم حذف التقرير بشكل نهائي ولا يمكن استرجاعه.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteReport} className="bg-destructive text-destructive-foreground">
-              حذف
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <PDFPreviewDialog
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        pdfBlob={pdfBlob}
+        isGenerating={isGeneratingPreview}
+        onDownload={handleExportPDF}
+      />
     </div>
   );
 };
