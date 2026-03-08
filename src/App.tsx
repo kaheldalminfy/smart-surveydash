@@ -51,13 +51,13 @@ const App = () => (
             <Route path="/complaints" element={<ProtectedRoute><Complaints /></ProtectedRoute>} />
             <Route path="/recommendations" element={<ProtectedRoute><Recommendations /></ProtectedRoute>} />
             <Route path="/archives" element={<ProtectedRoute><Archives /></ProtectedRoute>} />
-            <Route path="/comparison" element={<ProtectedRoute><ProgramComparison /></ProtectedRoute>} />
+            <Route path="/comparison" element={<ProtectedRoute allowedRoles={["admin", "dean", "coordinator", "program_manager"]}><ProgramComparison /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute allowedRoles={["admin"]}><Users /></ProtectedRoute>} />
             <Route path="/system-settings" element={<ProtectedRoute allowedRoles={["admin"]}><SystemSettings /></ProtectedRoute>} />
-            <Route path="/academic-calendar" element={<ProtectedRoute><AcademicCalendar /></ProtectedRoute>} />
-            <Route path="/accreditation" element={<ProtectedRoute><Accreditation /></ProtectedRoute>} />
-            <Route path="/accreditation/framework/:id" element={<ProtectedRoute><AccreditationFramework /></ProtectedRoute>} />
-            <Route path="/accreditation/indicator/:id" element={<ProtectedRoute><IndicatorDetails /></ProtectedRoute>} />
+            <Route path="/academic-calendar" element={<ProtectedRoute allowedRoles={["admin", "dean", "coordinator", "program_manager"]}><AcademicCalendar /></ProtectedRoute>} />
+            <Route path="/accreditation" element={<ProtectedRoute allowedRoles={["admin", "dean", "coordinator", "program_manager"]}><Accreditation /></ProtectedRoute>} />
+            <Route path="/accreditation/framework/:id" element={<ProtectedRoute allowedRoles={["admin", "dean", "coordinator", "program_manager"]}><AccreditationFramework /></ProtectedRoute>} />
+            <Route path="/accreditation/indicator/:id" element={<ProtectedRoute allowedRoles={["admin", "dean", "coordinator", "program_manager"]}><IndicatorDetails /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
