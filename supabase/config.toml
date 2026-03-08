@@ -21,3 +21,6 @@ verify_jwt = true
 [functions.evaluate-response]
 verify_jwt = true
 
+[functions.export-backup]
+verify_jwt = false
+
