@@ -52,8 +52,8 @@ const App = () => (
             <Route path="/recommendations" element={<ProtectedRoute><Recommendations /></ProtectedRoute>} />
             <Route path="/archives" element={<ProtectedRoute><Archives /></ProtectedRoute>} />
             <Route path="/comparison" element={<ProtectedRoute><ProgramComparison /></ProtectedRoute>} />
-            <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
-            <Route path="/system-settings" element={<ProtectedRoute><SystemSettings /></ProtectedRoute>} />
+            <Route path="/users" element={<ProtectedRoute allowedRoles={["admin"]}><Users /></ProtectedRoute>} />
+            <Route path="/system-settings" element={<ProtectedRoute allowedRoles={["admin"]}><SystemSettings /></ProtectedRoute>} />
             <Route path="/academic-calendar" element={<ProtectedRoute><AcademicCalendar /></ProtectedRoute>} />
             <Route path="/accreditation" element={<ProtectedRoute><Accreditation /></ProtectedRoute>} />
             <Route path="/accreditation/framework/:id" element={<ProtectedRoute><AccreditationFramework /></ProtectedRoute>} />
