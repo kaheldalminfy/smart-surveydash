@@ -59,6 +59,7 @@ const App = () => (
             <Route path="/accreditation" element={<ProtectedRoute allowedRoles={["admin", "dean", "coordinator", "program_manager"]}><Accreditation /></ProtectedRoute>} />
             <Route path="/accreditation/framework/:id" element={<ProtectedRoute allowedRoles={["admin", "dean", "coordinator", "program_manager"]}><AccreditationFramework /></ProtectedRoute>} />
             <Route path="/accreditation/indicator/:id" element={<ProtectedRoute allowedRoles={["admin", "dean", "coordinator", "program_manager"]}><IndicatorDetails /></ProtectedRoute>} />
+            <Route path="/backup-export" element={<ProtectedRoute allowedRoles={["admin"]}><BackupExport /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

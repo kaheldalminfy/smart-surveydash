@@ -124,6 +124,20 @@ export default function SystemSettings() {
           </div>
         </div>
 
+        {/* Backup Export Link */}
+        <Card className="mb-6 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/backup-export")}>
+          <CardContent className="flex items-center justify-between p-6">
+            <div className="flex items-center gap-3">
+              <Database className="h-5 w-5 text-primary" />
+              <div>
+                <h3 className="font-semibold">{language === "ar" ? "النسخ الاحتياطي" : "Data Backup"}</h3>
+                <p className="text-sm text-muted-foreground">{language === "ar" ? "تصدير نسخة احتياطية من بيانات النظام" : "Export a backup of system data"}</p>
+              </div>
+            </div>
+            <Button variant="outline" size="sm">{language === "ar" ? "فتح" : "Open"}</Button>
+          </CardContent>
+        </Card>
+
         {/* Logo Settings */}
         <Card>
           <CardHeader>
