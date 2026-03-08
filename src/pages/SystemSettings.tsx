@@ -13,7 +13,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 export default function SystemSettings() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [collegeLogo, setCollegeLogo] = useState("");
