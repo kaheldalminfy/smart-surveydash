@@ -131,7 +131,7 @@ export const ReportFilterCard = ({
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm font-medium">عدد الطلاب الذين قيّموا (من النظام)</Label>
+                <Label className="text-sm font-medium">عدد المستجيبين (من النظام)</Label>
                 <div className="flex items-center gap-2 h-10 px-3 rounded-md border bg-muted/50">
                   <Users className="h-4 w-4 text-muted-foreground" />
                   <span className="text-lg font-bold">{filteredResponsesCount}</span>
