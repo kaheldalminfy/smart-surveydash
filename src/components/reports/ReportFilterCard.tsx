@@ -119,7 +119,7 @@ export const ReportFilterCard = ({
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
               <div className="space-y-2">
-                <Label className="text-sm font-medium">العدد الفعلي للطلاب في المقرر</Label>
+                <Label className="text-sm font-medium">أدخل عدد المسجلين</Label>
                 <Input
                   type="number"
                   min="1"
