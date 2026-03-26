@@ -146,7 +146,7 @@ export const ReportFilterCard = ({
                   if (!manualEnrollment || isNaN(manualNum) || manualNum <= 0) {
                     return (
                       <div className="flex items-center gap-2 h-10 px-3 rounded-md border bg-muted/30">
-                        <span className="text-sm text-muted-foreground">أدخل عدد الطلاب لحساب النسبة</span>
+                        <span className="text-sm text-muted-foreground">أدخل العدد لحساب النسبة</span>
                       </div>
                     );
                   }
