@@ -123,7 +123,7 @@ export const ReportFilterCard = ({
                 <Input
                   type="number"
                   min="1"
-                  placeholder="أدخل عدد الطلاب المسجلين..."
+                  placeholder="أدخل عدد المسجلين..."
                   value={manualEnrollment}
                   onChange={(e) => onManualEnrollmentChange(e.target.value)}
                   className="text-lg"
@@ -131,11 +131,11 @@ export const ReportFilterCard = ({
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm font-medium">عدد الطلاب الذين قيّموا (من النظام)</Label>
+                <Label className="text-sm font-medium">عدد المستجيبين (من النظام)</Label>
                 <div className="flex items-center gap-2 h-10 px-3 rounded-md border bg-muted/50">
                   <Users className="h-4 w-4 text-muted-foreground" />
                   <span className="text-lg font-bold">{filteredResponsesCount}</span>
-                  <span className="text-sm text-muted-foreground">طالب</span>
+                  <span className="text-sm text-muted-foreground">مستجيب</span>
                 </div>
               </div>
 
@@ -146,7 +146,7 @@ export const ReportFilterCard = ({
                   if (!manualEnrollment || isNaN(manualNum) || manualNum <= 0) {
                     return (
                       <div className="flex items-center gap-2 h-10 px-3 rounded-md border bg-muted/30">
-                        <span className="text-sm text-muted-foreground">أدخل عدد الطلاب لحساب النسبة</span>
+                        <span className="text-sm text-muted-foreground">أدخل العدد لحساب النسبة</span>
                       </div>
                     );
                   }
