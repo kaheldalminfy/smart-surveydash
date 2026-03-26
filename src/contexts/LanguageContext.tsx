@@ -725,7 +725,7 @@ const translations: Record<Language, Record<string, string>> = {
     'reports.noOptions': 'لا توجد خيارات',
     'reports.clearFilter': 'مسح الفلتر',
     'reports.responseRateCalc': 'حساب نسبة الاستجابة',
-    'reports.actualStudents': 'العدد الفعلي للطلاب في المقرر',
+    'reports.actualStudents': 'أدخل عدد المسجلين',
     'reports.enterStudentCount': 'أدخل عدد الطلاب المسجلين...',
     'reports.studentsEvaluated': 'عدد الطلاب الذين قيّموا (من النظام)',
     'reports.student': 'طالب',
