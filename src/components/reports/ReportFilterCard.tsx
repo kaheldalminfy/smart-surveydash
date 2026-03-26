@@ -135,7 +135,7 @@ export const ReportFilterCard = ({
                 <div className="flex items-center gap-2 h-10 px-3 rounded-md border bg-muted/50">
                   <Users className="h-4 w-4 text-muted-foreground" />
                   <span className="text-lg font-bold">{filteredResponsesCount}</span>
-                  <span className="text-sm text-muted-foreground">طالب</span>
+                  <span className="text-sm text-muted-foreground">مستجيب</span>
                 </div>
               </div>
 
