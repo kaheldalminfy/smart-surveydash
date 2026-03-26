@@ -123,7 +123,7 @@ export const ReportFilterCard = ({
                 <Input
                   type="number"
                   min="1"
-                  placeholder="أدخل عدد الطلاب المسجلين..."
+                  placeholder="أدخل عدد المسجلين..."
                   value={manualEnrollment}
                   onChange={(e) => onManualEnrollmentChange(e.target.value)}
                   className="text-lg"
