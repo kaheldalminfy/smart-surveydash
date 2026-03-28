@@ -41,10 +41,14 @@ export interface ComplaintDetail {
 }
 
 export interface RecommendationDetail {
-  reportId: string;
-  surveyId: string;
-  surveyTitle: string;
-  recommendationsText: string;
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  semester: string | null;
+  academic_year: string | null;
+  program_id: string | null;
 }
 
 export interface ProgramStats {
