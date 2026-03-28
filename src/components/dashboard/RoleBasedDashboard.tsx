@@ -41,10 +41,14 @@ export interface ComplaintDetail {
 }
 
 export interface RecommendationDetail {
-  reportId: string;
-  surveyId: string;
-  surveyTitle: string;
-  recommendationsText: string;
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  semester: string | null;
+  academic_year: string | null;
+  program_id: string | null;
 }
 
 export interface ProgramStats {
@@ -276,29 +280,23 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
       }
     }
 
-    // Get recommendations from reports
-    const recommendations: RecommendationDetail[] = [];
-    if (surveyIds.length > 0) {
-      const { data: reports } = await supabase
-        .from('reports')
-        .select('id, survey_id, recommendations_text')
-        .in('survey_id', surveyIds)
-        .not('recommendations_text', 'is', null);
+    // Get recommendations from recommendations table
+    const { data: recsData } = await supabase
+      .from('recommendations')
+      .select('*')
+      .eq('program_id', program.id)
+      .order('created_at', { ascending: false });
 
-      if (reports) {
-        for (const report of reports) {
-          if (report.recommendations_text && report.recommendations_text.trim()) {
-            const surveyTitle = surveys?.find(s => s.id === report.survey_id)?.title || '';
-            recommendations.push({
-              reportId: report.id,
-              surveyId: report.survey_id || '',
-              surveyTitle,
-              recommendationsText: report.recommendations_text,
-            });
-          }
-        }
-      }
-    }
+    const recommendations: RecommendationDetail[] = (recsData || []).map(r => ({
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      status: r.status || 'pending',
+      priority: r.priority || 'medium',
+      semester: r.semester,
+      academic_year: r.academic_year,
+      program_id: r.program_id,
+    }));
 
     return {
       programId: program.id,

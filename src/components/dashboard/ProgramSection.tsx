@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { 
   Users, 
@@ -18,7 +20,8 @@ import {
   FileText,
   Clock,
   Lightbulb,
-  Pencil
+  Pencil,
+  Plus
 } from "lucide-react";
 import { 
   BarChart, 
@@ -68,9 +71,29 @@ const getStatusBadge = (status: string, language: string) => {
   return <Badge variant="secondary" className={info.className}>{info.label}</Badge>;
 };
 
+const getRecStatusBadge = (status: string, language: string) => {
+  const map: Record<string, { label: string; className: string }> = {
+    pending: { label: language === 'ar' ? 'قيد الانتظار' : 'Pending', className: 'bg-yellow-100 text-yellow-800' },
+    in_progress: { label: language === 'ar' ? 'قيد التنفيذ' : 'In Progress', className: 'bg-blue-100 text-blue-800' },
+    completed: { label: language === 'ar' ? 'مكتملة' : 'Completed', className: 'bg-green-100 text-green-800' },
+    postponed: { label: language === 'ar' ? 'مؤجلة' : 'Postponed', className: 'bg-gray-100 text-gray-800' },
+  };
+  const info = map[status] || map.pending;
+  return <Badge variant="secondary" className={info.className}>{info.label}</Badge>;
+};
+
+const getPriorityBadge = (priority: string, language: string) => {
+  const map: Record<string, { label: string; className: string }> = {
+    high: { label: language === 'ar' ? 'عالية' : 'High', className: 'bg-red-100 text-red-800' },
+    medium: { label: language === 'ar' ? 'متوسطة' : 'Medium', className: 'bg-orange-100 text-orange-800' },
+    low: { label: language === 'ar' ? 'منخفضة' : 'Low', className: 'bg-green-100 text-green-800' },
+  };
+  const info = map[priority] || map.medium;
+  return <Badge variant="secondary" className={info.className}>{info.label}</Badge>;
+};
+
 const getProgramInitial = (name: string): string => {
   const stripped = name.replace(/^برنامج\s*/, '');
-  // Remove "ال" prefix for a more meaningful letter
   const withoutAl = stripped.replace(/^ال/, '');
   return withoutAl.charAt(0) || stripped.charAt(0) || name.charAt(0);
 };
@@ -82,9 +105,15 @@ const ProgramSection = ({ stats, isExpanded = true, userRole }: ProgramSectionPr
   const [showComplaints, setShowComplaints] = useState(false);
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [editingRec, setEditingRec] = useState<RecommendationDetail | null>(null);
-  const [editText, setEditText] = useState('');
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editPriority, setEditPriority] = useState('medium');
   const [saving, setSaving] = useState(false);
   const [localRecommendations, setLocalRecommendations] = useState<RecommendationDetail[]>(stats.recommendations || []);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [newPriority, setNewPriority] = useState('medium');
   
   const canEdit = userRole === 'admin' || userRole === 'coordinator';
   
@@ -109,18 +138,61 @@ const ProgramSection = ({ stats, isExpanded = true, userRole }: ProgramSectionPr
     setSaving(true);
     try {
       const { error } = await supabase
-        .from('reports')
-        .update({ recommendations_text: editText })
-        .eq('id', editingRec.reportId);
+        .from('recommendations')
+        .update({ title: editTitle, description: editDescription, priority: editPriority })
+        .eq('id', editingRec.id);
       if (error) throw error;
       setLocalRecommendations(prev => prev.map(r => 
-        r.reportId === editingRec.reportId ? { ...r, recommendationsText: editText } : r
+        r.id === editingRec.id ? { ...r, title: editTitle, description: editDescription, priority: editPriority } : r
       ));
-      toast.success(language === 'ar' ? 'تم حفظ التوصيات بنجاح' : 'Recommendations saved successfully');
+      toast.success(language === 'ar' ? 'تم حفظ التوصية بنجاح' : 'Recommendation saved successfully');
       setEditingRec(null);
     } catch (err) {
       console.error(err);
-      toast.error(language === 'ar' ? 'حدث خطأ أثناء الحفظ' : 'Error saving recommendations');
+      toast.error(language === 'ar' ? 'حدث خطأ أثناء الحفظ' : 'Error saving recommendation');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddRecommendation = async () => {
+    if (!newTitle.trim() || !newDescription.trim()) {
+      toast.error(language === 'ar' ? 'يرجى تعبئة جميع الحقول' : 'Please fill all fields');
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from('recommendations')
+        .insert({
+          title: newTitle,
+          description: newDescription,
+          priority: newPriority,
+          program_id: stats.programId,
+          source_type: 'manual',
+          status: 'pending',
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      setLocalRecommendations(prev => [{
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        status: data.status || 'pending',
+        priority: data.priority || 'medium',
+        semester: data.semester,
+        academic_year: data.academic_year,
+        program_id: data.program_id,
+      }, ...prev]);
+      toast.success(language === 'ar' ? 'تمت إضافة التوصية بنجاح' : 'Recommendation added successfully');
+      setShowAddDialog(false);
+      setNewTitle('');
+      setNewDescription('');
+      setNewPriority('medium');
+    } catch (err) {
+      console.error(err);
+      toast.error(language === 'ar' ? 'حدث خطأ أثناء الإضافة' : 'Error adding recommendation');
     } finally {
       setSaving(false);
     }
@@ -345,49 +417,61 @@ const ProgramSection = ({ stats, isExpanded = true, userRole }: ProgramSectionPr
             </CollapsibleContent>
           </Collapsible>
 
-          {/* Recommendations Section */}
-          {localRecommendations.length > 0 && (
-            <Collapsible open={showRecommendations} onOpenChange={setShowRecommendations}>
-              <CollapsibleTrigger asChild>
-                <Card className="cursor-pointer hover:shadow-md transition-shadow">
-                  <CardContent className="pt-4 pb-4">
-                    <div className="flex items-center gap-2">
-                      <Lightbulb className="h-5 w-5 text-amber-500" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">
-                          {language === 'ar' ? 'التوصيات' : 'Recommendations'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {localRecommendations.length} {language === 'ar' ? 'توصية' : 'recommendation(s)'}
-                        </p>
-                      </div>
-                      {showRecommendations ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          {/* Recommendations Section - Always visible */}
+          <Collapsible open={showRecommendations} onOpenChange={setShowRecommendations}>
+            <CollapsibleTrigger asChild>
+              <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-center gap-2">
+                    <Lightbulb className="h-5 w-5 text-amber-500" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">
+                        {language === 'ar' ? 'التوصيات' : 'Recommendations'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {localRecommendations.length} {language === 'ar' ? 'توصية' : 'recommendation(s)'}
+                      </p>
                     </div>
-                  </CardContent>
-                </Card>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <Card>
-                  <CardHeader className="pb-2">
+                    {showRecommendations ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                  </div>
+                </CardContent>
+              </Card>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
                     <CardTitle className="text-base flex items-center gap-2">
                       <Lightbulb className="h-4 w-4 text-amber-500" />
                       {language === 'ar' ? 'التوصيات' : 'Recommendations'}
                     </CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                    {canEdit && (
+                      <Button size="sm" onClick={(e) => { e.stopPropagation(); setShowAddDialog(true); }}>
+                        <Plus className="h-4 w-4 mr-1" />
+                        {language === 'ar' ? 'إضافة توصية' : 'Add Recommendation'}
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {localRecommendations.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>{language === 'ar' ? 'الاستبيان' : 'Survey'}</TableHead>
-                          <TableHead>{language === 'ar' ? 'التوصيات' : 'Recommendations'}</TableHead>
+                          <TableHead>{language === 'ar' ? 'العنوان' : 'Title'}</TableHead>
+                          <TableHead>{language === 'ar' ? 'الوصف' : 'Description'}</TableHead>
+                          <TableHead className="text-center">{language === 'ar' ? 'الحالة' : 'Status'}</TableHead>
+                          <TableHead className="text-center">{language === 'ar' ? 'الأولوية' : 'Priority'}</TableHead>
                           {canEdit && <TableHead className="text-center w-20">{language === 'ar' ? 'تعديل' : 'Edit'}</TableHead>}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {localRecommendations.map(rec => (
-                          <TableRow key={rec.reportId}>
-                            <TableCell className="font-medium whitespace-nowrap">{rec.surveyTitle}</TableCell>
-                            <TableCell className="whitespace-pre-wrap text-sm max-w-md">{rec.recommendationsText}</TableCell>
+                          <TableRow key={rec.id}>
+                            <TableCell className="font-medium whitespace-nowrap">{rec.title}</TableCell>
+                            <TableCell className="whitespace-pre-wrap text-sm max-w-md">{rec.description}</TableCell>
+                            <TableCell className="text-center">{getRecStatusBadge(rec.status, language)}</TableCell>
+                            <TableCell className="text-center">{getPriorityBadge(rec.priority, language)}</TableCell>
                             {canEdit && (
                               <TableCell className="text-center">
                                 <Button
@@ -395,7 +479,9 @@ const ProgramSection = ({ stats, isExpanded = true, userRole }: ProgramSectionPr
                                   size="sm"
                                   onClick={() => {
                                     setEditingRec(rec);
-                                    setEditText(rec.recommendationsText);
+                                    setEditTitle(rec.title);
+                                    setEditDescription(rec.description);
+                                    setEditPriority(rec.priority);
                                   }}
                                 >
                                   <Pencil className="h-4 w-4" />
@@ -406,28 +492,55 @@ const ProgramSection = ({ stats, isExpanded = true, userRole }: ProgramSectionPr
                         ))}
                       </TableBody>
                     </Table>
-                  </CardContent>
-                </Card>
-              </CollapsibleContent>
-            </Collapsible>
-          )}
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      {language === 'ar' ? 'لا توجد توصيات' : 'No recommendations'}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </CollapsibleContent>
+          </Collapsible>
 
           {/* Edit Recommendation Dialog */}
           <Dialog open={!!editingRec} onOpenChange={(open) => !open && setEditingRec(null)}>
             <DialogContent className="sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>
-                  {language === 'ar' ? 'تعديل التوصيات' : 'Edit Recommendations'}
+                  {language === 'ar' ? 'تعديل التوصية' : 'Edit Recommendation'}
                 </DialogTitle>
               </DialogHeader>
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">{editingRec?.surveyTitle}</p>
-                <Textarea
-                  value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  rows={8}
-                  dir={language === 'ar' ? 'rtl' : 'ltr'}
-                />
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">{language === 'ar' ? 'العنوان' : 'Title'}</label>
+                  <Input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    dir={language === 'ar' ? 'rtl' : 'ltr'}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">{language === 'ar' ? 'الوصف' : 'Description'}</label>
+                  <Textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    rows={5}
+                    dir={language === 'ar' ? 'rtl' : 'ltr'}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">{language === 'ar' ? 'الأولوية' : 'Priority'}</label>
+                  <Select value={editPriority} onValueChange={setEditPriority}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="high">{language === 'ar' ? 'عالية' : 'High'}</SelectItem>
+                      <SelectItem value="medium">{language === 'ar' ? 'متوسطة' : 'Medium'}</SelectItem>
+                      <SelectItem value="low">{language === 'ar' ? 'منخفضة' : 'Low'}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setEditingRec(null)}>
@@ -437,6 +550,61 @@ const ProgramSection = ({ stats, isExpanded = true, userRole }: ProgramSectionPr
                   {saving 
                     ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...') 
                     : (language === 'ar' ? 'حفظ' : 'Save')}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Add Recommendation Dialog */}
+          <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>
+                  {language === 'ar' ? 'إضافة توصية جديدة' : 'Add New Recommendation'}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">{language === 'ar' ? 'العنوان' : 'Title'}</label>
+                  <Input
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    placeholder={language === 'ar' ? 'عنوان التوصية' : 'Recommendation title'}
+                    dir={language === 'ar' ? 'rtl' : 'ltr'}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">{language === 'ar' ? 'الوصف' : 'Description'}</label>
+                  <Textarea
+                    value={newDescription}
+                    onChange={(e) => setNewDescription(e.target.value)}
+                    placeholder={language === 'ar' ? 'وصف التوصية' : 'Recommendation description'}
+                    rows={5}
+                    dir={language === 'ar' ? 'rtl' : 'ltr'}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">{language === 'ar' ? 'الأولوية' : 'Priority'}</label>
+                  <Select value={newPriority} onValueChange={setNewPriority}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="high">{language === 'ar' ? 'عالية' : 'High'}</SelectItem>
+                      <SelectItem value="medium">{language === 'ar' ? 'متوسطة' : 'Medium'}</SelectItem>
+                      <SelectItem value="low">{language === 'ar' ? 'منخفضة' : 'Low'}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+                  {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                </Button>
+                <Button onClick={handleAddRecommendation} disabled={saving}>
+                  {saving 
+                    ? (language === 'ar' ? 'جاري الإضافة...' : 'Adding...') 
+                    : (language === 'ar' ? 'إضافة' : 'Add')}
                 </Button>
               </DialogFooter>
             </DialogContent>
