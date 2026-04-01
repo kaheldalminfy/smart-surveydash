@@ -100,7 +100,7 @@ const getProgramInitial = (name: string): string => {
   return withoutAl.charAt(0) || stripped.charAt(0) || name.charAt(0);
 };
 
-const ProgramSection = ({ stats, isExpanded = true, userRole }: ProgramSectionProps) => {
+const ProgramSection = ({ stats, isExpanded = true, userRole, isCollegeLevel = false }: ProgramSectionProps) => {
   const { language } = useLanguage();
   const programColor = PROGRAM_COLORS[stats.colorIndex % PROGRAM_COLORS.length];
   const [showSurveys, setShowSurveys] = useState(false);
