@@ -64,6 +64,7 @@ const Surveys = () => {
   useEffect(() => {
     loadSurveys();
     loadTemplates();
+    loadPrograms();
   }, []);
 
   const loadSurveys = async () => {
