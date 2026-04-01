@@ -521,6 +521,14 @@ const Surveys = () => {
                                           </Button>
                                         </Link>
                                         <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => setTransferDialog({ open: true, surveyId: survey.id, surveyTitle: survey.title, currentProgramId: survey.program_id })}
+                                        >
+                                          <ArrowRightLeft className="h-4 w-4 ml-2" />
+                                          {language === 'ar' ? 'نقل' : 'Transfer'}
+                                        </Button>
+                                        <Button
                                           variant="ghost"
                                           size="sm"
                                           onClick={() => setDeleteDialog({ open: true, id: survey.id, type: 'survey' })}
