@@ -569,27 +569,38 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
         </div>
       )}
 
+      {/* College Section */}
+      {collegeStats && (selectedProgram === 'all' || selectedProgram === 'college') && (
+        <Card className="overflow-hidden border-primary/30">
+          <CardContent className="p-6">
+            <ProgramSection stats={collegeStats} isExpanded={true} userRole={userRole} isCollegeLevel={true} />
+          </CardContent>
+        </Card>
+      )}
+
       {/* Program Sections */}
-      <div className="space-y-6">
-        {filteredStats.length > 0 ? (
-          filteredStats.map((stats) => (
-            <Card key={stats.programId} className="overflow-hidden">
-              <CardContent className="p-6">
-                <ProgramSection stats={stats} isExpanded={true} userRole={userRole} />
+      {selectedProgram !== 'college' && (
+        <div className="space-y-6">
+          {filteredStats.length > 0 ? (
+            filteredStats.map((stats) => (
+              <Card key={stats.programId} className="overflow-hidden">
+                <CardContent className="p-6">
+                  <ProgramSection stats={stats} isExpanded={true} userRole={userRole} />
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  {language === 'ar' ? 'لا توجد بيانات للعرض' : 'No data to display'}
+                </p>
               </CardContent>
             </Card>
-          ))
-        ) : (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">
-                {language === 'ar' ? 'لا توجد بيانات للعرض' : 'No data to display'}
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
