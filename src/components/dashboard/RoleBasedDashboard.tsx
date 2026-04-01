@@ -491,6 +491,9 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
                       <SelectItem value="all">
                         {language === 'ar' ? 'جميع البرامج' : 'All Programs'}
                       </SelectItem>
+                      <SelectItem value="college">
+                        {language === 'ar' ? 'الكلية' : 'College'}
+                      </SelectItem>
                       {programs.map(program => (
                         <SelectItem key={program.id} value={program.id}>
                           {program.name}
