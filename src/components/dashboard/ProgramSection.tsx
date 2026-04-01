@@ -47,6 +47,7 @@ interface ProgramSectionProps {
   stats: ProgramStats;
   isExpanded?: boolean;
   userRole?: 'admin' | 'dean' | 'coordinator' | 'program_manager' | 'faculty';
+  isCollegeLevel?: boolean;
 }
 
 const PROGRAM_COLORS = [
