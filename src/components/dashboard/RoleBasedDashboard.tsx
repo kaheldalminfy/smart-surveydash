@@ -118,6 +118,12 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
       }
       
       setProgramStats(stats);
+
+      // Load college-level stats (program_id IS NULL)
+      if (isDeanOrAdmin) {
+        const collegeStat = await loadCollegeLevelStats();
+        setCollegeStats(collegeStat);
+      }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
