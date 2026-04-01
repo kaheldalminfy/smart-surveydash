@@ -33,6 +33,10 @@ const Surveys = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [programSearchQueries, setProgramSearchQueries] = useState<Record<string, string>>({});
   const [programStatusFilters, setProgramStatusFilters] = useState<Record<string, 'all' | 'active' | 'draft' | 'closed'>>({});
+  const [programs, setPrograms] = useState<any[]>([]);
+  const [transferDialog, setTransferDialog] = useState<{open: boolean, surveyId: string, surveyTitle: string, currentProgramId: string | null}>({open: false, surveyId: '', surveyTitle: '', currentProgramId: null});
+  const [transferTarget, setTransferTarget] = useState<string>('');
+  const [transferring, setTransferring] = useState(false);
 
   const groupedSurveys = useMemo(() => {
     const filtered = surveys.filter(s => 
