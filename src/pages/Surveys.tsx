@@ -132,6 +132,40 @@ const Surveys = () => {
     }
   };
 
+  const loadPrograms = async () => {
+    const { data } = await supabase.from('programs').select('id, name');
+    setPrograms(data || []);
+  };
+
+  const handleTransferSurvey = async () => {
+    if (!transferDialog.surveyId) return;
+    setTransferring(true);
+    try {
+      const newProgramId = transferTarget === 'college' ? null : transferTarget;
+      const { error } = await supabase
+        .from('surveys')
+        .update({ program_id: newProgramId })
+        .eq('id', transferDialog.surveyId);
+      if (error) throw error;
+      toast({
+        title: language === 'ar' ? 'تم النقل' : 'Transferred',
+        description: language === 'ar' ? 'تم نقل الاستبيان بنجاح. جميع البيانات والاستجابات محفوظة.' : 'Survey transferred successfully. All data preserved.',
+      });
+      setTransferDialog({open: false, surveyId: '', surveyTitle: '', currentProgramId: null});
+      setTransferTarget('');
+      loadSurveys();
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        description: language === 'ar' ? 'فشل في نقل الاستبيان' : 'Failed to transfer survey',
+        variant: 'destructive',
+      });
+    } finally {
+      setTransferring(false);
+    }
+  };
+
   const getSurveyStatus = (survey: any) => {
     if (survey.status === "active") return { label: t('surveys.active'), variant: "default" as const };
     if (survey.status === "closed") return { label: t('surveys.closed'), variant: "secondary" as const };
