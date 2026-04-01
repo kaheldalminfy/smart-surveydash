@@ -13,7 +13,8 @@ import {
   TrendingUp,
   Users,
   FileText,
-  AlertCircle
+  AlertCircle,
+  GraduationCap
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -84,6 +85,7 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
   const { language, t } = useLanguage();
   const [programs, setPrograms] = useState<Program[]>([]);
   const [programStats, setProgramStats] = useState<ProgramStats[]>([]);
+  const [collegeStats, setCollegeStats] = useState<ProgramStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'all' | 'single'>('all');
   const [selectedProgram, setSelectedProgram] = useState<string>('all');
@@ -116,6 +118,12 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
       }
       
       setProgramStats(stats);
+
+      // Load college-level stats (program_id IS NULL)
+      if (isDeanOrAdmin) {
+        const collegeStat = await loadCollegeLevelStats();
+        setCollegeStats(collegeStat);
+      }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -315,6 +323,112 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
     };
   };
 
+  const loadCollegeLevelStats = async (): Promise<ProgramStats> => {
+    // Get surveys with no program (college-level)
+    const { data: surveys } = await supabase
+      .from('surveys')
+      .select('id, title')
+      .is('program_id', null);
+
+    const surveyIds = surveys?.map(s => s.id) || [];
+    
+    let totalResponses = 0;
+    if (surveyIds.length > 0) {
+      const { count } = await supabase
+        .from('responses')
+        .select('*', { count: 'exact', head: true })
+        .in('survey_id', surveyIds);
+      totalResponses = count || 0;
+    }
+
+    const surveyDetails: SurveyDetail[] = [];
+    const surveyAverages: number[] = [];
+
+    if (surveys && surveys.length > 0) {
+      for (const survey of surveys) {
+        const { data: surveyResponses } = await supabase
+          .from('responses')
+          .select('id')
+          .eq('survey_id', survey.id);
+
+        const responseCount = surveyResponses?.length || 0;
+        const responseIds = surveyResponses?.map(r => r.id) || [];
+
+        let avgSatisfaction = 0;
+        if (responseIds.length > 0) {
+          const { data: surveyAnswers } = await supabase
+            .from('answers')
+            .select('numeric_value, questions!inner(type)')
+            .in('response_id', responseIds)
+            .not('numeric_value', 'is', null)
+            .in('questions.type', ['likert', 'rating']);
+
+          const validAnswers = (surveyAnswers || []).filter((a: any) => 
+            a.numeric_value != null && a.numeric_value >= 1 && a.numeric_value <= 5
+          );
+          if (validAnswers.length > 0) {
+            const sum = validAnswers.reduce((acc: number, curr: any) => acc + curr.numeric_value, 0);
+            avgSatisfaction = sum / validAnswers.length;
+            surveyAverages.push(avgSatisfaction);
+          }
+        }
+
+        surveyDetails.push({ id: survey.id, title: survey.title, responseCount, avgSatisfaction });
+      }
+    }
+
+    const averageSatisfaction = surveyAverages.length > 0
+      ? surveyAverages.reduce((a, b) => a + b, 0) / surveyAverages.length
+      : 0;
+
+    // Complaints with no program
+    const { data: complaints } = await supabase
+      .from('complaints')
+      .select('id, subject, status, created_at, complainant_type')
+      .is('program_id', null)
+      .order('created_at', { ascending: false });
+
+    const complaintStats = {
+      pending: complaints?.filter(c => c.status === 'pending').length || 0,
+      inProgress: complaints?.filter(c => c.status === 'in_progress').length || 0,
+      resolved: complaints?.filter(c => c.status === 'resolved' || c.status === 'closed').length || 0,
+    };
+
+    const complaintDetails: ComplaintDetail[] = (complaints || []).map(c => ({
+      id: c.id, subject: c.subject, status: c.status || 'pending',
+      createdAt: c.created_at || '', complainantType: c.complainant_type,
+    }));
+
+    // Recommendations with no program
+    const { data: recsData } = await supabase
+      .from('recommendations')
+      .select('*')
+      .is('program_id', null)
+      .order('created_at', { ascending: false });
+
+    const recommendations: RecommendationDetail[] = (recsData || []).map(r => ({
+      id: r.id, title: r.title, description: r.description,
+      status: r.status || 'pending', priority: r.priority || 'medium',
+      semester: r.semester, academic_year: r.academic_year, program_id: r.program_id,
+    }));
+
+    return {
+      programId: 'college',
+      programName: language === 'ar' ? 'الكلية' : 'College',
+      programNameEn: language === 'ar' ? 'College' : undefined,
+      colorIndex: 0,
+      totalResponses,
+      averageSatisfaction,
+      totalSurveys: surveyIds.length,
+      textCommentsCount: 0,
+      complaintStats,
+      courseSatisfaction: [],
+      surveyDetails,
+      complaintDetails,
+      recommendations,
+    };
+  };
+
   // Calculate overall stats for header
   const overallStats = {
     totalPrograms: programs.length,
@@ -376,6 +490,9 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
                     <SelectContent>
                       <SelectItem value="all">
                         {language === 'ar' ? 'جميع البرامج' : 'All Programs'}
+                      </SelectItem>
+                      <SelectItem value="college">
+                        {language === 'ar' ? 'الكلية' : 'College'}
                       </SelectItem>
                       {programs.map(program => (
                         <SelectItem key={program.id} value={program.id}>
@@ -452,27 +569,38 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
         </div>
       )}
 
+      {/* College Section */}
+      {collegeStats && (selectedProgram === 'all' || selectedProgram === 'college') && (
+        <Card className="overflow-hidden border-primary/30">
+          <CardContent className="p-6">
+            <ProgramSection stats={collegeStats} isExpanded={true} userRole={userRole} isCollegeLevel={true} />
+          </CardContent>
+        </Card>
+      )}
+
       {/* Program Sections */}
-      <div className="space-y-6">
-        {filteredStats.length > 0 ? (
-          filteredStats.map((stats) => (
-            <Card key={stats.programId} className="overflow-hidden">
-              <CardContent className="p-6">
-                <ProgramSection stats={stats} isExpanded={true} userRole={userRole} />
+      {selectedProgram !== 'college' && (
+        <div className="space-y-6">
+          {filteredStats.length > 0 ? (
+            filteredStats.map((stats) => (
+              <Card key={stats.programId} className="overflow-hidden">
+                <CardContent className="p-6">
+                  <ProgramSection stats={stats} isExpanded={true} userRole={userRole} />
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  {language === 'ar' ? 'لا توجد بيانات للعرض' : 'No data to display'}
+                </p>
               </CardContent>
             </Card>
-          ))
-        ) : (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">
-                {language === 'ar' ? 'لا توجد بيانات للعرض' : 'No data to display'}
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

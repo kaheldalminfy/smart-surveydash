@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, BarChart3, Link2, QrCode, Edit, Trash2, FileText, Filter } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Search, BarChart3, Link2, QrCode, Edit, Trash2, FileText, Filter, ArrowRightLeft } from "lucide-react";
 import DashboardButton from "@/components/DashboardButton";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +33,10 @@ const Surveys = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [programSearchQueries, setProgramSearchQueries] = useState<Record<string, string>>({});
   const [programStatusFilters, setProgramStatusFilters] = useState<Record<string, 'all' | 'active' | 'draft' | 'closed'>>({});
+  const [programs, setPrograms] = useState<any[]>([]);
+  const [transferDialog, setTransferDialog] = useState<{open: boolean, surveyId: string, surveyTitle: string, currentProgramId: string | null}>({open: false, surveyId: '', surveyTitle: '', currentProgramId: null});
+  const [transferTarget, setTransferTarget] = useState<string>('');
+  const [transferring, setTransferring] = useState(false);
 
   const groupedSurveys = useMemo(() => {
     const filtered = surveys.filter(s => 
@@ -58,6 +64,7 @@ const Surveys = () => {
   useEffect(() => {
     loadSurveys();
     loadTemplates();
+    loadPrograms();
   }, []);
 
   const loadSurveys = async () => {
@@ -122,6 +129,40 @@ const Surveys = () => {
       console.error("Error loading templates:", error);
     } else if (data) {
       setTemplates(data);
+    }
+  };
+
+  const loadPrograms = async () => {
+    const { data } = await supabase.from('programs').select('id, name');
+    setPrograms(data || []);
+  };
+
+  const handleTransferSurvey = async () => {
+    if (!transferDialog.surveyId) return;
+    setTransferring(true);
+    try {
+      const newProgramId = transferTarget === 'college' ? null : transferTarget;
+      const { error } = await supabase
+        .from('surveys')
+        .update({ program_id: newProgramId })
+        .eq('id', transferDialog.surveyId);
+      if (error) throw error;
+      toast({
+        title: language === 'ar' ? 'تم النقل' : 'Transferred',
+        description: language === 'ar' ? 'تم نقل الاستبيان بنجاح. جميع البيانات والاستجابات محفوظة.' : 'Survey transferred successfully. All data preserved.',
+      });
+      setTransferDialog({open: false, surveyId: '', surveyTitle: '', currentProgramId: null});
+      setTransferTarget('');
+      loadSurveys();
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        description: language === 'ar' ? 'فشل في نقل الاستبيان' : 'Failed to transfer survey',
+        variant: 'destructive',
+      });
+    } finally {
+      setTransferring(false);
     }
   };
 
@@ -480,6 +521,14 @@ const Surveys = () => {
                                           </Button>
                                         </Link>
                                         <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => setTransferDialog({ open: true, surveyId: survey.id, surveyTitle: survey.title, currentProgramId: survey.program_id })}
+                                        >
+                                          <ArrowRightLeft className="h-4 w-4 ml-2" />
+                                          {language === 'ar' ? 'نقل' : 'Transfer'}
+                                        </Button>
+                                        <Button
                                           variant="ghost"
                                           size="sm"
                                           onClick={() => setDeleteDialog({ open: true, id: survey.id, type: 'survey' })}
@@ -589,6 +638,50 @@ const Surveys = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Transfer Survey Dialog */}
+      <Dialog open={transferDialog.open} onOpenChange={(open) => { if (!open) { setTransferDialog({open: false, surveyId: '', surveyTitle: '', currentProgramId: null}); setTransferTarget(''); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{language === 'ar' ? 'نقل الاستبيان إلى برنامج آخر' : 'Transfer Survey to Another Program'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {language === 'ar' 
+                ? `نقل "${transferDialog.surveyTitle}" - جميع الاستجابات والبيانات ستبقى محفوظة.`
+                : `Transfer "${transferDialog.surveyTitle}" - All responses and data will be preserved.`}
+            </p>
+            <div>
+              <label className="text-sm font-medium mb-2 block">
+                {language === 'ar' ? 'البرنامج الهدف' : 'Target Program'}
+              </label>
+              <Select value={transferTarget} onValueChange={setTransferTarget}>
+                <SelectTrigger>
+                  <SelectValue placeholder={language === 'ar' ? 'اختر البرنامج' : 'Select Program'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="college">
+                    {language === 'ar' ? 'الكلية (عام)' : 'College (General)'}
+                  </SelectItem>
+                  {programs.filter(p => p.id !== transferDialog.currentProgramId).map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setTransferDialog({open: false, surveyId: '', surveyTitle: '', currentProgramId: null}); setTransferTarget(''); }}>
+              {language === 'ar' ? 'إلغاء' : 'Cancel'}
+            </Button>
+            <Button onClick={handleTransferSurvey} disabled={!transferTarget || transferring}>
+              {transferring 
+                ? (language === 'ar' ? 'جاري النقل...' : 'Transferring...') 
+                : (language === 'ar' ? 'نقل' : 'Transfer')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
