@@ -638,6 +638,50 @@ const Surveys = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Transfer Survey Dialog */}
+      <Dialog open={transferDialog.open} onOpenChange={(open) => { if (!open) { setTransferDialog({open: false, surveyId: '', surveyTitle: '', currentProgramId: null}); setTransferTarget(''); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{language === 'ar' ? 'نقل الاستبيان إلى برنامج آخر' : 'Transfer Survey to Another Program'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {language === 'ar' 
+                ? `نقل "${transferDialog.surveyTitle}" - جميع الاستجابات والبيانات ستبقى محفوظة.`
+                : `Transfer "${transferDialog.surveyTitle}" - All responses and data will be preserved.`}
+            </p>
+            <div>
+              <label className="text-sm font-medium mb-2 block">
+                {language === 'ar' ? 'البرنامج الهدف' : 'Target Program'}
+              </label>
+              <Select value={transferTarget} onValueChange={setTransferTarget}>
+                <SelectTrigger>
+                  <SelectValue placeholder={language === 'ar' ? 'اختر البرنامج' : 'Select Program'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="college">
+                    {language === 'ar' ? 'الكلية (عام)' : 'College (General)'}
+                  </SelectItem>
+                  {programs.filter(p => p.id !== transferDialog.currentProgramId).map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setTransferDialog({open: false, surveyId: '', surveyTitle: '', currentProgramId: null}); setTransferTarget(''); }}>
+              {language === 'ar' ? 'إلغاء' : 'Cancel'}
+            </Button>
+            <Button onClick={handleTransferSurvey} disabled={!transferTarget || transferring}>
+              {transferring 
+                ? (language === 'ar' ? 'جاري النقل...' : 'Transferring...') 
+                : (language === 'ar' ? 'نقل' : 'Transfer')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
