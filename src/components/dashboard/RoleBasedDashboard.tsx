@@ -13,7 +13,8 @@ import {
   TrendingUp,
   Users,
   FileText,
-  AlertCircle
+  AlertCircle,
+  GraduationCap
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
