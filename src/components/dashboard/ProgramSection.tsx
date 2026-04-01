@@ -212,15 +212,17 @@ const ProgramSection = ({ stats, isExpanded = true, userRole, isCollegeLevel = f
       <div 
         className="flex items-center gap-3 p-4 rounded-lg"
         style={{ 
-          background: `linear-gradient(135deg, ${programColor}15 0%, ${programColor}05 100%)`,
-          borderLeft: `4px solid ${programColor}`
+          background: isCollegeLevel 
+            ? `linear-gradient(135deg, hsl(var(--primary) / 0.15) 0%, hsl(var(--primary) / 0.05) 100%)`
+            : `linear-gradient(135deg, ${programColor}15 0%, ${programColor}05 100%)`,
+          borderLeft: isCollegeLevel ? `4px solid hsl(var(--primary))` : `4px solid ${programColor}`
         }}
       >
         <div 
           className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg"
-          style={{ backgroundColor: programColor }}
+          style={{ backgroundColor: isCollegeLevel ? 'hsl(var(--primary))' : programColor }}
         >
-          {getProgramInitial(stats.programName)}
+          {isCollegeLevel ? <GraduationCap className="h-6 w-6" /> : getProgramInitial(stats.programName)}
         </div>
         <div className="flex-1">
           <h3 className="text-lg font-bold">{stats.programName}</h3>
