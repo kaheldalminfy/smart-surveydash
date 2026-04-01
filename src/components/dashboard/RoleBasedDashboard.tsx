@@ -85,6 +85,7 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
   const { language, t } = useLanguage();
   const [programs, setPrograms] = useState<Program[]>([]);
   const [programStats, setProgramStats] = useState<ProgramStats[]>([]);
+  const [collegeStats, setCollegeStats] = useState<ProgramStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'all' | 'single'>('all');
   const [selectedProgram, setSelectedProgram] = useState<string>('all');
