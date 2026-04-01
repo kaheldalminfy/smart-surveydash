@@ -21,7 +21,8 @@ import {
   Clock,
   Lightbulb,
   Pencil,
-  Plus
+  Plus,
+  GraduationCap
 } from "lucide-react";
 import { 
   BarChart, 
