@@ -39,6 +39,7 @@ const SurveyInfoCard = ({ survey, setSurvey, programs, getUniqueAcademicYears, g
             <select id="program" className="w-full rounded-md border border-input bg-background px-3 py-2"
               value={survey.programId} onChange={(e) => setSurvey({...survey, programId: e.target.value})}>
               <option value="">{t('designer.selectProgram')}</option>
+              <option value="college">{language === 'ar' ? "على مستوى الكلية" : "College Level"}</option>
               {programs.map((program) => (<option key={program.id} value={program.id}>{program.name}</option>))}
             </select>
           </div>

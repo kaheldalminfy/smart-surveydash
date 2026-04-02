@@ -224,7 +224,7 @@ const SurveyDesigner = () => {
         toast({ title: t('common.updated'), description: t('designer.surveyUpdated') });
       } else {
         const { data: surveyData, error: surveyError } = await supabase.from("surveys").insert({
-          title: survey.title, description: survey.description, program_id: survey.programId,
+          title: survey.title, description: survey.description, program_id: survey.programId === 'college' ? null : survey.programId || null,
           is_anonymous: survey.isAnonymous, start_date: survey.startDate || null, end_date: survey.endDate || null,
           semester: survey.semester || null, academic_year: survey.academicYear || null,
           target_enrollment: survey.targetEnrollment ? parseInt(survey.targetEnrollment) : null,
