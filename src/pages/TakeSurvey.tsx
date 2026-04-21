@@ -114,8 +114,11 @@ const TakeSurvey = () => {
       if (questionsError) throw new Error(language === 'ar' ? "فشل في التحقق من الأسئلة" : "Failed to verify questions");
       if (!freshQuestions || freshQuestions.length === 0) throw new Error(language === 'ar' ? "لا توجد أسئلة في هذا الاستبيان" : "No questions in this survey");
       const dbQuestionMap = new Map(freshQuestions.map(q => [q.id, q]));
-      const localQuestionIds = questions.map(q => q.id);
-      const questionsChanged = localQuestionIds.some(localId => !dbQuestionMap.has(localId));
+      const localQuestionIds = new Set(questions.map(q => q.id));
+      const dbQuestionIds = new Set(freshQuestions.map(q => q.id));
+      const questionsChanged =
+        questions.some(q => !dbQuestionMap.has(q.id)) ||
+        freshQuestions.some(q => !localQuestionIds.has(q.id));
       if (questionsChanged) {
         toast({ title: t('common.error'), description: language === 'ar' ? "تغيرت أسئلة الاستبيان. يرجى إعادة تحميل الصفحة" : "Survey questions changed. Please reload.", variant: "destructive" });
         setQuestions(freshQuestions); setResponses({}); setCurrentQuestionIndex(0); setIsSubmitting(false); return;
@@ -124,13 +127,16 @@ const TakeSurvey = () => {
       let userId = null;
       try { const { data: { user }, error: authError } = await supabase.auth.getUser(); if (!authError && user) userId = user.id; } catch (authError) {}
 
-      const questionsWithAnswers = questions.filter(q => q.type !== 'section');
+      // Build answers from FRESH DB questions (source of truth) — guarantees question_id integrity
+      // and prevents any chance of duplicate (response_id, question_id) which would now violate the new UNIQUE constraint.
+      const seen = new Set<string>();
+      const questionsWithAnswers = freshQuestions.filter(q => q.type !== 'section' && !seen.has(q.id) && (seen.add(q.id), true));
       const answersData = questionsWithAnswers.map(question => {
         const responseValue = responses[question.id];
         return {
           question_id: question.id,
-          value: responseValue !== undefined && responseValue !== null ? String(responseValue) : null,
-          numeric_value: responseValue !== undefined && responseValue !== null && !isNaN(Number(responseValue)) ? Number(responseValue) : null,
+          value: responseValue !== undefined && responseValue !== null && responseValue !== "" ? String(responseValue) : null,
+          numeric_value: responseValue !== undefined && responseValue !== null && responseValue !== "" && !isNaN(Number(responseValue)) ? Number(responseValue) : null,
         };
       }).filter(answer => answer.value !== null || answer.numeric_value !== null);
 
