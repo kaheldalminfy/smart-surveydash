@@ -99,11 +99,23 @@ const TakeSurvey = () => {
   const nextQuestion = () => { if (validateCurrentQuestion() && currentQuestionIndex < questions.length - 1) setCurrentQuestionIndex(prev => prev + 1); };
   const previousQuestion = () => { if (currentQuestionIndex > 0) setCurrentQuestionIndex(prev => prev - 1); };
 
+  const isAnswered = (val: any) =>
+    val !== undefined && val !== null && String(val).trim() !== "";
+
   const submitSurvey = async () => {
-    const missingRequiredQuestions = questions.filter(q => q.is_required && (responses[q.id] === undefined || responses[q.id] === null || responses[q.id] === ""));
+    // Initial client-side check against current local questions
+    const missingRequiredQuestions = questions.filter(
+      q => q.type !== 'section' && q.is_required && !isAnswered(responses[q.id])
+    );
     if (missingRequiredQuestions.length > 0) {
-      toast({ title: t('takeSurvey.requiredQuestions'), description: `${language === 'ar' ? 'يرجى الإجابة على جميع الأسئلة المطلوبة' : 'Please answer all required questions'} (${missingRequiredQuestions.length} ${t('takeSurvey.remainingQuestions')})`, variant: "destructive" });
-      const firstMissingIndex = questions.findIndex(q => q.is_required && (responses[q.id] === undefined || responses[q.id] === null || responses[q.id] === ""));
+      toast({
+        title: t('takeSurvey.requiredQuestions'),
+        description: `${language === 'ar' ? 'يرجى الإجابة على جميع الأسئلة المطلوبة قبل الإرسال' : 'Please answer all required questions before submitting'} (${missingRequiredQuestions.length})`,
+        variant: "destructive"
+      });
+      const firstMissingIndex = questions.findIndex(
+        q => q.type !== 'section' && q.is_required && !isAnswered(responses[q.id])
+      );
       if (firstMissingIndex !== -1) setCurrentQuestionIndex(firstMissingIndex);
       return;
     }
@@ -115,7 +127,6 @@ const TakeSurvey = () => {
       if (!freshQuestions || freshQuestions.length === 0) throw new Error(language === 'ar' ? "لا توجد أسئلة في هذا الاستبيان" : "No questions in this survey");
       const dbQuestionMap = new Map(freshQuestions.map(q => [q.id, q]));
       const localQuestionIds = new Set(questions.map(q => q.id));
-      const dbQuestionIds = new Set(freshQuestions.map(q => q.id));
       const questionsChanged =
         questions.some(q => !dbQuestionMap.has(q.id)) ||
         freshQuestions.some(q => !localQuestionIds.has(q.id));
@@ -124,21 +135,51 @@ const TakeSurvey = () => {
         setQuestions(freshQuestions); setResponses({}); setCurrentQuestionIndex(0); setIsSubmitting(false); return;
       }
 
+      // SERVER-TRUTH validation: verify all required questions from DB are answered
+      const missingFromDb = freshQuestions.filter(
+        q => q.type !== 'section' && q.is_required && !isAnswered(responses[q.id])
+      );
+      if (missingFromDb.length > 0) {
+        toast({
+          title: t('takeSurvey.requiredQuestions'),
+          description: `${language === 'ar' ? 'يجب الإجابة على جميع الأسئلة المطلوبة. الأسئلة الناقصة:' : 'All required questions must be answered. Missing:'} ${missingFromDb.length}`,
+          variant: "destructive"
+        });
+        const firstMissingId = missingFromDb[0].id;
+        const idx = questions.findIndex(q => q.id === firstMissingId);
+        if (idx !== -1) setCurrentQuestionIndex(idx);
+        setIsSubmitting(false);
+        return;
+      }
+
       let userId = null;
       try { const { data: { user }, error: authError } = await supabase.auth.getUser(); if (!authError && user) userId = user.id; } catch (authError) {}
 
-      // Build answers from FRESH DB questions (source of truth) — guarantees question_id integrity
-      // and prevents any chance of duplicate (response_id, question_id) which would now violate the new UNIQUE constraint.
+      // Build answers from FRESH DB questions (source of truth)
       const seen = new Set<string>();
       const questionsWithAnswers = freshQuestions.filter(q => q.type !== 'section' && !seen.has(q.id) && (seen.add(q.id), true));
-      const answersData = questionsWithAnswers.map(question => {
-        const responseValue = responses[question.id];
-        return {
-          question_id: question.id,
-          value: responseValue !== undefined && responseValue !== null && responseValue !== "" ? String(responseValue) : null,
-          numeric_value: responseValue !== undefined && responseValue !== null && responseValue !== "" && !isNaN(Number(responseValue)) ? Number(responseValue) : null,
-        };
-      }).filter(answer => answer.value !== null || answer.numeric_value !== null);
+      const answersData = questionsWithAnswers
+        .map(question => {
+          const responseValue = responses[question.id];
+          const hasValue = isAnswered(responseValue);
+          return {
+            question_id: question.id,
+            is_required: question.is_required,
+            value: hasValue ? String(responseValue) : null,
+            numeric_value: hasValue && !isNaN(Number(responseValue)) ? Number(responseValue) : null,
+          };
+        })
+        // Keep all required questions (even if somehow null — shouldn't happen after validation)
+        // and only optional answers that have a value. This prevents silently dropping required answers.
+        .filter(a => a.is_required || a.value !== null || a.numeric_value !== null)
+        .map(({ is_required, ...rest }) => rest);
+
+      // Final guard: ensure no required answer slipped through as null
+      const requiredCount = freshQuestions.filter(q => q.type !== 'section' && q.is_required).length;
+      const answeredRequiredCount = answersData.filter(a => a.value !== null || a.numeric_value !== null).length;
+      if (answeredRequiredCount < requiredCount) {
+        throw new Error(language === 'ar' ? "إجابات مطلوبة مفقودة. لا يمكن الإرسال." : "Missing required answers. Cannot submit.");
+      }
 
       if (answersData.length === 0) throw new Error(language === 'ar' ? "لا توجد إجابات للإرسال" : "No answers to submit");
 
