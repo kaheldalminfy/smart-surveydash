@@ -9,10 +9,35 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
   try {
+    // Require authenticated admin
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return json({ error: 'Unauthorized' }, 401)
+    }
+    const authClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } },
+    )
+    const token = authHeader.replace('Bearer ', '')
+    const { data: claimsData, error: claimsErr } = await authClient.auth.getClaims(token)
+    if (claimsErr || !claimsData?.claims) {
+      return json({ error: 'Unauthorized' }, 401)
+    }
+    const callerId = claimsData.claims.sub
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
+
+    const { data: isAdmin } = await supabase.rpc('has_role', {
+      _user_id: callerId,
+      _role: 'admin',
+    })
+    if (!isAdmin) {
+      return json({ error: 'Forbidden: admin role required' }, 403)
+    }
 
     // Fetch all coordinator role rows
     const { data: roles, error: rErr } = await supabase

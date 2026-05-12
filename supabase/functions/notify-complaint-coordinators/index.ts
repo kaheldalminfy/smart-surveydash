@@ -33,6 +33,15 @@ Deno.serve(async (req) => {
       return json({ error: 'Complaint not found' }, 404)
     }
 
+    // Anti-abuse: only notify for freshly submitted complaints (within 2 minutes).
+    // This endpoint is unauthenticated (anonymous complaint submission), so we
+    // restrict it to the brief window right after insert to prevent attackers
+    // from re-triggering notifications for arbitrary historical complaints.
+    const ageMs = Date.now() - new Date(complaint.created_at).getTime()
+    if (ageMs > 2 * 60 * 1000) {
+      return json({ error: 'Complaint is not eligible for notification' }, 403)
+    }
+
     // Fetch program name
     let programName: string | null = null
     if (complaint.program_id) {

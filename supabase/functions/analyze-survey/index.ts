@@ -36,6 +36,34 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Authorization: caller must be admin OR coordinator/program_manager for the survey's program
+    const { data: surveyMeta, error: surveyMetaErr } = await supabase
+      .from("surveys")
+      .select("program_id")
+      .eq("id", surveyId)
+      .single();
+    if (surveyMetaErr || !surveyMeta) {
+      return new Response(JSON.stringify({ error: "Survey not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const callerId = userData.user.id;
+    const { data: roleRows } = await supabase
+      .from("user_roles")
+      .select("role, program_id")
+      .eq("user_id", callerId);
+
+    const allowed = (roleRows ?? []).some((r: any) => {
+      if (r.role === "admin" || r.role === "dean") return true;
+      if (r.role === "coordinator" || r.role === "program_manager") {
+        return r.program_id === null || r.program_id === surveyMeta.program_id;
+      }
+      return false;
+    });
+
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // Fetch survey data with responses
     const { data: survey } = await supabase
       .from("surveys")

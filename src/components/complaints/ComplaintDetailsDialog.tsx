@@ -29,13 +29,20 @@ const ComplaintDetailsDialog = ({ complaint, canManage, onClose, onEdit, onDelet
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
     const dir = language === 'ar' ? 'rtl' : 'ltr';
-    const statusLabel = t(`complaintsUI.status.${complaint.status}`);
+    const esc = (s: string | null | undefined) =>
+      String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    const statusLabel = esc(t(`complaintsUI.status.${complaint.status}`));
     const printContent = `
       <!DOCTYPE html>
       <html dir="${dir}" lang="${language}">
       <head>
         <meta charset="UTF-8">
-        <title>${t('complaintsUI.detailsTitle')} - ${complaint.subject}</title>
+        <title>${esc(t('complaintsUI.detailsTitle'))} - ${esc(complaint.subject)}</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 40px; direction: ${dir}; line-height: 1.6; }
@@ -59,26 +66,26 @@ const ComplaintDetailsDialog = ({ complaint, canManage, onClose, onEdit, onDelet
       </head>
       <body>
         <div class="header">
-          <h1>${t('complaintsUI.detailsTitle')}</h1>
-          <p>${complaint.id.substring(0, 8).toUpperCase()}</p>
+          <h1>${esc(t('complaintsUI.detailsTitle'))}</h1>
+          <p>${esc(complaint.id.substring(0, 8).toUpperCase())}</p>
         </div>
         <div class="section">
           <div class="info-grid">
-            <div class="info-item"><div class="info-label">${t('complaintsUI.titleLabel')}:</div><div class="info-value">${complaint.subject}</div></div>
-            <div class="info-item"><div class="info-label">${t('complaintsUI.statusLabel')}</div><div class="info-value"><span class="status-badge status-${complaint.status}">${statusLabel}</span></div></div>
-            <div class="info-item"><div class="info-label">${t('complaintsUI.category')}:</div><div class="info-value">${getCategoryLabel(complaint.type, t)}</div></div>
-            <div class="info-item"><div class="info-label">${t('complaintsUI.programLabel')}</div><div class="info-value">${complaint.programs?.name || t('complaintsUI.notSpecified')}</div></div>
-            <div class="info-item"><div class="info-label">${t('complaintsUI.complainantLabel')}</div><div class="info-value">${complaint.student_name || t('complaintsUI.notSpecified')}</div></div>
-            <div class="info-item"><div class="info-label">${t('complaintsUI.email')}</div><div class="info-value">${complaint.student_email || t('complaintsUI.notSpecified')}</div></div>
-            <div class="info-item"><div class="info-label">${t('complaintsUI.submittedAt')}</div><div class="info-value">${new Date(complaint.created_at).toLocaleString(locale)}</div></div>
+            <div class="info-item"><div class="info-label">${esc(t('complaintsUI.titleLabel'))}:</div><div class="info-value">${esc(complaint.subject)}</div></div>
+            <div class="info-item"><div class="info-label">${esc(t('complaintsUI.statusLabel'))}</div><div class="info-value"><span class="status-badge status-${esc(complaint.status)}">${statusLabel}</span></div></div>
+            <div class="info-item"><div class="info-label">${esc(t('complaintsUI.category'))}:</div><div class="info-value">${esc(getCategoryLabel(complaint.type, t))}</div></div>
+            <div class="info-item"><div class="info-label">${esc(t('complaintsUI.programLabel'))}</div><div class="info-value">${esc(complaint.programs?.name || t('complaintsUI.notSpecified'))}</div></div>
+            <div class="info-item"><div class="info-label">${esc(t('complaintsUI.complainantLabel'))}</div><div class="info-value">${esc(complaint.student_name || t('complaintsUI.notSpecified'))}</div></div>
+            <div class="info-item"><div class="info-label">${esc(t('complaintsUI.email'))}</div><div class="info-value">${esc(complaint.student_email || t('complaintsUI.notSpecified'))}</div></div>
+            <div class="info-item"><div class="info-label">${esc(t('complaintsUI.submittedAt'))}</div><div class="info-value">${esc(new Date(complaint.created_at).toLocaleString(locale))}</div></div>
           </div>
         </div>
         <div class="section">
-          <div class="section-title">${t('complaintsUI.descLabel')}</div>
-          <div class="description-box">${complaint.description}</div>
+          <div class="section-title">${esc(t('complaintsUI.descLabel'))}</div>
+          <div class="description-box">${esc(complaint.description)}</div>
         </div>
-        ${complaint.resolution_notes ? `<div class="section"><div class="section-title">${t('complaintsUI.resolutionNotes')}</div><div class="resolution-box">${complaint.resolution_notes}</div></div>` : ''}
-        <div class="footer"><p>${new Date().toLocaleString(locale)}</p></div>
+        ${complaint.resolution_notes ? `<div class="section"><div class="section-title">${esc(t('complaintsUI.resolutionNotes'))}</div><div class="resolution-box">${esc(complaint.resolution_notes)}</div></div>` : ''}
+        <div class="footer"><p>${esc(new Date().toLocaleString(locale))}</p></div>
       </body>
       </html>
     `;
