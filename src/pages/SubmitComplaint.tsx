@@ -153,6 +153,11 @@ const SubmitComplaint = () => {
 
       if (complaintError) throw complaintError;
 
+      // Notify program coordinator(s) — fire-and-forget; don't block UX
+      supabase.functions
+        .invoke("notify-complaint-coordinators", { body: { complaintId } })
+        .catch((err) => console.error("Coordinator notify failed:", err));
+
       toast({
         title: language === 'ar' ? "تم إرسال الشكوى بنجاح" : "Complaint submitted successfully",
         description: language === 'ar' ? "شكراً لك، سيتم مراجعة شكواك في أقرب وقت ممكن" : "Thank you, your complaint will be reviewed as soon as possible",

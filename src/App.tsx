@@ -26,6 +26,7 @@ import Accreditation from "./pages/Accreditation";
 import AccreditationFramework from "./pages/AccreditationFramework";
 import IndicatorDetails from "./pages/IndicatorDetails";
 import BackupExport from "./pages/BackupExport";
+import Unsubscribe from "./pages/Unsubscribe";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,6 +45,7 @@ const App = () => (
             <Route path="/survey-complete" element={<SurveyComplete />} />
             <Route path="/submit-complaint" element={<SubmitComplaint />} />
             <Route path="/complaint-submitted" element={<ComplaintSubmitted />} />
+            <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/surveys" element={<ProtectedRoute><Surveys /></ProtectedRoute>} />
             <Route path="/surveys/new" element={<ProtectedRoute><SurveyDesigner /></ProtectedRoute>} />
