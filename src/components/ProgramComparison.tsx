@@ -372,24 +372,24 @@ const ProgramComparison = () => {
   };
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className="space-y-6">
       {/* Filters */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-primary" />
-            مقارنة البرامج الأكاديمية
+            {t('progComp.title')}
           </CardTitle>
-          <CardDescription>قارن أداء البرامج حسب نوع الاستبيان والعام الأكاديمي</CardDescription>
+          <CardDescription>{t('progComp.desc')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Academic Year */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">العام الأكاديمي <span className="text-destructive">*</span></label>
+              <label className="text-sm font-medium">{t('progComp.academicYear')} <span className="text-destructive">*</span></label>
               <Select value={selectedAcademicYear} onValueChange={setSelectedAcademicYear}>
                 <SelectTrigger>
-                  <SelectValue placeholder="اختر العام الأكاديمي" />
+                  <SelectValue placeholder={t('progComp.selectAY')} />
                 </SelectTrigger>
                 <SelectContent>
                   {academicYears.map(y => (
@@ -401,22 +401,22 @@ const ProgramComparison = () => {
 
             {/* Semester */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">الفصل الدراسي</label>
+              <label className="text-sm font-medium">{t('progComp.semester')}</label>
               <Select value={selectedSemester} onValueChange={setSelectedSemester}>
                 <SelectTrigger>
-                  <SelectValue placeholder="جميع الفصول" />
+                  <SelectValue placeholder={t('progComp.allSemesters')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">جميع الفصول</SelectItem>
-                  <SelectItem value="خريف">خريف</SelectItem>
-                  <SelectItem value="ربيع">ربيع</SelectItem>
+                  <SelectItem value="all">{t('progComp.allSemesters')}</SelectItem>
+                  <SelectItem value="خريف">{t('progComp.fall')}</SelectItem>
+                  <SelectItem value="ربيع">{t('progComp.spring')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Programs */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">اختر البرامج (2+)</label>
+              <label className="text-sm font-medium">{t('progComp.selectPrograms')}</label>
               <Select
                 onValueChange={(value) => {
                   if (!selectedPrograms.includes(value)) {
@@ -425,7 +425,7 @@ const ProgramComparison = () => {
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="أضف برنامج" />
+                  <SelectValue placeholder={t('progComp.addProgram')} />
                 </SelectTrigger>
                 <SelectContent>
                   {programs
@@ -461,7 +461,7 @@ const ProgramComparison = () => {
             disabled={loading || selectedPrograms.length < 2 || !selectedAcademicYear}
             className="w-full md:w-auto"
           >
-            {loading ? <><Loader2 className="h-4 w-4 animate-spin ml-2" /> جاري التحليل...</> : 'بدء المقارنة'}
+            {loading ? <><Loader2 className="h-4 w-4 animate-spin ml-2" /> {t('progComp.analyzing')}</> : t('progComp.start')}
           </Button>
         </CardContent>
       </Card>
