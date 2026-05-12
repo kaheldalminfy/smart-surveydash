@@ -42,7 +42,7 @@ const ComplaintDetailsDialog = ({ complaint, canManage, onClose, onEdit, onDelet
       <html dir="${dir}" lang="${language}">
       <head>
         <meta charset="UTF-8">
-        <title>${t('complaintsUI.detailsTitle')} - ${complaint.subject}</title>
+        <title>${esc(t('complaintsUI.detailsTitle'))} - ${esc(complaint.subject)}</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 40px; direction: ${dir}; line-height: 1.6; }
