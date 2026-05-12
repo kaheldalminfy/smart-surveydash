@@ -1,28 +1,25 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { FileText, Clock, MessageSquare, CheckCircle } from "lucide-react";
 import { Complaint } from "./complaintsHelpers";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface StatusInfo {
-  label: string;
+  labelKey: string;
   icon: React.ReactNode;
   color: string;
   bgColor: string;
   borderColor: string;
 }
 
-const getStatusInfo = (status: string): StatusInfo => {
-  const statusMap: Record<string, StatusInfo> = {
-    all: { label: "إجمالي الشكاوى", icon: <FileText className="h-8 w-8" />, color: "text-blue-600", bgColor: "bg-blue-50 hover:bg-blue-100", borderColor: "border-blue-200" },
-    pending: { label: "جديدة", icon: <Clock className="h-8 w-8" />, color: "text-blue-600", bgColor: "bg-blue-50 hover:bg-blue-100", borderColor: "border-blue-200" },
-    in_progress: { label: "قيد الإجراء", icon: <MessageSquare className="h-8 w-8" />, color: "text-orange-600", bgColor: "bg-orange-50 hover:bg-orange-100", borderColor: "border-orange-200" },
-    resolved: { label: "تم الحل", icon: <CheckCircle className="h-8 w-8" />, color: "text-green-600", bgColor: "bg-green-50 hover:bg-green-100", borderColor: "border-green-200" },
-  };
-  return statusMap[status] || statusMap.all;
+const statusInfoMap: Record<string, StatusInfo> = {
+  all: { labelKey: 'complaintsUI.totalComplaints', icon: <FileText className="h-8 w-8" />, color: "text-blue-600", bgColor: "bg-blue-50 hover:bg-blue-100", borderColor: "border-blue-200" },
+  pending: { labelKey: 'complaintsUI.status.pending', icon: <Clock className="h-8 w-8" />, color: "text-blue-600", bgColor: "bg-blue-50 hover:bg-blue-100", borderColor: "border-blue-200" },
+  in_progress: { labelKey: 'complaintsUI.status.in_progress', icon: <MessageSquare className="h-8 w-8" />, color: "text-orange-600", bgColor: "bg-orange-50 hover:bg-orange-100", borderColor: "border-orange-200" },
+  resolved: { labelKey: 'complaintsUI.status.resolved', icon: <CheckCircle className="h-8 w-8" />, color: "text-green-600", bgColor: "bg-green-50 hover:bg-green-100", borderColor: "border-green-200" },
 };
 
-export { getStatusInfo };
+export const getStatusInfo = (status: string) => statusInfoMap[status] || statusInfoMap.all;
 
 interface ComplaintClickableStatsProps {
   complaintsData: Complaint[];
@@ -33,6 +30,7 @@ interface ComplaintClickableStatsProps {
 }
 
 const ComplaintClickableStats = ({ complaintsData, context, activeStatusView, activeStatusContext, onStatClick }: ComplaintClickableStatsProps) => {
+  const { t } = useLanguage();
   const statsData = {
     total: complaintsData.length,
     pending: complaintsData.filter(c => c.status === "pending").length,
@@ -43,7 +41,7 @@ const ComplaintClickableStats = ({ complaintsData, context, activeStatusView, ac
   const isActive = (status: string) =>
     activeStatusView === status && activeStatusContext?.type === context.type && activeStatusContext?.programId === context.programId;
 
-  const renderCard = (status: string, count: number, label: string) => {
+  const renderCard = (status: string, count: number) => {
     const info = getStatusInfo(status);
     return (
       <Card
@@ -53,7 +51,7 @@ const ComplaintClickableStats = ({ complaintsData, context, activeStatusView, ac
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">{label}</p>
+              <p className="text-sm font-medium text-muted-foreground">{t(info.labelKey)}</p>
               <p className="text-2xl font-bold">{count}</p>
             </div>
             <div className={info.color}>{info.icon}</div>
@@ -65,10 +63,10 @@ const ComplaintClickableStats = ({ complaintsData, context, activeStatusView, ac
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-      {renderCard('all', statsData.total, "إجمالي الشكاوى")}
-      {renderCard('pending', statsData.pending, "جديدة")}
-      {renderCard('in_progress', statsData.inProgress, "قيد الإجراء")}
-      {renderCard('resolved', statsData.resolved, "تم الحل")}
+      {renderCard('all', statsData.total)}
+      {renderCard('pending', statsData.pending)}
+      {renderCard('in_progress', statsData.inProgress)}
+      {renderCard('resolved', statsData.resolved)}
     </div>
   );
 };
