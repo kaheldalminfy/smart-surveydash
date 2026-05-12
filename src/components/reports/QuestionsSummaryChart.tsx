@@ -3,12 +3,14 @@ import { Badge } from "@/components/ui/badge";
 import { BarChart3 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { getMeanLevel } from "./reportConstants";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface QuestionsSummaryChartProps {
   likertRatingQuestions: any[];
 }
 
 export const QuestionsSummaryChart = ({ likertRatingQuestions }: QuestionsSummaryChartProps) => {
+  const { t, language } = useLanguage();
   if (likertRatingQuestions.length === 0) return null;
 
   return (
@@ -16,9 +18,9 @@ export const QuestionsSummaryChart = ({ likertRatingQuestions }: QuestionsSummar
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <BarChart3 className="h-5 w-5" />
-          ملخص متوسطات الأسئلة
+          {t('reports.questionSummary')}
         </CardTitle>
-        <CardDescription>مقارنة متوسطات جميع الأسئلة (ليكرت والتقييم)</CardDescription>
+        <CardDescription>{t('reports.questionSummaryDesc')}</CardDescription>
       </CardHeader>
       <CardContent>
         <div id="summary-chart" className="min-h-[400px] bg-white p-4 rounded-lg" style={{ height: Math.max(400, likertRatingQuestions.length * 50) }}>
@@ -27,7 +29,7 @@ export const QuestionsSummaryChart = ({ likertRatingQuestions }: QuestionsSummar
               data={likertRatingQuestions.map((q, i) => ({
                 name: q.text.length > 40 ? q.text.substring(0, 40) + '...' : q.text,
                 fullName: q.text,
-                shortName: `س${i + 1}`,
+                shortName: `${t('reports.qPrefix')}${i + 1}`,
                 mean: parseFloat(q.mean) || 0,
                 responses: q.responseCount,
               }))}
@@ -35,12 +37,7 @@ export const QuestionsSummaryChart = ({ likertRatingQuestions }: QuestionsSummar
               margin={{ top: 20, right: 30, left: 20, bottom: 120 }}
             >
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-                type="category"
-                dataKey="shortName"
-                tick={{ fontSize: 12, fontWeight: 'bold' }}
-                interval={0}
-              />
+              <XAxis type="category" dataKey="shortName" tick={{ fontSize: 12, fontWeight: 'bold' }} interval={0} />
               <YAxis type="number" domain={[0, 5]} />
               <Tooltip
                 content={({ active, payload }) => {
@@ -48,11 +45,11 @@ export const QuestionsSummaryChart = ({ likertRatingQuestions }: QuestionsSummar
                     const data = payload[0].payload;
                     const level = getMeanLevel(data.mean);
                     return (
-                      <div className="bg-card p-3 rounded-lg border shadow-lg max-w-sm" style={{ direction: 'rtl' }}>
+                      <div className="bg-card p-3 rounded-lg border shadow-lg max-w-sm" style={{ direction: language === 'ar' ? 'rtl' : 'ltr' }}>
                         <p className="font-medium text-sm mb-2 leading-relaxed">{data.fullName}</p>
-                        <p className="text-primary font-bold">المتوسط: {data.mean.toFixed(2)}</p>
-                        <p className="text-muted-foreground text-xs">التقييم: {level.label}</p>
-                        <p className="text-muted-foreground text-xs">عدد الاستجابات: {data.responses}</p>
+                        <p className="text-primary font-bold">{t('reports.mean')}: {data.mean.toFixed(2)}</p>
+                        <p className="text-muted-foreground text-xs">{t('reports.evaluation')}: {level.label}</p>
+                        <p className="text-muted-foreground text-xs">{t('reports.responsesCount')}: {data.responses}</p>
                       </div>
                     );
                   }
@@ -70,11 +67,11 @@ export const QuestionsSummaryChart = ({ likertRatingQuestions }: QuestionsSummar
           </ResponsiveContainer>
         </div>
         <div className="mt-4 p-4 bg-muted/30 rounded-lg">
-          <h4 className="font-medium mb-3 text-sm">دليل الأسئلة:</h4>
+          <h4 className="font-medium mb-3 text-sm">{t('reports.questionGuide')}</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
             {likertRatingQuestions.map((q, i) => (
               <div key={q.id} className="flex gap-2">
-                <Badge variant="outline" className="shrink-0">س{i + 1}</Badge>
+                <Badge variant="outline" className="shrink-0">{t('reports.qPrefix')}{i + 1}</Badge>
                 <span className="text-muted-foreground truncate" title={q.text}>{q.text}</span>
               </div>
             ))}

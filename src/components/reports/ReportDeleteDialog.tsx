@@ -1,4 +1,5 @@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ReportDeleteDialogProps {
   open: boolean;
@@ -7,19 +8,18 @@ interface ReportDeleteDialogProps {
 }
 
 export const ReportDeleteDialog = ({ open, onOpenChange, onConfirm }: ReportDeleteDialogProps) => {
+  const { t } = useLanguage();
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>هل أنت متأكد من حذف التقرير؟</AlertDialogTitle>
-          <AlertDialogDescription>
-            سيتم حذف التقرير بشكل نهائي ولا يمكن استرجاعه.
-          </AlertDialogDescription>
+          <AlertDialogTitle>{t('reports.deleteConfirm')}</AlertDialogTitle>
+          <AlertDialogDescription>{t('reports.deleteConfirmDesc')}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>إلغاء</AlertDialogCancel>
+          <AlertDialogCancel>{t('complaintsUI.cancel')}</AlertDialogCancel>
           <AlertDialogAction onClick={onConfirm} className="bg-destructive text-destructive-foreground">
-            حذف
+            {t('reports.delete')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

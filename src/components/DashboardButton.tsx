@@ -1,35 +1,25 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const DashboardButton = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useLanguage();
 
-  // Don't show on dashboard page itself
-  if (location.pathname === "/dashboard") {
-    return null;
-  }
+  if (location.pathname === "/dashboard") return null;
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => navigate("/dashboard")}
-          className="shrink-0"
-        >
+        <Button variant="outline" size="icon" onClick={() => navigate("/dashboard")} className="shrink-0">
           <LayoutDashboard className="h-5 w-5" />
         </Button>
       </TooltipTrigger>
       <TooltipContent>
-        <p>لوحة التحكم</p>
+        <p>{t('dashboardBtn.tooltip')}</p>
       </TooltipContent>
     </Tooltip>
   );

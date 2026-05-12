@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Users, BarChart3, Target, ListChecks, MessageSquare, AlertTriangle } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ReportStatisticsCardsProps {
   filteredResponsesCount: number;
@@ -14,31 +15,20 @@ interface ReportStatisticsCardsProps {
 }
 
 export const ReportStatisticsCards = ({
-  filteredResponsesCount,
-  totalResponses,
-  targetEnrollment,
-  overallMean,
-  questionsCount,
-  totalTextResponses,
-  hasFilter,
-  hasAnswersData,
+  filteredResponsesCount, totalResponses, targetEnrollment, overallMean,
+  questionsCount, totalTextResponses, hasFilter, hasAnswersData,
 }: ReportStatisticsCardsProps) => {
+  const { t } = useLanguage();
   const responseRate = targetEnrollment > 0
     ? Math.min(100, Math.round((filteredResponsesCount / targetEnrollment) * 100))
     : null;
   const rateColor = responseRate === null
     ? 'text-muted-foreground'
-    : responseRate >= 70
-      ? 'text-green-600'
-      : responseRate >= 50
-        ? 'text-yellow-600'
-        : 'text-orange-600';
+    : responseRate >= 70 ? 'text-green-600' : responseRate >= 50 ? 'text-yellow-600' : 'text-orange-600';
   const rateBgColor = responseRate === null
     ? 'from-gray-500/10 to-gray-600/5 border-gray-200'
-    : responseRate >= 70
-      ? 'from-green-500/10 to-green-600/5 border-green-200'
-      : responseRate >= 50
-        ? 'from-yellow-500/10 to-yellow-600/5 border-yellow-200'
+    : responseRate >= 70 ? 'from-green-500/10 to-green-600/5 border-green-200'
+      : responseRate >= 50 ? 'from-yellow-500/10 to-yellow-600/5 border-yellow-200'
         : 'from-orange-500/10 to-orange-600/5 border-orange-200';
 
   return (
@@ -48,13 +38,13 @@ export const ReportStatisticsCards = ({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">إجمالي الاستجابات</p>
+                <p className="text-sm text-muted-foreground">{t('reports.totalResponses')}</p>
                 <p className="text-3xl font-bold text-blue-600">{filteredResponsesCount}</p>
                 {targetEnrollment > 0 && (
-                  <p className="text-xs text-muted-foreground">من {targetEnrollment} طالب</p>
+                  <p className="text-xs text-muted-foreground">{t('reports.fromStudents').replace('{0}', String(targetEnrollment))}</p>
                 )}
                 {hasFilter && (
-                  <p className="text-xs text-muted-foreground">مفلتر من {totalResponses}</p>
+                  <p className="text-xs text-muted-foreground">{t('reports.filteredFrom').replace('{0}', String(totalResponses))}</p>
                 )}
               </div>
               <Users className="h-10 w-10 text-blue-500/30" />
@@ -66,22 +56,22 @@ export const ReportStatisticsCards = ({
           <CardContent className="p-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">معدل الاستجابة</p>
+                <p className="text-sm text-muted-foreground">{t('reports.responseRateLabel')}</p>
                 <Target className={`h-6 w-6 ${rateColor} opacity-30`} />
               </div>
               <p className={`text-3xl font-bold ${rateColor}`}>
-                {responseRate !== null ? `${responseRate}%` : 'غير محدد'}
+                {responseRate !== null ? `${responseRate}%` : t('reports.notDetermined')}
               </p>
               {targetEnrollment > 0 && (
                 <div className="space-y-1">
                   <Progress value={responseRate || 0} className="h-2" />
                   <p className="text-xs text-muted-foreground">
-                    {responseRate && responseRate < 50 ? '⚠️ نسبة منخفضة' : responseRate && responseRate >= 70 ? '✓ نسبة جيدة' : ''}
+                    {responseRate && responseRate < 50 ? t('reports.lowRateShort') : responseRate && responseRate >= 70 ? t('reports.goodRateShort') : ''}
                   </p>
                 </div>
               )}
               {!targetEnrollment && (
-                <p className="text-xs text-muted-foreground">أضف عدد الطلبة في الاستبيان</p>
+                <p className="text-xs text-muted-foreground">{t('reports.addStudentsInSurvey')}</p>
               )}
             </div>
           </CardContent>
@@ -91,9 +81,9 @@ export const ReportStatisticsCards = ({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">المتوسط العام</p>
+                <p className="text-sm text-muted-foreground">{t('reports.overallMean')}</p>
                 <p className="text-3xl font-bold text-green-600">{overallMean.toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground">من 5.0</p>
+                <p className="text-xs text-muted-foreground">{t('reports.outOf5')}</p>
               </div>
               <BarChart3 className="h-10 w-10 text-green-500/30" />
             </div>
@@ -104,7 +94,7 @@ export const ReportStatisticsCards = ({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">عدد الأسئلة</p>
+                <p className="text-sm text-muted-foreground">{t('reports.questionsCount')}</p>
                 <p className="text-3xl font-bold text-purple-600">{questionsCount}</p>
               </div>
               <ListChecks className="h-10 w-10 text-purple-500/30" />
@@ -116,7 +106,7 @@ export const ReportStatisticsCards = ({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">التعليقات النصية</p>
+                <p className="text-sm text-muted-foreground">{t('reports.textComments')}</p>
                 <p className="text-3xl font-bold text-amber-600">{totalTextResponses}</p>
               </div>
               <MessageSquare className="h-10 w-10 text-amber-500/30" />
@@ -133,9 +123,9 @@ export const ReportStatisticsCards = ({
                 <AlertTriangle className="h-5 w-5 text-destructive" />
               </div>
               <div>
-                <p className="font-semibold text-destructive">تنبيه: لا توجد إجابات محفوظة</p>
+                <p className="font-semibold text-destructive">{t('reports.noAnswersWarning')}</p>
                 <p className="text-sm text-muted-foreground">
-                  يوجد {totalResponses} استجابة لكن بدون إجابات مفصلة. قد تكون هناك مشكلة في حفظ الإجابات عند تعبئة الاستبيان.
+                  {t('reports.noAnswersDesc').replace('{0}', String(totalResponses))}
                 </p>
               </div>
             </div>
