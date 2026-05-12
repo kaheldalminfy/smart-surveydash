@@ -200,11 +200,11 @@ const Reports = () => {
           }
         });
         distribution = [
-          { name: 'غير موافق بشدة', value: counts[1], fill: '#ef4444' },
-          { name: 'غير موافق', value: counts[2], fill: '#f97316' },
-          { name: 'محايد', value: counts[3], fill: '#eab308' },
-          { name: 'موافق', value: counts[4], fill: '#22c55e' },
-          { name: 'موافق بشدة', value: counts[5], fill: '#16a34a' },
+          { name: t('likert.sd'), value: counts[1], fill: '#ef4444' },
+          { name: t('likert.d'), value: counts[2], fill: '#f97316' },
+          { name: t('likert.n'), value: counts[3], fill: '#eab308' },
+          { name: t('likert.a'), value: counts[4], fill: '#22c55e' },
+          { name: t('likert.sa'), value: counts[5], fill: '#16a34a' },
         ];
       }
 
