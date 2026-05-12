@@ -212,11 +212,11 @@ const ProgramComparison = () => {
 
   const loadComparisonData = async () => {
     if (selectedPrograms.length < 2) {
-      toast({ title: "تنبيه", description: "يرجى اختيار برنامجين على الأقل", variant: "destructive" });
+      toast({ title: t('progComp.notice'), description: t('progComp.minPrograms'), variant: "destructive" });
       return;
     }
     if (!selectedAcademicYear) {
-      toast({ title: "تنبيه", description: "يرجى اختيار العام الأكاديمي", variant: "destructive" });
+      toast({ title: t('progComp.notice'), description: t('progComp.needAY'), variant: "destructive" });
       return;
     }
 
