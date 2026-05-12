@@ -650,7 +650,7 @@ const ProgramComparison = () => {
                     })}
                     {/* Overall Row */}
                     <TableRow className="bg-muted/30 font-bold">
-                      <TableCell className="text-right">المتوسط العام</TableCell>
+                      <TableCell className="text-right">{t('progComp.overallRow')}</TableCell>
                       {comparisonResult.overall.map((p, i) => (
                         <TableCell key={i} className="text-center">
                           <span style={{ color: p.color }}>{p.overallMean}</span>
