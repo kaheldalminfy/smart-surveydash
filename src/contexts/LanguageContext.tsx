@@ -2011,6 +2011,11 @@ const translations: Record<Language, Record<string, string>> = {
     'progComp.diff': 'Diff',
     'progComp.unavailable': 'Unavailable',
     'progComp.overallRow': 'Overall mean',
+    'likert.sd': 'Strongly Disagree',
+    'likert.d': 'Disagree',
+    'likert.n': 'Neutral',
+    'likert.a': 'Agree',
+    'likert.sa': 'Strongly Agree',
   }
 };
 
