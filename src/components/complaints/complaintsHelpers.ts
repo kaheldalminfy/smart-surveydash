@@ -1,5 +1,3 @@
-import React from "react";
-
 export interface Complaint {
   id: string;
   subject: string;
@@ -31,29 +29,44 @@ export interface Program {
   name: string;
 }
 
-export const statusOptions = [
-  { value: "pending", label: "جديدة" },
-  { value: "in_progress", label: "قيد الإجراء" },
-  { value: "resolved", label: "تم الحل" },
+export type TFn = (key: string) => string;
+
+export const getStatusOptions = (t: TFn) => [
+  { value: "pending", label: t('complaintsUI.status.pending') },
+  { value: "in_progress", label: t('complaintsUI.status.in_progress') },
+  { value: "resolved", label: t('complaintsUI.status.resolved') },
 ];
 
-export const getCategoryLabel = (category: string) => {
-  const categories: Record<string, string> = {
-    academic: "أكاديمي",
-    administrative: "إداري",
-    technical: "تقني",
-    facility: "مرافق",
-    other: "أخرى",
+export const getCategoryLabel = (category: string, t: TFn) => {
+  const map: Record<string, string> = {
+    academic: t('complaintsUI.cat.academic'),
+    administrative: t('complaintsUI.cat.administrative'),
+    technical: t('complaintsUI.cat.technical'),
+    facility: t('complaintsUI.cat.facility'),
+    other: t('complaintsUI.cat.other'),
   };
-  return categories[category] || category;
+  return map[category] || category;
 };
 
-// Generate academic years (current year + 100 years ahead)
+// Backward-compat (no-translation) — kept so files not yet migrated still build.
+// Returns the raw key; callers should migrate to getStatusOptions/getCategoryLabel.
+export const statusOptions = [
+  { value: "pending", label: "pending" },
+  { value: "in_progress", label: "in_progress" },
+  { value: "resolved", label: "resolved" },
+];
+
 const currentYear = new Date().getFullYear();
 export const academicYears = Array.from({ length: 101 }, (_, i) => {
   const startYear = currentYear + i;
   return `${startYear}-${startYear + 1}`;
 });
 
-// Static semester options
+export const getSemesterOptions = (t: TFn) => [
+  t('complaintsUI.semester.fall'),
+  t('complaintsUI.semester.spring'),
+  t('complaintsUI.semester.summer'),
+];
+
+// Backward-compat
 export const semesterOptions = ["خريف", "ربيع", "صيفي"];

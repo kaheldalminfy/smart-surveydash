@@ -1,115 +1,50 @@
+# Fix incomplete Arabic→English translation
 
+## Findings (deep audit)
 
-## خطة التحقق الشاملة من جاهزية النظام
+I scanned every `.tsx` file under `src/` for Arabic characters and cross-referenced with i18n usage (`useLanguage` / `t()`). Result:
 
-سأقوم بمراجعة عميقة لجميع مكونات النظام بناءً على الكود الفعلي وحالة قاعدة البيانات، مع التركيز على الجوانب الحرجة: تدفق الاستبيانات، الإجابات، التقارير، الصلاحيات، والاعتمادية.
+**20 files contain hardcoded Arabic text and never call the i18n system.** They will always display Arabic regardless of the language toggle.
 
-### المرحلة 1: التحقق من سلامة قاعدة البيانات (Database Integrity)
+### Affected areas
 
-**استعلامات تشخيصية شاملة:**
+**Reports module (entire UI)**
+- `pages/Reports.tsx`
+- `components/reports/ReportStatisticsCards.tsx`
+- `components/reports/ReportMetadataCard.tsx`
+- `components/reports/ReportFilterCard.tsx`
+- `components/reports/ReportDeleteDialog.tsx`
+- `components/reports/ReportHeader.tsx`
+- `components/reports/RecommendationsCard.tsx`
+- `components/reports/QuestionsSummaryChart.tsx`
+- `components/reports/QuestionAnalysisSection.tsx`
 
-1. **الإجابات المكررة (Duplicates)**
-   - فحص وجود أزواج `(response_id, question_id)` مكررة بعد إضافة قيد UNIQUE
-   - التأكد من تطبيق القيد فعلياً على كل السجلات الحالية
+**Complaints sub-components**
+- `components/complaints/NewComplaintDialog.tsx`
+- `components/complaints/ComplaintStatusDashboard.tsx`
+- `components/complaints/ComplaintResolutionDialog.tsx`
+- `components/complaints/ComplaintQRSection.tsx`
+- `components/complaints/ComplaintFiltersCard.tsx`
+- `components/complaints/ComplaintEditDialog.tsx`
+- `components/complaints/ComplaintDetailsDialog.tsx`
+- `components/complaints/ComplaintClickableStats.tsx`
+- `components/complaints/ComplaintCard.tsx`
 
-2. **الاستجابات اليتيمة (Orphans)**
-   - استجابات بلا إجابات (`responses` بدون `answers`)
-   - إجابات بلا استجابة أب (`answers` بدون `response`)
-   - إجابات تشير لأسئلة محذوفة (`question_id` غير موجود في `questions`)
-   - استجابات تشير لاستبيانات محذوفة
+**Other**
+- `components/ProgramComparison.tsx`
+- `components/DashboardButton.tsx`
 
-3. **تكرار الأسئلة عبر جميع الاستبيانات**
-   - فحص وجود أسئلة بنفس `(survey_id, text, order_index)` في أي استبيان
-   - فحص تكرار `order_index` في نفس الاستبيان
-   - فحص استبيانات بلا أسئلة لكنها `active`
+Files with i18n but partial coverage exist too (e.g. some toast messages), but the 20 above are the main visible problems.
 
-4. **سلامة التقارير**
-   - تقارير تشير لاستبيانات محذوفة
-   - مقارنة `statistics` المخزنة في `reports` مع الأرقام الفعلية في `responses`/`answers`
+## Plan
 
-### المرحلة 2: التحقق من منطق إرسال الاستبيان
+1. Extend `src/contexts/LanguageContext.tsx` with new translation keys grouped by namespace: `reports.*`, `complaintsUI.*`, `programComparison.*`, `dashboardBtn.*`.
+2. For each affected file:
+   - Import `useLanguage`
+   - Replace every Arabic literal with `t('key')`
+   - Keep DB-sourced text (program/course names, user-entered content) unchanged per existing memory rule.
+3. Verify by toggling language in preview; spot-check Reports page and Complaints dialogs.
 
-**مراجعة `src/pages/TakeSurvey.tsx`:**
-- التحقق أن `freshQuestions` تستخدم كمصدر للحقيقة عند البناء
-- التحقق من معالجة حالة تعديل الاستبيان أثناء التعبئة
-- التحقق من معالجة الأسئلة من نوع `section` (استبعادها من الإجابات)
-- التحقق من سلوك الإرسال للمستخدمين المجهولين
-- مراجعة منطق التحقق من الإجابات المطلوبة (validation)
-- مراجعة آلية إنشاء `responseId` (UUID من العميل) ومدى توافقها مع RLS
+## Scope confirmation
 
-**مراجعة `SurveyDesigner` و `QuestionItem`:**
-- التحقق من منطق إضافة/حذف/تعديل الأسئلة
-- التحقق من حماية الأسئلة التي لها إجابات (triggers)
-- التحقق من عدم إنشاء IDs مكررة عند الحفظ
-
-### المرحلة 3: التحقق من الصلاحيات (RLS & Roles)
-
-**مراجعة سياسات RLS لكل جدول حساس:**
-- `surveys`, `responses`, `answers`, `questions`
-- `complaints`, `reports`, `recommendations`
-- `accreditation_*` tables
-
-**التحقق من ثغرة "على مستوى الكلية" (program_id = null):**
-- مراجعة `has_role_in_program` ومدى دعمها للقيم الفارغة
-- التحقق أن المنسقين يرون الاستبيانات/الاستجابات على مستوى الكلية
-- التحقق أن العميد يرى كل شيء
-
-**التحقق من إدارة الأدوار:**
-- عدم وجود أدوار في جدول `profiles`
-- استخدام `has_role` و `has_role_in_program` فقط
-- التحقق من الـ Edge Functions (`manage-user`, `delete-user`) للصلاحيات
-
-### المرحلة 4: التحقق من التقارير والتحليلات
-
-**مراجعة `Reports.tsx` و `SurveyAnalytics.tsx`:**
-- التحقق من حساب معدل الاستجابة (`target_enrollment`)
-- التحقق من حساب المتوسطات لأسئلة Likert
-- التحقق من معالجة الأسئلة من نوع `section` و `text`
-- التحقق من استثناء الإجابات الفارغة من الإحصائيات
-
-**مراجعة `exportReport.ts`:**
-- التحقق من تصدير PDF (الخط العربي، الترتيب، الأرقام)
-- التحقق من عدم تكرار البيانات في التقرير المُصدّر
-
-### المرحلة 5: التحقق من الميزات المساعدة
-
-- **الشكاوى**: تدفق الإرسال، تغيير الحالة، الإشعارات
-- **الاعتمادية**: إضافة الأطر، المؤشرات، رفع الأدلة، التقييم بالـ AI
-- **الأرشفة**: عملية الأرشفة وعدم فقدان البيانات
-- **Edge Functions**: فحص الـ logs لأي أخطاء حديثة
-
-### المرحلة 6: تقرير نهائي شامل
-
-سأقدم تقريراً يحتوي على:
-
-| الفئة | الحالة | التفاصيل |
-|---|---|---|
-| سلامة البيانات | ✅/⚠️/❌ | عدد المشاكل المكتشفة |
-| منطق الإرسال | ✅/⚠️/❌ | الثغرات إن وجدت |
-| الصلاحيات | ✅/⚠️/❌ | فجوات الوصول |
-| التقارير | ✅/⚠️/❌ | دقة الأرقام |
-| الميزات الفرعية | ✅/⚠️/❌ | الجاهزية |
-
-**لكل مشكلة مكتشفة:**
-- وصف المشكلة وموقعها في الكود/قاعدة البيانات
-- مستوى الخطورة (حرج / متوسط / منخفض)
-- الإصلاح المقترح (migration أو تعديل كود)
-
-### الإصلاحات المتوقعة (إن وُجدت مشاكل)
-
-بعد التشخيص، إذا اكتشفت مشاكل سأقوم بـ:
-1. **migrations جديدة** لإصلاح بيانات تالفة أو سياسات RLS ناقصة
-2. **تعديلات كود** على ملفات مثل `TakeSurvey.tsx`, `SurveyDesigner.tsx`, `Reports.tsx` حسب الحاجة
-3. **تحديث `has_role_in_program`** لدعم `program_id = null` بشكل صريح إذا اكتشفت أن الفجوة لا تزال تؤثر على الصلاحيات
-
-### ما لن أفعله
-
-- لن أحذف أي استجابات أو إجابات حقيقية
-- لن أعدل بنية الجداول الأساسية بدون مبرر
-- لن أغير الـ RLS بطرق توسع الوصول دون إذن صريح
-- لن ألمس جداول `auth` أو `storage`
-
-### النتيجة المتوقعة
-
-تقرير واضح بحالة كل مكون في النظام، مع قائمة محددة بالمشاكل (إن وجدت) وإصلاحاتها المقترحة، حتى تتمكن من الموافقة على الإصلاحات قبل تنفيذها.
-
+This is a substantial sweep (~200 individual strings across 20 files + ~200 new keys in LanguageContext). I will preserve all logic, only swap presentation strings.
