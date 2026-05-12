@@ -22,6 +22,7 @@ const Reports = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [report, setReport] = useState<any>(null);
   const [survey, setSurvey] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
