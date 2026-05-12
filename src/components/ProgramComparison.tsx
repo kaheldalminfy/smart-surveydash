@@ -591,7 +591,7 @@ const ProgramComparison = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TableIcon className="h-5 w-5 text-primary" />
-                جدول المقارنة التفصيلي
+                {t('progComp.tableTitle')}
               </CardTitle>
             </CardHeader>
             <CardContent>
