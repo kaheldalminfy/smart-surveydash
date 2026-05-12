@@ -487,20 +487,20 @@ const ProgramComparison = () => {
                 <CardContent className="space-y-3">
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div className="bg-muted/50 rounded-lg p-3 text-center">
-                      <div className="text-muted-foreground text-xs">الاستبيانات</div>
+                      <div className="text-muted-foreground text-xs">{t('progComp.surveys')}</div>
                       <div className="text-xl font-bold">{p.totalSurveys}</div>
                     </div>
                     <div className="bg-muted/50 rounded-lg p-3 text-center">
-                      <div className="text-muted-foreground text-xs">الاستجابات</div>
+                      <div className="text-muted-foreground text-xs">{t('progComp.responses')}</div>
                       <div className="text-xl font-bold">{p.totalResponses}</div>
                     </div>
                   </div>
                   <div className="flex justify-between items-center pt-2 border-t">
-                    <span className="text-sm text-muted-foreground">المتوسط العام:</span>
+                    <span className="text-sm text-muted-foreground">{t('progComp.overallMean')}</span>
                     <span className="text-lg font-bold" style={{ color: p.color }}>{p.overallMean}/5</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">نسبة الرضا:</span>
+                    <span className="text-sm text-muted-foreground">{t('progComp.satisfaction')}</span>
                     <div className="flex items-center gap-1">
                       <span className="text-lg font-bold text-primary">{p.satisfactionRate}%</span>
                       <TrendingUp className="h-4 w-4 text-green-500" />
