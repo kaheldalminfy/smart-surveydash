@@ -599,7 +599,7 @@ const ProgramComparison = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-right min-w-[200px]">نوع الاستبيان</TableHead>
+                      <TableHead className="text-right min-w-[200px]">{t('progComp.tableType')}</TableHead>
                       {selectedProgramsWithColors.map(p => (
                         <TableHead key={p.id} className="text-center min-w-[120px]">
                           <div className="flex items-center justify-center gap-1">
@@ -609,7 +609,7 @@ const ProgramComparison = () => {
                         </TableHead>
                       ))}
                       {selectedPrograms.length === 2 && (
-                        <TableHead className="text-center min-w-[80px]">الفرق</TableHead>
+                        <TableHead className="text-center min-w-[80px]">{t('progComp.diff')}</TableHead>
                       )}
                     </TableRow>
                   </TableHeader>
