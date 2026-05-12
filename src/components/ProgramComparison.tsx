@@ -318,7 +318,7 @@ const ProgramComparison = () => {
 
       setComparisonResult({ surveyTypes, overall });
     } catch (error) {
-      toast({ title: "خطأ", description: "فشل في تحميل بيانات المقارنة", variant: "destructive" });
+      toast({ title: t('progComp.error'), description: t('progComp.loadErr'), variant: "destructive" });
     } finally {
       setLoading(false);
     }
