@@ -171,6 +171,7 @@ interface ComparisonResult {
 
 const ProgramComparison = () => {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [programs, setPrograms] = useState<any[]>([]);
   const [academicYears, setAcademicYears] = useState<string[]>([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>('');
