@@ -627,7 +627,7 @@ const ProgramComparison = () => {
                               {pd.exists && pd.averageScore > 0 ? (
                                 <span className="font-semibold">{pd.averageScore}</span>
                               ) : (
-                                <span className="text-muted-foreground text-xs">غير متوفر</span>
+                                <span className="text-muted-foreground text-xs">{t('progComp.unavailable')}</span>
                               )}
                             </TableCell>
                           ))}
