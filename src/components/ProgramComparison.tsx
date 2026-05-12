@@ -364,7 +364,7 @@ const ProgramComparison = () => {
           <div key={i} className="flex items-center gap-2 mb-1">
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
             <span>{entry.name}: </span>
-            <span className="font-bold">{entry.value !== null ? `${entry.value}/5` : 'غير متوفر'}</span>
+            <span className="font-bold">{entry.value !== null ? `${entry.value}/5` : t('progComp.unavailable')}</span>
           </div>
         ))}
       </div>
