@@ -1,18 +1,21 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { QrCode, Copy } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ComplaintQRSectionProps {
   qrCodeData: string;
   onCopyLink: () => void;
 }
 
-const ComplaintQRSection = ({ qrCodeData, onCopyLink }: ComplaintQRSectionProps) => (
+const ComplaintQRSection = ({ qrCodeData, onCopyLink }: ComplaintQRSectionProps) => {
+  const { t } = useLanguage();
+  return (
   <Card className="bg-gradient-to-br from-primary/5 to-secondary/5 border-primary/20">
     <CardHeader>
       <CardTitle className="flex items-center gap-2">
         <QrCode className="h-6 w-6 text-primary" />
-        رمز QR لتقديم الشكاوى
+        {t('complaintsUI.qrTitle')}
       </CardTitle>
     </CardHeader>
     <CardContent>
@@ -33,14 +36,14 @@ const ComplaintQRSection = ({ qrCodeData, onCopyLink }: ComplaintQRSectionProps)
             }}
             className="w-full"
           >
-            تحميل رمز QR
+            {t('complaintsUI.qrDownload')}
           </Button>
         </div>
         <div className="flex flex-col justify-center space-y-4">
           <div>
-            <h3 className="font-semibold text-lg mb-2">رابط تقديم الشكوى</h3>
+            <h3 className="font-semibold text-lg mb-2">{t('complaintsUI.qrLinkTitle')}</h3>
             <p className="text-muted-foreground text-sm mb-4">
-              يمكن للطلاب وأعضاء هيئة التدريس تقديم شكاواهم مباشرة عبر مسح رمز QR أو استخدام الرابط أدناه
+              {t('complaintsUI.qrLinkDesc')}
             </p>
           </div>
           <div className="bg-background p-4 rounded-lg border">
@@ -48,12 +51,13 @@ const ComplaintQRSection = ({ qrCodeData, onCopyLink }: ComplaintQRSectionProps)
           </div>
           <Button variant="outline" onClick={onCopyLink} className="w-full">
             <Copy className="h-4 w-4 ml-2" />
-            نسخ الرابط
+            {t('complaintsUI.qrCopy')}
           </Button>
         </div>
       </div>
     </CardContent>
   </Card>
-);
+  );
+};
 
 export default ComplaintQRSection;
