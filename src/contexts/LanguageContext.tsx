@@ -1008,6 +1008,11 @@ const translations: Record<Language, Record<string, string>> = {
     'progComp.diff': 'الفرق',
     'progComp.unavailable': 'غير متوفر',
     'progComp.overallRow': 'المتوسط العام',
+    'likert.sd': 'غير موافق بشدة',
+    'likert.d': 'غير موافق',
+    'likert.n': 'محايد',
+    'likert.a': 'موافق',
+    'likert.sa': 'موافق بشدة',
   },
   en: {
     // Navigation
