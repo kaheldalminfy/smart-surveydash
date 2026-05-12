@@ -29,7 +29,14 @@ const ComplaintDetailsDialog = ({ complaint, canManage, onClose, onEdit, onDelet
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
     const dir = language === 'ar' ? 'rtl' : 'ltr';
-    const statusLabel = t(`complaintsUI.status.${complaint.status}`);
+    const esc = (s: string | null | undefined) =>
+      String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    const statusLabel = esc(t(`complaintsUI.status.${complaint.status}`));
     const printContent = `
       <!DOCTYPE html>
       <html dir="${dir}" lang="${language}">
