@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Sparkles, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { exportToPDF, exportToExcel, captureChartAsImage, generatePDFBlob } from "@/utils/exportReport";
 import { PDFPreviewDialog } from "@/components/PDFPreviewDialog";
 import { MCQ_COLORS } from "@/components/reports/reportConstants";
