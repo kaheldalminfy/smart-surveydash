@@ -42,3 +42,6 @@ verify_jwt = false
 
 [functions.notify-complaint-coordinators]
 verify_jwt = false
+
+[functions.send-coordinator-announcement]
+verify_jwt = true
