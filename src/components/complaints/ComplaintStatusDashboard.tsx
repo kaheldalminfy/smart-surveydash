@@ -8,6 +8,7 @@ import { Search, User } from "lucide-react";
 import { Complaint } from "./complaintsHelpers";
 import ComplaintCard from "./ComplaintCard";
 import { getStatusInfo } from "./ComplaintClickableStats";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ComplaintStatusDashboardProps {
   complaintsData: Complaint[];
@@ -20,6 +21,7 @@ interface ComplaintStatusDashboardProps {
 }
 
 const ComplaintStatusDashboard = ({ complaintsData, status, canManage, onClose, onView, onStatusChange, onDelete }: ComplaintStatusDashboardProps) => {
+  const { t } = useLanguage();
   const filteredByStatus = status === 'all' ? complaintsData : complaintsData.filter(c => c.status === status);
   const statusInfo = getStatusInfo(status);
 
@@ -45,11 +47,11 @@ const ComplaintStatusDashboard = ({ complaintsData, status, canManage, onClose, 
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-3">
             <div className={statusInfo.color}>{statusInfo.icon}</div>
-            <span>{statusInfo.label}</span>
+            <span>{t(statusInfo.labelKey)}</span>
             <Badge variant="secondary" className="text-lg px-3 py-1">{filteredByStatus.length}</Badge>
           </CardTitle>
           <Button variant="ghost" size="sm" onClick={onClose}>
-            إغلاق ✕
+            {t('complaintsUI.close')}
           </Button>
         </div>
       </CardHeader>
@@ -57,7 +59,7 @@ const ComplaintStatusDashboard = ({ complaintsData, status, canManage, onClose, 
         <div className="mb-6">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="البحث في الشكاوى..." className="pl-10" />
+            <Input placeholder={t('complaintsUI.searchPh')} className="pl-10" />
           </div>
         </div>
 
@@ -65,40 +67,40 @@ const ComplaintStatusDashboard = ({ complaintsData, status, canManage, onClose, 
           <TabsList className="flex flex-wrap h-auto gap-2 bg-muted p-2">
             <TabsTrigger value="all-types" className="flex items-center gap-2">
               <User className="h-4 w-4" />
-              الكل
+              {t('complaintsUI.all')}
               <Badge variant="secondary">{filteredByStatus.length}</Badge>
             </TabsTrigger>
             <TabsTrigger value="students" className="flex items-center gap-2">
-              🎓 طلاب
+              🎓 {t('complaintsUI.students')}
               <Badge variant="secondary">{studentComplaints.length}</Badge>
             </TabsTrigger>
             <TabsTrigger value="faculty" className="flex items-center gap-2">
-              👨‍🏫 أعضاء هيئة التدريس
+              👨‍🏫 {t('complaintsUI.faculty')}
               <Badge variant="secondary">{facultyComplaints.length}</Badge>
             </TabsTrigger>
             <TabsTrigger value="employees" className="flex items-center gap-2">
-              👔 موظفين
+              👔 {t('complaintsUI.employees')}
               <Badge variant="secondary">{employeeComplaints.length}</Badge>
             </TabsTrigger>
             {otherComplaints.length > 0 && (
               <TabsTrigger value="other" className="flex items-center gap-2">
-                📋 أخرى
+                📋 {t('complaintsUI.other')}
                 <Badge variant="secondary">{otherComplaints.length}</Badge>
               </TabsTrigger>
             )}
           </TabsList>
 
           <TabsContent value="all-types" className="space-y-4">
-            {renderList(filteredByStatus, "لا توجد شكاوى")}
+            {renderList(filteredByStatus, t('complaintsUI.noneAll'))}
           </TabsContent>
           <TabsContent value="students" className="space-y-4">
-            {renderList(studentComplaints, "لا توجد شكاوى من الطلاب")}
+            {renderList(studentComplaints, t('complaintsUI.noneStudents'))}
           </TabsContent>
           <TabsContent value="faculty" className="space-y-4">
-            {renderList(facultyComplaints, "لا توجد شكاوى من أعضاء هيئة التدريس")}
+            {renderList(facultyComplaints, t('complaintsUI.noneFaculty'))}
           </TabsContent>
           <TabsContent value="employees" className="space-y-4">
-            {renderList(employeeComplaints, "لا توجد شكاوى من الموظفين")}
+            {renderList(employeeComplaints, t('complaintsUI.noneEmployees'))}
           </TabsContent>
           {otherComplaints.length > 0 && (
             <TabsContent value="other" className="space-y-4">

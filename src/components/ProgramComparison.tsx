@@ -11,6 +11,7 @@ import {
 import { TrendingUp, Award, Star, BarChart3, Radar as RadarIcon, TableIcon, Loader2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const PROGRAM_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'];
 
@@ -170,6 +171,7 @@ interface ComparisonResult {
 
 const ProgramComparison = () => {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [programs, setPrograms] = useState<any[]>([]);
   const [academicYears, setAcademicYears] = useState<string[]>([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>('');
@@ -210,11 +212,11 @@ const ProgramComparison = () => {
 
   const loadComparisonData = async () => {
     if (selectedPrograms.length < 2) {
-      toast({ title: "تنبيه", description: "يرجى اختيار برنامجين على الأقل", variant: "destructive" });
+      toast({ title: t('progComp.notice'), description: t('progComp.minPrograms'), variant: "destructive" });
       return;
     }
     if (!selectedAcademicYear) {
-      toast({ title: "تنبيه", description: "يرجى اختيار العام الأكاديمي", variant: "destructive" });
+      toast({ title: t('progComp.notice'), description: t('progComp.needAY'), variant: "destructive" });
       return;
     }
 
@@ -316,7 +318,7 @@ const ProgramComparison = () => {
 
       setComparisonResult({ surveyTypes, overall });
     } catch (error) {
-      toast({ title: "خطأ", description: "فشل في تحميل بيانات المقارنة", variant: "destructive" });
+      toast({ title: t('progComp.error'), description: t('progComp.loadErr'), variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -362,7 +364,7 @@ const ProgramComparison = () => {
           <div key={i} className="flex items-center gap-2 mb-1">
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
             <span>{entry.name}: </span>
-            <span className="font-bold">{entry.value !== null ? `${entry.value}/5` : 'غير متوفر'}</span>
+            <span className="font-bold">{entry.value !== null ? `${entry.value}/5` : t('progComp.unavailable')}</span>
           </div>
         ))}
       </div>
@@ -370,24 +372,24 @@ const ProgramComparison = () => {
   };
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className="space-y-6">
       {/* Filters */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-primary" />
-            مقارنة البرامج الأكاديمية
+            {t('progComp.title')}
           </CardTitle>
-          <CardDescription>قارن أداء البرامج حسب نوع الاستبيان والعام الأكاديمي</CardDescription>
+          <CardDescription>{t('progComp.desc')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Academic Year */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">العام الأكاديمي <span className="text-destructive">*</span></label>
+              <label className="text-sm font-medium">{t('progComp.academicYear')} <span className="text-destructive">*</span></label>
               <Select value={selectedAcademicYear} onValueChange={setSelectedAcademicYear}>
                 <SelectTrigger>
-                  <SelectValue placeholder="اختر العام الأكاديمي" />
+                  <SelectValue placeholder={t('progComp.selectAY')} />
                 </SelectTrigger>
                 <SelectContent>
                   {academicYears.map(y => (
@@ -399,22 +401,22 @@ const ProgramComparison = () => {
 
             {/* Semester */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">الفصل الدراسي</label>
+              <label className="text-sm font-medium">{t('progComp.semester')}</label>
               <Select value={selectedSemester} onValueChange={setSelectedSemester}>
                 <SelectTrigger>
-                  <SelectValue placeholder="جميع الفصول" />
+                  <SelectValue placeholder={t('progComp.allSemesters')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">جميع الفصول</SelectItem>
-                  <SelectItem value="خريف">خريف</SelectItem>
-                  <SelectItem value="ربيع">ربيع</SelectItem>
+                  <SelectItem value="all">{t('progComp.allSemesters')}</SelectItem>
+                  <SelectItem value="خريف">{t('progComp.fall')}</SelectItem>
+                  <SelectItem value="ربيع">{t('progComp.spring')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Programs */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">اختر البرامج (2+)</label>
+              <label className="text-sm font-medium">{t('progComp.selectPrograms')}</label>
               <Select
                 onValueChange={(value) => {
                   if (!selectedPrograms.includes(value)) {
@@ -423,7 +425,7 @@ const ProgramComparison = () => {
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="أضف برنامج" />
+                  <SelectValue placeholder={t('progComp.addProgram')} />
                 </SelectTrigger>
                 <SelectContent>
                   {programs
@@ -459,7 +461,7 @@ const ProgramComparison = () => {
             disabled={loading || selectedPrograms.length < 2 || !selectedAcademicYear}
             className="w-full md:w-auto"
           >
-            {loading ? <><Loader2 className="h-4 w-4 animate-spin ml-2" /> جاري التحليل...</> : 'بدء المقارنة'}
+            {loading ? <><Loader2 className="h-4 w-4 animate-spin ml-2" /> {t('progComp.analyzing')}</> : t('progComp.start')}
           </Button>
         </CardContent>
       </Card>
@@ -485,20 +487,20 @@ const ProgramComparison = () => {
                 <CardContent className="space-y-3">
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div className="bg-muted/50 rounded-lg p-3 text-center">
-                      <div className="text-muted-foreground text-xs">الاستبيانات</div>
+                      <div className="text-muted-foreground text-xs">{t('progComp.surveys')}</div>
                       <div className="text-xl font-bold">{p.totalSurveys}</div>
                     </div>
                     <div className="bg-muted/50 rounded-lg p-3 text-center">
-                      <div className="text-muted-foreground text-xs">الاستجابات</div>
+                      <div className="text-muted-foreground text-xs">{t('progComp.responses')}</div>
                       <div className="text-xl font-bold">{p.totalResponses}</div>
                     </div>
                   </div>
                   <div className="flex justify-between items-center pt-2 border-t">
-                    <span className="text-sm text-muted-foreground">المتوسط العام:</span>
+                    <span className="text-sm text-muted-foreground">{t('progComp.overallMean')}</span>
                     <span className="text-lg font-bold" style={{ color: p.color }}>{p.overallMean}/5</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">نسبة الرضا:</span>
+                    <span className="text-sm text-muted-foreground">{t('progComp.satisfaction')}</span>
                     <div className="flex items-center gap-1">
                       <span className="text-lg font-bold text-primary">{p.satisfactionRate}%</span>
                       <TrendingUp className="h-4 w-4 text-green-500" />
@@ -515,9 +517,9 @@ const ProgramComparison = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-primary" />
-                  مقارنة حسب نوع الاستبيان
+                  {t('progComp.byType')}
                 </CardTitle>
-                <CardDescription>المتوسط العام لكل نوع استبيان مقسّم حسب البرنامج</CardDescription>
+                <CardDescription>{t('progComp.byTypeDesc')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={400}>
@@ -556,9 +558,9 @@ const ProgramComparison = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <RadarIcon className="h-5 w-5 text-primary" />
-                  مخطط الأداء الشامل
+                  {t('progComp.radarTitle')}
                 </CardTitle>
-                <CardDescription>مقارنة شاملة لأداء البرامج عبر جميع أنواع الاستبيانات</CardDescription>
+                <CardDescription>{t('progComp.radarDesc')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={400}>
@@ -589,7 +591,7 @@ const ProgramComparison = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TableIcon className="h-5 w-5 text-primary" />
-                جدول المقارنة التفصيلي
+                {t('progComp.tableTitle')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -597,7 +599,7 @@ const ProgramComparison = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-right min-w-[200px]">نوع الاستبيان</TableHead>
+                      <TableHead className="text-right min-w-[200px]">{t('progComp.tableType')}</TableHead>
                       {selectedProgramsWithColors.map(p => (
                         <TableHead key={p.id} className="text-center min-w-[120px]">
                           <div className="flex items-center justify-center gap-1">
@@ -607,7 +609,7 @@ const ProgramComparison = () => {
                         </TableHead>
                       ))}
                       {selectedPrograms.length === 2 && (
-                        <TableHead className="text-center min-w-[80px]">الفرق</TableHead>
+                        <TableHead className="text-center min-w-[80px]">{t('progComp.diff')}</TableHead>
                       )}
                     </TableRow>
                   </TableHeader>
@@ -625,7 +627,7 @@ const ProgramComparison = () => {
                               {pd.exists && pd.averageScore > 0 ? (
                                 <span className="font-semibold">{pd.averageScore}</span>
                               ) : (
-                                <span className="text-muted-foreground text-xs">غير متوفر</span>
+                                <span className="text-muted-foreground text-xs">{t('progComp.unavailable')}</span>
                               )}
                             </TableCell>
                           ))}
@@ -648,7 +650,7 @@ const ProgramComparison = () => {
                     })}
                     {/* Overall Row */}
                     <TableRow className="bg-muted/30 font-bold">
-                      <TableCell className="text-right">المتوسط العام</TableCell>
+                      <TableCell className="text-right">{t('progComp.overallRow')}</TableCell>
                       {comparisonResult.overall.map((p, i) => (
                         <TableCell key={i} className="text-center">
                           <span style={{ color: p.color }}>{p.overallMean}</span>

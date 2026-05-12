@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { MessageSquare, Trash2, Printer } from "lucide-react";
-import { Complaint, statusOptions, getCategoryLabel } from "./complaintsHelpers";
-import { getStatusBadge } from "./ComplaintCard";
+import { Complaint, getStatusOptions, getCategoryLabel } from "./complaintsHelpers";
+import { useStatusBadge } from "./ComplaintCard";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ComplaintDetailsDialogProps {
   complaint: Complaint | null;
@@ -17,20 +18,27 @@ interface ComplaintDetailsDialogProps {
 }
 
 const ComplaintDetailsDialog = ({ complaint, canManage, onClose, onEdit, onDelete, onStatusChange }: ComplaintDetailsDialogProps) => {
+  const { t, language } = useLanguage();
+  const statusBadge = useStatusBadge();
+  const statusOptions = getStatusOptions(t);
+  const locale = language === 'ar' ? 'ar-SA' : 'en-US';
+
   if (!complaint) return null;
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
+    const dir = language === 'ar' ? 'rtl' : 'ltr';
+    const statusLabel = t(`complaintsUI.status.${complaint.status}`);
     const printContent = `
       <!DOCTYPE html>
-      <html dir="rtl" lang="ar">
+      <html dir="${dir}" lang="${language}">
       <head>
         <meta charset="UTF-8">
-        <title>تفاصيل الشكوى - ${complaint.subject}</title>
+        <title>${t('complaintsUI.detailsTitle')} - ${complaint.subject}</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 40px; direction: rtl; line-height: 1.6; }
+          body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 40px; direction: ${dir}; line-height: 1.6; }
           .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
           .header h1 { font-size: 24px; margin-bottom: 10px; }
           .header p { color: #666; }
@@ -47,38 +55,30 @@ const ComplaintDetailsDialog = ({ complaint, canManage, onClose, onEdit, onDelet
           .description-box { background: #f5f5f5; padding: 15px; border-radius: 8px; white-space: pre-wrap; }
           .resolution-box { background: #e8f5e9; border: 1px solid #a5d6a7; padding: 15px; border-radius: 8px; }
           .footer { margin-top: 40px; text-align: center; color: #999; font-size: 12px; border-top: 1px solid #ddd; padding-top: 20px; }
-          @media print { body { padding: 20px; } .header { page-break-after: avoid; } }
         </style>
       </head>
       <body>
         <div class="header">
-          <h1>تفاصيل الشكوى</h1>
-          <p>رقم الشكوى: ${complaint.id.substring(0, 8).toUpperCase()}</p>
+          <h1>${t('complaintsUI.detailsTitle')}</h1>
+          <p>${complaint.id.substring(0, 8).toUpperCase()}</p>
         </div>
         <div class="section">
-          <div class="section-title">معلومات عامة</div>
           <div class="info-grid">
-            <div class="info-item"><div class="info-label">العنوان:</div><div class="info-value">${complaint.subject}</div></div>
-            <div class="info-item"><div class="info-label">الحالة:</div><div class="info-value"><span class="status-badge status-${complaint.status}">${complaint.status === 'pending' ? 'جديدة' : complaint.status === 'in_progress' ? 'قيد الإجراء' : 'تم الحل'}</span></div></div>
-            <div class="info-item"><div class="info-label">التصنيف:</div><div class="info-value">${getCategoryLabel(complaint.type)}</div></div>
-            <div class="info-item"><div class="info-label">البرنامج:</div><div class="info-value">${complaint.programs?.name || 'غير محدد'}</div></div>
+            <div class="info-item"><div class="info-label">${t('complaintsUI.titleLabel')}:</div><div class="info-value">${complaint.subject}</div></div>
+            <div class="info-item"><div class="info-label">${t('complaintsUI.statusLabel')}</div><div class="info-value"><span class="status-badge status-${complaint.status}">${statusLabel}</span></div></div>
+            <div class="info-item"><div class="info-label">${t('complaintsUI.category')}:</div><div class="info-value">${getCategoryLabel(complaint.type, t)}</div></div>
+            <div class="info-item"><div class="info-label">${t('complaintsUI.programLabel')}</div><div class="info-value">${complaint.programs?.name || t('complaintsUI.notSpecified')}</div></div>
+            <div class="info-item"><div class="info-label">${t('complaintsUI.complainantLabel')}</div><div class="info-value">${complaint.student_name || t('complaintsUI.notSpecified')}</div></div>
+            <div class="info-item"><div class="info-label">${t('complaintsUI.email')}</div><div class="info-value">${complaint.student_email || t('complaintsUI.notSpecified')}</div></div>
+            <div class="info-item"><div class="info-label">${t('complaintsUI.submittedAt')}</div><div class="info-value">${new Date(complaint.created_at).toLocaleString(locale)}</div></div>
           </div>
         </div>
         <div class="section">
-          <div class="section-title">بيانات مقدم الشكوى</div>
-          <div class="info-grid">
-            <div class="info-item"><div class="info-label">الاسم:</div><div class="info-value">${complaint.student_name || 'غير محدد'}</div></div>
-            <div class="info-item"><div class="info-label">البريد الإلكتروني:</div><div class="info-value">${complaint.student_email || 'غير محدد'}</div></div>
-            <div class="info-item"><div class="info-label">نوع مقدم الشكوى:</div><div class="info-value">${complaint.complainant_type || 'غير محدد'}</div></div>
-            <div class="info-item"><div class="info-label">تاريخ ووقت التقديم:</div><div class="info-value" style="font-family: monospace;">${new Date(complaint.created_at).toLocaleDateString('ar-SA')} - ${new Date(complaint.created_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div></div>
-          </div>
-        </div>
-        <div class="section">
-          <div class="section-title">تفاصيل الشكوى</div>
+          <div class="section-title">${t('complaintsUI.descLabel')}</div>
           <div class="description-box">${complaint.description}</div>
         </div>
-        ${complaint.resolution_notes ? `<div class="section"><div class="section-title">ملاحظات المعالجة</div><div class="resolution-box">${complaint.resolution_notes}</div></div>` : ''}
-        <div class="footer"><p>تم طباعة هذا التقرير بتاريخ: ${new Date().toLocaleDateString('ar-SA')} - ${new Date().toLocaleTimeString('ar-SA')}</p></div>
+        ${complaint.resolution_notes ? `<div class="section"><div class="section-title">${t('complaintsUI.resolutionNotes')}</div><div class="resolution-box">${complaint.resolution_notes}</div></div>` : ''}
+        <div class="footer"><p>${new Date().toLocaleString(locale)}</p></div>
       </body>
       </html>
     `;
@@ -93,13 +93,13 @@ const ComplaintDetailsDialog = ({ complaint, canManage, onClose, onEdit, onDelet
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MessageSquare className="h-5 w-5" />
-            تفاصيل الشكوى
+            {t('complaintsUI.detailsTitle')}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-6">
           <div className="flex items-center gap-3 flex-wrap">
-            {getStatusBadge(complaint.status)}
-            <Badge variant="outline">{getCategoryLabel(complaint.type)}</Badge>
+            {statusBadge(complaint.status)}
+            <Badge variant="outline">{getCategoryLabel(complaint.type, t)}</Badge>
             {complaint.complainant_type && (
               <Badge variant="secondary">{complaint.complainant_type}</Badge>
             )}
@@ -111,20 +111,20 @@ const ComplaintDetailsDialog = ({ complaint, canManage, onClose, onEdit, onDelet
           </div>
           
           <div className="grid grid-cols-2 gap-4 text-sm">
-            <div><span className="font-medium">مقدم الشكوى:</span><p>{complaint.student_name || "غير محدد"}</p></div>
-            <div><span className="font-medium">البريد الإلكتروني:</span><p>{complaint.student_email || "غير محدد"}</p></div>
-            <div><span className="font-medium">البرنامج:</span><p>{complaint.programs?.name || "غير محدد"}</p></div>
+            <div><span className="font-medium">{t('complaintsUI.complainantLabel')}</span><p>{complaint.student_name || t('complaintsUI.notSpecified')}</p></div>
+            <div><span className="font-medium">{t('complaintsUI.email')}</span><p>{complaint.student_email || t('complaintsUI.notSpecified')}</p></div>
+            <div><span className="font-medium">{t('complaintsUI.programLabel')}</span><p>{complaint.programs?.name || t('complaintsUI.notSpecified')}</p></div>
             <div>
-              <span className="font-medium">تاريخ ووقت التقديم:</span>
+              <span className="font-medium">{t('complaintsUI.submittedAt')}</span>
               <p className="font-mono text-sm">
-                {new Date(complaint.created_at).toLocaleDateString('ar-SA')} - {new Date(complaint.created_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                {new Date(complaint.created_at).toLocaleDateString(locale)} - {new Date(complaint.created_at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
               </p>
             </div>
           </div>
 
           {complaint.resolution_notes && (
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <h4 className="font-semibold text-green-900 mb-2">ملاحظات المعالجة:</h4>
+              <h4 className="font-semibold text-green-900 mb-2">{t('complaintsUI.resolutionNotes')}</h4>
               <p className="text-green-800 whitespace-pre-wrap">{complaint.resolution_notes}</p>
             </div>
           )}
@@ -132,7 +132,7 @@ const ComplaintDetailsDialog = ({ complaint, canManage, onClose, onEdit, onDelet
           <div className="flex justify-end gap-2 print:hidden">
             <Button variant="outline" onClick={handlePrint}>
               <Printer className="h-4 w-4 ml-2" />
-              طباعة
+              {t('complaintsUI.print')}
             </Button>
             
             {canManage && (
@@ -140,33 +140,33 @@ const ComplaintDetailsDialog = ({ complaint, canManage, onClose, onEdit, onDelet
                 <AlertDialogTrigger asChild>
                   <Button variant="outline" className="text-destructive">
                     <Trash2 className="h-4 w-4 ml-2" />
-                    حذف
+                    {t('complaintsUI.delete')}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>هل أنت متأكد من حذف هذه الشكوى؟</AlertDialogTitle>
-                    <AlertDialogDescription>سيتم حذف الشكوى نهائياً ولا يمكن استرجاعها.</AlertDialogDescription>
+                    <AlertDialogTitle>{t('complaintsUI.deleteConfirmTitle')}</AlertDialogTitle>
+                    <AlertDialogDescription>{t('complaintsUI.deleteConfirmDesc')}</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                    <AlertDialogCancel>{t('complaintsUI.cancel')}</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={() => { onDelete(complaint.id); onClose(); }}
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
-                      حذف
+                      {t('complaintsUI.delete')}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
             )}
             
-            <Button variant="outline" onClick={onClose}>إغلاق</Button>
+            <Button variant="outline" onClick={onClose}>{t('complaintsUI.close')}</Button>
             {canManage && (
               <>
-                <Button variant="outline" onClick={() => onEdit(complaint)}>تعديل</Button>
+                <Button variant="outline" onClick={() => onEdit(complaint)}>{t('complaintsUI.edit')}</Button>
                 <div className="flex items-center gap-2">
-                  <Label className="text-sm">الحالة:</Label>
+                  <Label className="text-sm">{t('complaintsUI.statusLabel')}</Label>
                   <select
                     className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
                     value={complaint.status}

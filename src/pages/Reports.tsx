@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Sparkles, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { exportToPDF, exportToExcel, captureChartAsImage, generatePDFBlob } from "@/utils/exportReport";
 import { PDFPreviewDialog } from "@/components/PDFPreviewDialog";
 import { MCQ_COLORS } from "@/components/reports/reportConstants";
@@ -21,6 +22,7 @@ const Reports = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [report, setReport] = useState<any>(null);
   const [survey, setSurvey] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -198,11 +200,11 @@ const Reports = () => {
           }
         });
         distribution = [
-          { name: 'غير موافق بشدة', value: counts[1], fill: '#ef4444' },
-          { name: 'غير موافق', value: counts[2], fill: '#f97316' },
-          { name: 'محايد', value: counts[3], fill: '#eab308' },
-          { name: 'موافق', value: counts[4], fill: '#22c55e' },
-          { name: 'موافق بشدة', value: counts[5], fill: '#16a34a' },
+          { name: t('likert.sd'), value: counts[1], fill: '#ef4444' },
+          { name: t('likert.d'), value: counts[2], fill: '#f97316' },
+          { name: t('likert.n'), value: counts[3], fill: '#eab308' },
+          { name: t('likert.a'), value: counts[4], fill: '#22c55e' },
+          { name: t('likert.sa'), value: counts[5], fill: '#16a34a' },
         ];
       }
 
@@ -347,11 +349,11 @@ const Reports = () => {
       .eq("id", report.id);
 
     if (error) {
-      toast({ title: "خطأ", description: "فشل حفظ بيانات التقرير", variant: "destructive" });
+      toast({ title: t("reports.toastError"), description: t("reports.toastSaveMetaErr"), variant: "destructive" });
       return;
     }
 
-    toast({ title: "تم الحفظ", description: "تم حفظ بيانات التقرير بنجاح" });
+    toast({ title: t("reports.toastSaveOk"), description: t("reports.toastSaveMeta") });
     loadReport();
   };
 
@@ -359,11 +361,11 @@ const Reports = () => {
     const { error } = await supabase.from("reports").delete().eq("id", report.id);
 
     if (error) {
-      toast({ title: "خطأ", description: "فشل في حذف التقرير", variant: "destructive" });
+      toast({ title: t("reports.toastError"), description: t("reports.toastDeleteErr"), variant: "destructive" });
       return;
     }
 
-    toast({ title: "تم الحذف", description: "تم حذف التقرير بنجاح" });
+    toast({ title: t("reports.toastDeleteOk"), description: t("reports.toastDeleteOkDesc") });
     navigate("/surveys");
   };
 
@@ -379,18 +381,18 @@ const Reports = () => {
       .eq("id", report.id);
 
     if (error) {
-      toast({ title: "خطأ", description: "فشل في حفظ التوصيات", variant: "destructive" });
+      toast({ title: t("reports.toastError"), description: t("reports.toastSaveRecsErr"), variant: "destructive" });
       return;
     }
 
-    toast({ title: "تم الحفظ", description: courseName ? `تم حفظ التوصيات لمقرر "${courseName}"` : "تم حفظ التوصيات بنجاح" });
+    toast({ title: t("reports.toastSaveOk"), description: courseName ? t("reports.toastSaveRecsCourse").replace("{0}", courseName) : t("reports.toastSaveRecs") });
     setEditRecommendationsOpen(false);
     loadReport();
   };
 
   const handleSaveAndTransferRecommendations = async () => {
     if (!editedRecommendations.trim()) {
-      toast({ title: "تنبيه", description: "لا توجد توصيات لنقلها", variant: "destructive" });
+      toast({ title: t("reports.notice"), description: t("reports.toastNoRecs"), variant: "destructive" });
       return;
     }
 
@@ -405,7 +407,7 @@ const Reports = () => {
       .eq("id", report.id);
 
     if (saveError) {
-      toast({ title: "خطأ", description: "فشل في حفظ التوصيات", variant: "destructive" });
+      toast({ title: t("reports.toastError"), description: t("reports.toastSaveRecsErr"), variant: "destructive" });
       return;
     }
 
@@ -428,11 +430,11 @@ const Reports = () => {
         .eq("id", existing.id);
 
       if (updateError) {
-        toast({ title: "خطأ", description: "فشل في تحديث التوصيات في المتابعة", variant: "destructive" });
+        toast({ title: t("reports.toastError"), description: t("reports.toastUpdateErr"), variant: "destructive" });
         return;
       }
 
-      toast({ title: "تم التحديث", description: "تم تحديث التوصيات في صفحة المتابعة" });
+      toast({ title: t("reports.toastUpdated"), description: t("reports.toastUpdatedDesc") });
     } else {
       const { error: insertError } = await supabase
         .from("recommendations")
@@ -449,11 +451,11 @@ const Reports = () => {
         });
 
       if (insertError) {
-        toast({ title: "خطأ", description: "فشل في نقل التوصيات", variant: "destructive" });
+        toast({ title: t("reports.toastError"), description: t("reports.toastTransferErr"), variant: "destructive" });
         return;
       }
 
-      toast({ title: "تم النقل", description: "تم نقل التوصيات إلى صفحة متابعة التوصيات بنجاح" });
+      toast({ title: t("reports.toastTransferred"), description: t("reports.toastTransferredDesc") });
     }
 
     setEditRecommendationsOpen(false);
@@ -600,10 +602,10 @@ const Reports = () => {
 
       if (error) throw error;
 
-      toast({ title: "تم إنشاء التقرير بنجاح", description: "تم تحليل البيانات بالذكاء الاصطناعي" });
+      toast({ title: t("reports.toastReportOk"), description: t("reports.toastReportOkDesc") });
       loadReport();
     } catch (error) {
-      toast({ title: "خطأ", description: "حدث خطأ أثناء إنشاء التقرير", variant: "destructive" });
+      toast({ title: t("reports.toastError"), description: t("reports.toastReportErr"), variant: "destructive" });
     } finally {
       setIsGenerating(false);
     }
@@ -611,7 +613,7 @@ const Reports = () => {
 
   const handleExportPDF = async () => {
     setIsExporting(true);
-    toast({ title: "جاري التصدير", description: "يتم التقاط الرسوم البيانية..." });
+    toast({ title: t("reports.toastExporting"), description: t("reports.toastExportingDesc") });
 
     try {
       const { stats, textResponses, pdfAnswers, reportForPDF } = preparePDFData();
@@ -633,10 +635,10 @@ const Reports = () => {
       }
 
       await exportToPDF(reportForPDF, survey, stats, collegeLogo, chartImages, textResponses, collegeName, filterInfo, coordinatorName || undefined);
-      toast({ title: "تم التصدير", description: "تم تصدير التقرير بنجاح" });
+      toast({ title: t("reports.toastExportOk"), description: t("reports.toastExportPdfOk") });
     } catch (error) {
       console.error("Export error:", error);
-      toast({ title: "خطأ", description: "حدث خطأ أثناء تصدير التقرير", variant: "destructive" });
+      toast({ title: t("reports.toastError"), description: t("reports.toastExportErr"), variant: "destructive" });
     } finally {
       setIsExporting(false);
     }
@@ -655,7 +657,7 @@ const Reports = () => {
       setPdfBlob(blob);
     } catch (error) {
       console.error("Preview error:", error);
-      toast({ title: "خطأ", description: "حدث خطأ أثناء إنشاء المعاينة", variant: "destructive" });
+      toast({ title: t("reports.toastError"), description: t("reports.toastPreviewErr"), variant: "destructive" });
     } finally {
       setIsGeneratingPreview(false);
     }
@@ -699,7 +701,7 @@ const Reports = () => {
       }));
 
     exportToExcel(report, survey, stats, textResponses);
-    toast({ title: "تم التصدير", description: "تم تصدير ملف Excel بنجاح" });
+    toast({ title: t("reports.toastExportOk"), description: t("reports.toastExportExcelOk") });
   };
 
   if (loading) {
@@ -715,17 +717,17 @@ const Reports = () => {
       <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
         <Card className="max-w-md">
           <CardHeader>
-            <CardTitle>لا يوجد تقرير</CardTitle>
-            <CardDescription>لم يتم إنشاء تقرير لهذا الاستبيان بعد</CardDescription>
+            <CardTitle>{t("reports.noReport")}</CardTitle>
+            <CardDescription>{t("reports.noReportDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Button onClick={generateReport} disabled={isGenerating} className="w-full">
               <Sparkles className="h-4 w-4 ml-2" />
-              {isGenerating ? "جاري إنشاء التقرير..." : "إنشاء تقرير بالذكاء الاصطناعي"}
+              {isGenerating ? t("reports.creating") : t("reports.createWithAI")}
             </Button>
             <Button variant="outline" onClick={() => navigate("/surveys")} className="w-full">
               <ArrowRight className="h-4 w-4 ml-2" />
-              العودة إلى الاستبيانات
+              {t("reports.backToSurveys")}
             </Button>
           </CardContent>
         </Card>
