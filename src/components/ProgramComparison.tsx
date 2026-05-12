@@ -558,9 +558,9 @@ const ProgramComparison = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <RadarIcon className="h-5 w-5 text-primary" />
-                  مخطط الأداء الشامل
+                  {t('progComp.radarTitle')}
                 </CardTitle>
-                <CardDescription>مقارنة شاملة لأداء البرامج عبر جميع أنواع الاستبيانات</CardDescription>
+                <CardDescription>{t('progComp.radarDesc')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={400}>
