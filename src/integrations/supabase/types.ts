@@ -248,39 +248,99 @@ export type Database = {
           },
         ]
       }
+      archive_audit_log: {
+        Row: {
+          action: string
+          archive_id: string
+          id: string
+          metadata: Json | null
+          performed_at: string
+          performed_by: string | null
+          reason: string | null
+        }
+        Insert: {
+          action: string
+          archive_id: string
+          id?: string
+          metadata?: Json | null
+          performed_at?: string
+          performed_by?: string | null
+          reason?: string | null
+        }
+        Update: {
+          action?: string
+          archive_id?: string
+          id?: string
+          metadata?: Json | null
+          performed_at?: string
+          performed_by?: string | null
+          reason?: string | null
+        }
+        Relationships: []
+      }
       archives: {
         Row: {
           academic_year: string
           archived_at: string | null
           archived_by: string | null
+          closing_notes: string | null
           data: Json
           data_type: string
+          export_count: number
+          frozen_at: string | null
+          frozen_by: string | null
           id: string
           is_frozen: boolean | null
+          kpis_snapshot: Json | null
+          period_end_date: string | null
+          period_start_date: string | null
           program_id: string | null
           semester: string
+          status: string
+          title: string | null
+          updated_at: string
         }
         Insert: {
           academic_year: string
           archived_at?: string | null
           archived_by?: string | null
+          closing_notes?: string | null
           data: Json
           data_type: string
+          export_count?: number
+          frozen_at?: string | null
+          frozen_by?: string | null
           id?: string
           is_frozen?: boolean | null
+          kpis_snapshot?: Json | null
+          period_end_date?: string | null
+          period_start_date?: string | null
           program_id?: string | null
           semester: string
+          status?: string
+          title?: string | null
+          updated_at?: string
         }
         Update: {
           academic_year?: string
           archived_at?: string | null
           archived_by?: string | null
+          closing_notes?: string | null
           data?: Json
           data_type?: string
+          export_count?: number
+          frozen_at?: string | null
+          frozen_by?: string | null
           id?: string
           is_frozen?: boolean | null
+          kpis_snapshot?: Json | null
+          period_end_date?: string | null
+          period_start_date?: string | null
           program_id?: string | null
           semester?: string
+          status?: string
+          title?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
