@@ -347,11 +347,9 @@ const Archives = () => {
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setSelectedItem(null)}>{t('common.close')}</Button>
-                {selectedItem.file_path && (
-                  <Button onClick={() => toast({ title: t('archives.comingSoon'), description: t('archives.comingSoonDesc') })}>
-                    <Download className="h-4 w-4 ml-2" />{t('archives.downloadFile')}
-                  </Button>
-                )}
+                <Button onClick={() => handleDownloadPDF(selectedItem)}>
+                  <Download className="h-4 w-4 ml-2" />{language === 'ar' ? 'تنزيل PDF' : 'Download PDF'}
+                </Button>
               </div>
             </div>
           </DialogContent>
