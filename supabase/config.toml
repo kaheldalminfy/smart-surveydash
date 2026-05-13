@@ -45,3 +45,6 @@ verify_jwt = false
 
 [functions.send-coordinator-announcement]
 verify_jwt = true
+
+[functions.create-period-archive]
+verify_jwt = true

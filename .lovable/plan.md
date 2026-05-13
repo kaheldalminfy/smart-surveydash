@@ -1,50 +1,135 @@
-# Fix incomplete Arabic→English translation
+# مقترح نظام الأرشفة لمنظومة ضمان الجودة
 
-## Findings (deep audit)
+## الفكرة الأساسية
+الأرشفة = "إغلاق فترة أكاديمية" (فصل دراسي) بحيث تُحفظ كل بياناتها (استبيانات، تقارير، شكاوى، توصيات، اعتماد) كنسخة مجمّدة (Snapshot) غير قابلة للتعديل، مع إمكانية الاستعراض والتصدير لاحقاً للرجوع إليها أو للمراجعة الخارجية والاعتماد.
 
-I scanned every `.tsx` file under `src/` for Arabic characters and cross-referenced with i18n usage (`useLanguage` / `t()`). Result:
+---
 
-**20 files contain hardcoded Arabic text and never call the i18n system.** They will always display Arabic regardless of the language toggle.
+## 1. وحدة الأرشفة (Archive Unit)
+بدلاً من أرشفة عناصر مفردة عشوائياً، نقترح **الأرشفة على مستوى الفترة** لكل برنامج:
 
-### Affected areas
+```
+أرشيف = (البرنامج + السنة الأكاديمية + الفصل)
+مثال: برنامج القانون - 2025/2026 - الفصل الخريفي
+```
 
-**Reports module (entire UI)**
-- `pages/Reports.tsx`
-- `components/reports/ReportStatisticsCards.tsx`
-- `components/reports/ReportMetadataCard.tsx`
-- `components/reports/ReportFilterCard.tsx`
-- `components/reports/ReportDeleteDialog.tsx`
-- `components/reports/ReportHeader.tsx`
-- `components/reports/RecommendationsCard.tsx`
-- `components/reports/QuestionsSummaryChart.tsx`
-- `components/reports/QuestionAnalysisSection.tsx`
+كل وحدة أرشيف تحتوي على:
+- **Snapshot الاستبيانات**: الاستبيانات + الأسئلة + كل الردود + التحليلات الإحصائية
+- **Snapshot التقارير**: التقارير المُولدة + التوصيات + توصيات AI
+- **Snapshot الشكاوى**: كل الشكاوى المُقدّمة في الفترة + حالاتها النهائية + ملاحظات الحل
+- **Snapshot الاعتماد**: حالة المعايير والمؤشرات + نسب الالتزام + ملفات الإثبات
+- **مؤشرات أداء الفترة (KPIs)**: متوسطات Likert، معدل الاستجابة، عدد الشكاوى المحلولة، نسبة الاعتماد
 
-**Complaints sub-components**
-- `components/complaints/NewComplaintDialog.tsx`
-- `components/complaints/ComplaintStatusDashboard.tsx`
-- `components/complaints/ComplaintResolutionDialog.tsx`
-- `components/complaints/ComplaintQRSection.tsx`
-- `components/complaints/ComplaintFiltersCard.tsx`
-- `components/complaints/ComplaintEditDialog.tsx`
-- `components/complaints/ComplaintDetailsDialog.tsx`
-- `components/complaints/ComplaintClickableStats.tsx`
-- `components/complaints/ComplaintCard.tsx`
+---
 
-**Other**
-- `components/ProgramComparison.tsx`
-- `components/DashboardButton.tsx`
+## 2. أنواع الأرشفة
 
-Files with i18n but partial coverage exist too (e.g. some toast messages), but the 20 above are the main visible problems.
+| النوع | المُشغِّل | متى يُستخدم |
+|------|---------|------------|
+| **أرشفة فصلية تلقائية** | منسق البرنامج / المدير | بعد انتهاء الفصل وإغلاق آخر استبيان |
+| **أرشفة كلية** | العميد / المدير | أرشفة شاملة لكل البرامج لفصل معين |
+| **أرشفة لقطة (Snapshot)** | أي وقت | لقطة لحظية للاعتماد دون تجميد |
 
-## Plan
+---
 
-1. Extend `src/contexts/LanguageContext.tsx` with new translation keys grouped by namespace: `reports.*`, `complaintsUI.*`, `programComparison.*`, `dashboardBtn.*`.
-2. For each affected file:
-   - Import `useLanguage`
-   - Replace every Arabic literal with `t('key')`
-   - Keep DB-sourced text (program/course names, user-entered content) unchanged per existing memory rule.
-3. Verify by toggling language in preview; spot-check Reports page and Complaints dialogs.
+## 3. حالات الأرشيف (Lifecycle)
 
-## Scope confirmation
+```text
+[Draft] → [Sealed/Frozen] → [Published] → [Exported]
+   ↑           ↓                 ↓             ↓
+ قابل      مجمّد لا           متاح للعرض    PDF/ZIP
+للتعديل    يُعدّل             داخلياً       للاعتماد
+```
 
-This is a substantial sweep (~200 individual strings across 20 files + ~200 new keys in LanguageContext). I will preserve all logic, only swap presentation strings.
+- **Draft**: تحضير مبدئي قابل للحذف/التعديل (24 ساعة قبل التجميد)
+- **Frozen**: مجمّد، يُمنع الحذف والتعديل بـ DB Trigger
+- **Published**: متاح في صفحة الأرشيف للأدوار المخوّلة
+- **Exported**: تم توليد ملف PDF/ZIP رسمي للاعتماد الخارجي
+
+---
+
+## 4. الصلاحيات (RBAC)
+
+| الدور | إنشاء أرشيف | عرض | تصدير | حذف Draft | فك التجميد |
+|------|------------|-----|-------|-----------|------------|
+| Admin | ✅ كل البرامج | ✅ | ✅ | ✅ | ✅ (مع سبب) |
+| Dean | ✅ كل البرامج | ✅ | ✅ | ❌ | ❌ |
+| Coordinator | ✅ برنامجه فقط | ✅ برنامجه | ✅ برنامجه | ✅ برنامجه | ❌ |
+| Manager | ❌ | ✅ برنامجه | ❌ | ❌ | ❌ |
+| Faculty | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+---
+
+## 5. واجهة المستخدم المقترحة
+
+### صفحة `/archives` بثلاث طرق عرض:
+1. **عرض البرامج** (الأهم): كروت لكل برنامج تظهر آخر فترة مؤرشفة + KPIs مختصرة
+2. **خط زمني**: أرشيفات مجمّعة حسب السنة → الفصل (موجود حالياً، يُحسّن)
+3. **عرض القائمة**: للبحث المتقدم والتصفية
+
+### معالج الأرشفة (Wizard) في 4 خطوات:
+```
+1. اختر البرنامج والفترة
+2. مراجعة المحتوى (عدد الاستبيانات/الردود/الشكاوى/التقارير)
+3. إضافة ملاحظات ختامية للفترة
+4. تأكيد التجميد (مع تنبيه أن العملية لا يمكن التراجع عنها)
+```
+
+### صفحة تفاصيل الأرشيف:
+- Tabs: نظرة عامة | الاستبيانات | التقارير | الشكاوى | الاعتماد | KPIs
+- زر "تصدير PDF شامل" + "تصدير ZIP (JSON خام)"
+
+---
+
+## 6. التصدير والتقارير الرسمية
+- **PDF موحّد**: تقرير الفترة الأكاديمية الشامل (Cover + KPIs + ملخص كل قسم) — يستفيد من نظام jsPDF الحالي مع دعم العربية
+- **ZIP Backup**: كل البيانات JSON للأرشفة طويلة الأمد (يستفيد من `export-backup` Edge Function الموجودة)
+- **بطاقة الاعتماد (Accreditation Card)**: تقرير مختصر صفحة واحدة لكل فترة، مهيّأ لجهات الاعتماد الخارجية
+
+---
+
+## 7. الإشعارات
+- إشعار بريد للمنسق عند **اقتراب نهاية الفصل** (يذكّر بالأرشفة)
+- إشعار للعميد عند **اكتمال أرشفة برنامج**
+- إشعار عند **محاولة فك التجميد** (للمسؤول والعميد معاً للشفافية)
+
+---
+
+## 8. التغييرات التقنية المطلوبة (للقسم الفني)
+
+### قاعدة البيانات
+- توسيع جدول `archives` بأعمدة: `status` (draft/frozen/published), `period_start_date`, `period_end_date`, `kpis_snapshot` (jsonb), `closing_notes`, `frozen_at`, `frozen_by`, `export_count`
+- جدول جديد `archive_audit_log` لتسجيل كل عملية فك تجميد/تصدير
+- DB Triggers لمنع حذف/تعديل السجلات المرتبطة بفترة مؤرشفة (Soft-lock للاستبيانات والتقارير الأصلية)
+- RLS محدّثة بناءً على الجدول الجديد + role checks
+
+### Edge Functions
+- `create-period-archive`: يجمع كل بيانات الفترة في snapshot واحد (jsonb)
+- `freeze-archive`: تحويل من Draft إلى Frozen
+- `export-archive-pdf`: توليد PDF الشامل
+- `notify-archive-deadline`: cron job أسبوعي قبل نهاية الفصل
+
+### الواجهة الأمامية
+- إعادة تصميم `Archives.tsx` بالعرض ثلاثي الـ Tabs
+- Wizard جديد `ArchiveCreateWizard.tsx`
+- صفحة `ArchiveDetails.tsx` بـ Tabs لاستعراض المحتوى المجمّد
+- استخدام Design Tokens الموجودة (`--program-1` إلى `--program-8`) لتمييز البرامج
+
+---
+
+## ما الذي يميّز هذا المقترح؟
+1. **متسق مع طبيعة المنظومة**: الأرشفة بالفصل الدراسي (وليس عناصر متفرقة) يطابق دورة العمل الأكاديمية
+2. **جاهز للاعتماد**: التصدير الموحّد يخدم متطلبات جهات الاعتماد مباشرة
+3. **يحترم الصلاحيات الحالية**: يستخدم نفس نظام RBAC والبرامج الموجود
+4. **آمن قانونياً**: التجميد مع سجل تدقيق يضمن نزاهة البيانات التاريخية
+5. **يستفيد من البنية القائمة**: Email infra، PDF export، Backup export، AI analysis — كلها قابلة لإعادة الاستخدام
+
+---
+
+## خطوات البناء المقترحة (Phases)
+- **Phase 1**: توسيع schema + Wizard أرشفة الفصل + التجميد
+- **Phase 2**: صفحة تفاصيل الأرشيف بـ Tabs + التصدير PDF
+- **Phase 3**: الإشعارات التلقائية + تقرير بطاقة الاعتماد
+- **Phase 4**: عرض البرامج المرئي + KPIs على مستوى الفترة
+
+هل تريد أن أبدأ بـ Phase 1، أم تفضّل تعديل/تبسيط جانب معين قبل البدء؟

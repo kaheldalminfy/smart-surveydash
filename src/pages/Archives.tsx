@@ -11,11 +11,15 @@ import DashboardButton from "@/components/DashboardButton";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
+import ArchiveCreateWizard from "@/components/archives/ArchiveCreateWizard";
 
 interface ArchivedItem {
   id: string;
   title: string;
-  data_type: "survey" | "report" | "complaint";
+  data_type: string;
+  status?: string;
+  kpis_snapshot?: any;
+  closing_notes?: string;
   semester: string;
   academic_year: string;
   archived_at: string;
@@ -133,18 +137,8 @@ const Archives = () => {
             <p className="text-muted-foreground">{t('archives.subtitle')}</p>
           </div>
         </div>
-        <Dialog open={showArchiveDialog} onOpenChange={setShowArchiveDialog}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 ml-2" />{t('archives.archiveNewItem')}</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader><DialogTitle>{t('archives.archiveNewItem')}</DialogTitle></DialogHeader>
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">{t('archives.noteFeature')}</p>
-              <Button variant="outline" onClick={() => setShowArchiveDialog(false)}>{t('common.close')}</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setShowArchiveDialog(true)}><Plus className="h-4 w-4 ml-2" />{t('archives.archiveNewItem')}</Button>
+        <ArchiveCreateWizard open={showArchiveDialog} onOpenChange={setShowArchiveDialog} onCreated={loadArchives} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -301,6 +295,25 @@ const Archives = () => {
                   </div>
                 )}
               </div>
+              {selectedItem.kpis_snapshot && Object.keys(selectedItem.kpis_snapshot).length > 0 && (
+                <div className="p-4 border rounded-lg">
+                  <h4 className="font-medium mb-3">{language === 'ar' ? 'مؤشرات الفترة' : 'Period KPIs'}</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                    {Object.entries(selectedItem.kpis_snapshot).map(([k, v]) => (
+                      <div key={k} className="p-2 bg-muted rounded">
+                        <div className="text-xs text-muted-foreground">{k}</div>
+                        <div className="font-semibold">{v === null ? '—' : typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(2)) : String(v)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {selectedItem.closing_notes && (
+                <div className="p-4 border rounded-lg">
+                  <h4 className="font-medium mb-2">{language === 'ar' ? 'ملاحظات ختامية' : 'Closing notes'}</h4>
+                  <p className="text-sm whitespace-pre-wrap text-muted-foreground">{selectedItem.closing_notes}</p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div><span className="font-medium">{t('archives.itemType')}</span><p>{getTypeLabel(selectedItem.data_type)}</p></div>
                 <div><span className="font-medium">{t('archives.semesterLabel')}</span><p>{selectedItem.semester} {selectedItem.academic_year}</p></div>
