@@ -230,7 +230,7 @@ const Archives = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" onClick={() => setSelectedItem(item)}><Eye className="h-4 w-4" /></Button>
-                      {item.file_path && (<Button variant="outline" size="sm" onClick={() => toast({ title: t('archives.comingSoon'), description: t('archives.comingSoonDesc') })}><Download className="h-4 w-4" /></Button>)}
+                      <Button variant="outline" size="sm" title={language === 'ar' ? 'تنزيل PDF' : 'Download PDF'} onClick={() => handleDownloadPDF(item)}><Download className="h-4 w-4" /></Button>
                       {!item.is_frozen && (<Button variant="outline" size="sm" onClick={() => deleteArchiveItem(item.id)}><Trash2 className="h-4 w-4" /></Button>)}
                     </div>
                   </div>
