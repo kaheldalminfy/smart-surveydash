@@ -11,6 +11,7 @@ import DashboardButton from "@/components/DashboardButton";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
+import ArchiveCreateWizard from "@/components/archives/ArchiveCreateWizard";
 
 interface ArchivedItem {
   id: string;
