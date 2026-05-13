@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import ArchiveCreateWizard from "@/components/archives/ArchiveCreateWizard";
+import { downloadArchivePDF } from "@/utils/exportArchivePDF";
 
 interface ArchivedItem {
   id: string;
@@ -70,6 +71,30 @@ const Archives = () => {
       loadArchives();
     } catch (error: any) {
       toast({ title: t('common.error'), description: language === 'ar' ? "فشل في حذف العنصر" : "Failed to delete item", variant: "destructive" });
+    }
+  };
+
+  const handleDownloadPDF = async (item: ArchivedItem) => {
+    try {
+      toast({ title: language === 'ar' ? 'جاري إنشاء PDF...' : 'Generating PDF...' });
+      await downloadArchivePDF(item as any);
+      // Bump export_count (best-effort, allowed by trigger even on frozen)
+      await supabase
+        .from('archives')
+        .update({ export_count: ((item as any).export_count ?? 0) + 1 })
+        .eq('id', item.id);
+      await supabase.from('archive_audit_log').insert({
+        archive_id: item.id,
+        action: 'exported_pdf',
+        metadata: { format: 'pdf' },
+      } as any);
+      toast({ title: language === 'ar' ? 'تم التنزيل' : 'Downloaded' });
+    } catch (e: any) {
+      toast({
+        title: t('common.error'),
+        description: e?.message || (language === 'ar' ? 'فشل إنشاء PDF' : 'Failed to generate PDF'),
+        variant: 'destructive',
+      });
     }
   };
 
@@ -205,7 +230,7 @@ const Archives = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" onClick={() => setSelectedItem(item)}><Eye className="h-4 w-4" /></Button>
-                      {item.file_path && (<Button variant="outline" size="sm" onClick={() => toast({ title: t('archives.comingSoon'), description: t('archives.comingSoonDesc') })}><Download className="h-4 w-4" /></Button>)}
+                      <Button variant="outline" size="sm" title={language === 'ar' ? 'تنزيل PDF' : 'Download PDF'} onClick={() => handleDownloadPDF(item)}><Download className="h-4 w-4" /></Button>
                       {!item.is_frozen && (<Button variant="outline" size="sm" onClick={() => deleteArchiveItem(item.id)}><Trash2 className="h-4 w-4" /></Button>)}
                     </div>
                   </div>
@@ -322,11 +347,9 @@ const Archives = () => {
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setSelectedItem(null)}>{t('common.close')}</Button>
-                {selectedItem.file_path && (
-                  <Button onClick={() => toast({ title: t('archives.comingSoon'), description: t('archives.comingSoonDesc') })}>
-                    <Download className="h-4 w-4 ml-2" />{t('archives.downloadFile')}
-                  </Button>
-                )}
+                <Button onClick={() => handleDownloadPDF(selectedItem)}>
+                  <Download className="h-4 w-4 ml-2" />{language === 'ar' ? 'تنزيل PDF' : 'Download PDF'}
+                </Button>
               </div>
             </div>
           </DialogContent>
