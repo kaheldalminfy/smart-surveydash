@@ -16,7 +16,10 @@ import ArchiveCreateWizard from "@/components/archives/ArchiveCreateWizard";
 interface ArchivedItem {
   id: string;
   title: string;
-  data_type: "survey" | "report" | "complaint";
+  data_type: string;
+  status?: string;
+  kpis_snapshot?: any;
+  closing_notes?: string;
   semester: string;
   academic_year: string;
   archived_at: string;
@@ -134,18 +137,8 @@ const Archives = () => {
             <p className="text-muted-foreground">{t('archives.subtitle')}</p>
           </div>
         </div>
-        <Dialog open={showArchiveDialog} onOpenChange={setShowArchiveDialog}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 ml-2" />{t('archives.archiveNewItem')}</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader><DialogTitle>{t('archives.archiveNewItem')}</DialogTitle></DialogHeader>
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">{t('archives.noteFeature')}</p>
-              <Button variant="outline" onClick={() => setShowArchiveDialog(false)}>{t('common.close')}</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setShowArchiveDialog(true)}><Plus className="h-4 w-4 ml-2" />{t('archives.archiveNewItem')}</Button>
+        <ArchiveCreateWizard open={showArchiveDialog} onOpenChange={setShowArchiveDialog} onCreated={loadArchives} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
