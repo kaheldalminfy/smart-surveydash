@@ -98,7 +98,8 @@ const Archives = () => {
     }
   };
 
-    const getTypeBadge = (type: string) => {
+  const getTypeBadge = (type: string) => {
+    const typeConfig = {
       survey: { label: t('archives.survey'), variant: "default" as const, color: "bg-blue-500" },
       report: { label: t('archives.report'), variant: "secondary" as const, color: "bg-green-500" },
       complaint: { label: t('archives.complaint'), variant: "outline" as const, color: "bg-orange-500" },
