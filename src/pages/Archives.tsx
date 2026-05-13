@@ -74,7 +74,30 @@ const Archives = () => {
     }
   };
 
-  const getTypeBadge = (type: string) => {
+  const handleDownloadPDF = async (item: ArchivedItem) => {
+    try {
+      toast({ title: language === 'ar' ? 'جاري إنشاء PDF...' : 'Generating PDF...' });
+      await downloadArchivePDF(item as any);
+      // Bump export_count (best-effort, allowed by trigger even on frozen)
+      await supabase
+        .from('archives')
+        .update({ export_count: ((item as any).export_count ?? 0) + 1 })
+        .eq('id', item.id);
+      await supabase.from('archive_audit_log').insert({
+        archive_id: item.id,
+        action: 'exported_pdf',
+        metadata: { format: 'pdf' },
+      } as any);
+      toast({ title: language === 'ar' ? 'تم التنزيل' : 'Downloaded' });
+    } catch (e: any) {
+      toast({
+        title: t('common.error'),
+        description: e?.message || (language === 'ar' ? 'فشل إنشاء PDF' : 'Failed to generate PDF'),
+        variant: 'destructive',
+      });
+    }
+  };
+
     const typeConfig = {
       survey: { label: t('archives.survey'), variant: "default" as const, color: "bg-blue-500" },
       report: { label: t('archives.report'), variant: "secondary" as const, color: "bg-green-500" },
