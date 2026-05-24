@@ -373,6 +373,7 @@ const Dashboard = () => {
           </TabsContent>
         </Tabs>
       </main>
+      <AICopilotWidget />
     </div>
   );
 };
