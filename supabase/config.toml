@@ -48,3 +48,10 @@ verify_jwt = true
 
 [functions.create-period-archive]
 verify_jwt = true
+
+[functions.ai-copilot]
+verify_jwt = true
+
+[functions.predict-program-risk]
+verify_jwt = true
+

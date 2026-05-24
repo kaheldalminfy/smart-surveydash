@@ -10,6 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import RoleBasedDashboard from "@/components/dashboard/RoleBasedDashboard";
+import AICopilotWidget from "@/components/ai/AICopilotWidget";
+import ProgramRiskPanel from "@/components/ai/ProgramRiskPanel";
 
 type AppRole = 'admin' | 'dean' | 'coordinator' | 'program_manager' | 'faculty';
 
@@ -246,6 +248,12 @@ const Dashboard = () => {
               ))}
             </div>
 
+            {(userRole === 'admin' || userRole === 'dean') && (
+              <div className="mb-8">
+                <ProgramRiskPanel />
+              </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card className="lg:col-span-2">
                 <CardHeader>
@@ -365,6 +373,7 @@ const Dashboard = () => {
           </TabsContent>
         </Tabs>
       </main>
+      <AICopilotWidget />
     </div>
   );
 };
