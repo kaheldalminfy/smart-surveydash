@@ -67,7 +67,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
       .order("created_at", { ascending: false });
 
     if (error) {
-      toast({ title: "خطأ", description: "فشل تحميل الشكاوى", variant: "destructive" });
+      toast({ title: t('cmplPg.error'), description: t('complaintStats.loadError'), variant: "destructive" });
     } else {
       setComplaints(data || []);
     }
@@ -80,23 +80,23 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
       : complaints.filter(c => c.program_id === selectedProgram);
 
     const statusLabels: Record<string, string> = {
-      pending: "جديدة",
-      in_progress: "قيد الإجراء",
-      resolved: "تم الحل",
+      pending: t('complaintStats.statusNew'),
+      in_progress: t('complaintStats.statusInProgress'),
+      resolved: t('complaintStats.statusResolved'),
     };
 
     const typeLabels: Record<string, string> = {
-      academic: "أكاديمية",
-      administrative: "إدارية",
-      technical: "تقنية",
-      other: "أخرى",
+      academic: t('complaintStats.typeAcademic'),
+      administrative: t('complaintStats.typeAdministrative'),
+      technical: t('complaintStats.typeTechnical'),
+      other: t('complaintStats.typeOther'),
     };
 
     const complainantTypeLabels: Record<string, string> = {
-      student: "طالب",
-      faculty: "عضو هيئة تدريس",
-      employee: "موظف",
-      other: "أخرى",
+      student: t('complaintStats.compStudent'),
+      faculty: t('complaintStats.compFaculty'),
+      employee: t('complaintStats.compEmployee'),
+      other: t('complaintStats.compOther'),
     };
 
     // Status counts
@@ -134,9 +134,9 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
 
     // By status
     const byStatus = [
-      { name: "جديدة", value: pending, fill: "#f59e0b" },
-      { name: "قيد الإجراء", value: inProgress, fill: "#3b82f6" },
-      { name: "تم الحل", value: resolved, fill: "#22c55e" },
+      { name: t('complaintStats.statusNew'), value: pending, fill: "#f59e0b" },
+      { name: t('complaintStats.statusInProgress'), value: inProgress, fill: "#3b82f6" },
+      { name: t('complaintStats.statusResolved'), value: resolved, fill: "#22c55e" },
     ];
 
     // By month (last 6 months)
@@ -156,7 +156,9 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
       }
     });
 
-    const monthNames = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+    const monthNamesAr = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+    const monthNamesEn = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthNames = language === 'ar' ? monthNamesAr : monthNamesEn;
     const byMonth = Object.entries(monthCounts).map(([key, count]) => {
       const [year, month] = key.split("-");
       return {
@@ -247,7 +249,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
 
     doc.save(`complaints-report-${selectedProgram === "all" ? "all" : selectedProgram}.pdf`);
     
-    toast({ title: "تم التصدير", description: "تم تصدير التقرير بصيغة PDF" });
+    toast({ title: t('complaintStats.exported'), description: t('complaintStats.exportedPdf') });
   };
 
   const exportToExcel = () => {
@@ -337,7 +339,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
 
     XLSX.writeFile(wb, `complaints-report-${selectedProgram === "all" ? "all" : selectedProgram}.xlsx`);
     
-    toast({ title: "تم التصدير", description: "تم تصدير التقرير بصيغة Excel" });
+    toast({ title: t('complaintStats.exported'), description: t('complaintStats.exportedExcel') });
   };
 
   if (!isOpen) return null;
@@ -365,7 +367,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
                   Excel
                 </Button>
                 <Button variant="secondary" onClick={onClose}>
-                  إغلاق
+                  {t('complaintStats.close')}
                 </Button>
               </div>
             </div>
@@ -373,13 +375,13 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
           <CardContent className="space-y-6">
             {/* Filter */}
             <div className="flex items-center gap-4">
-              <span className="text-sm font-medium">البرنامج:</span>
+              <span className="text-sm font-medium">{t('complaintStats.program')}</span>
               <Select value={selectedProgram} onValueChange={setSelectedProgram}>
                 <SelectTrigger className="w-64">
-                  <SelectValue placeholder="اختر البرنامج" />
+                  <SelectValue placeholder={t('complaintStats.selectProgram')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">جميع البرامج</SelectItem>
+                  <SelectItem value="all">{t('complaintStats.allPrograms')}</SelectItem>
                   {programs.map(program => (
                     <SelectItem key={program.id} value={program.id}>
                       {program.name}
@@ -401,7 +403,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
                     <CardContent className="pt-6">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm text-muted-foreground">إجمالي الشكاوى</p>
+                          <p className="text-sm text-muted-foreground">{t('complaintStats.total')}</p>
                           <p className="text-3xl font-bold">{stats.total}</p>
                         </div>
                         <AlertCircle className="h-10 w-10 text-blue-500 opacity-50" />
@@ -413,7 +415,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
                     <CardContent className="pt-6">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm text-muted-foreground">شكاوى جديدة</p>
+                          <p className="text-sm text-muted-foreground">{t('complaintStats.pending')}</p>
                           <p className="text-3xl font-bold">{stats.pending}</p>
                         </div>
                         <Clock className="h-10 w-10 text-yellow-500 opacity-50" />
@@ -425,7 +427,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
                     <CardContent className="pt-6">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm text-muted-foreground">قيد الإجراء</p>
+                          <p className="text-sm text-muted-foreground">{t('complaintStats.inProgress')}</p>
                           <p className="text-3xl font-bold">{stats.inProgress}</p>
                         </div>
                         <TrendingUp className="h-10 w-10 text-purple-500 opacity-50" />
@@ -437,7 +439,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
                     <CardContent className="pt-6">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm text-muted-foreground">تم الحل</p>
+                          <p className="text-sm text-muted-foreground">{t('complaintStats.resolved')}</p>
                           <p className="text-3xl font-bold">{stats.resolved}</p>
                         </div>
                         <CheckCircle className="h-10 w-10 text-green-500 opacity-50" />
@@ -450,7 +452,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
                 <Card>
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">نسبة الحل</span>
+                      <span className="text-sm font-medium">{t('complaintStats.resolutionRate')}</span>
                       <Badge variant="secondary">
                         {stats.total > 0 ? ((stats.resolved / stats.total) * 100).toFixed(1) : 0}%
                       </Badge>
@@ -469,7 +471,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
                   {/* Status Distribution */}
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-lg">توزيع الشكاوى حسب الحالة</CardTitle>
+                      <CardTitle className="text-lg">{t('complaintStats.byStatus')}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       {stats.byStatus.some(s => s.value > 0) ? (
@@ -494,7 +496,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
                         </ResponsiveContainer>
                       ) : (
                         <div className="flex items-center justify-center h-[300px] text-muted-foreground">
-                          لا توجد بيانات
+                          {t('complaintStats.noData')}
                         </div>
                       )}
                     </CardContent>
@@ -504,7 +506,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
                   {stats.byComplainantType.length > 0 && (
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-lg">توزيع الشكاوى حسب مقدم الشكوى</CardTitle>
+                        <CardTitle className="text-lg">{t('complaintStats.byComplainant')}</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <ResponsiveContainer width="100%" height={300}>
@@ -527,7 +529,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
                   {/* Monthly Trend */}
                   <Card className="lg:col-span-2">
                     <CardHeader>
-                      <CardTitle className="text-lg">اتجاه الشكاوى الشهري (آخر 6 أشهر)</CardTitle>
+                      <CardTitle className="text-lg">{t('complaintStats.monthlyTrend')}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <ResponsiveContainer width="100%" height={300}>
@@ -536,7 +538,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
                           <XAxis dataKey="name" />
                           <YAxis />
                           <Tooltip />
-                          <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} name="عدد الشكاوى" />
+                          <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} name={t('complaintStats.complaintsCount')} />
                         </BarChart>
                       </ResponsiveContainer>
                     </CardContent>
