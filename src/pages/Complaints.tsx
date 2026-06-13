@@ -95,7 +95,7 @@ const Complaints = () => {
   const copyComplaintLink = () => {
     const complaintUrl = `${window.location.origin}/submit-complaint`;
     navigator.clipboard.writeText(complaintUrl);
-    toast({ title: "تم النسخ", description: "تم نسخ رابط تقديم الشكوى" });
+    toast({ title: t('cmplPg.copied'), description: t('cmplPg.copiedDesc') });
   };
 
   const loadComplaints = async () => {
@@ -130,7 +130,7 @@ const Complaints = () => {
       if (error) throw error;
       setComplaints(data || []);
     } catch (error: any) {
-      toast({ title: "خطأ", description: "فشل في تحميل الشكاوى", variant: "destructive" });
+      toast({ title: t('cmplPg.error'), description: t('cmplPg.loadError'), variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -159,12 +159,12 @@ const Complaints = () => {
 
   const handleSubmitComplaint = async () => {
     if (!newComplaint.title || !newComplaint.description) {
-      toast({ title: "خطأ", description: "الرجاء إدخال العنوان والوصف", variant: "destructive" });
+      toast({ title: t('cmplPg.error'), description: t('cmplPg.titleDescRequired'), variant: "destructive" });
       return;
     }
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("المستخدم غير مسجل الدخول");
+      if (!user) throw new Error(t('cmplPg.notLoggedIn'));
       const { error } = await supabase.from("complaints").insert({
         subject: newComplaint.title,
         description: newComplaint.description,
@@ -173,12 +173,12 @@ const Complaints = () => {
         status: "pending",
       });
       if (error) throw error;
-      toast({ title: "تم إرسال الشكوى", description: "تم إرسال شكواك بنجاح وسيتم مراجعتها قريباً" });
+      toast({ title: t('cmplPg.submitSuccess'), description: t('cmplPg.submitSuccessDesc') });
       setNewComplaint({ title: "", description: "", category: "academic", priority: "medium", program_id: "" });
       setShowNewComplaintDialog(false);
       loadComplaints();
     } catch (error: any) {
-      toast({ title: "خطأ", description: error.message || "فشل في إرسال الشكوى", variant: "destructive" });
+      toast({ title: t('cmplPg.error'), description: error.message || t('cmplPg.submitError'), variant: "destructive" });
     }
   };
 
@@ -186,10 +186,10 @@ const Complaints = () => {
     try {
       const { error } = await supabase.from("complaints").delete().eq("id", complaintId);
       if (error) throw error;
-      toast({ title: "تم الحذف", description: "تم حذف الشكوى بنجاح" });
+      toast({ title: t('cmplPg.deleted'), description: t('cmplPg.deletedDesc') });
       loadComplaints();
     } catch (error: any) {
-      toast({ title: "خطأ", description: "فشل في حذف الشكوى", variant: "destructive" });
+      toast({ title: t('cmplPg.error'), description: t('cmplPg.deleteError'), variant: "destructive" });
     }
   };
 
@@ -206,13 +206,13 @@ const Complaints = () => {
       }
       const { error } = await supabase.from("complaints").update(updateData).eq("id", complaintId);
       if (error) throw error;
-      toast({ title: "تم التحديث", description: "تم تحديث حالة الشكوى بنجاح" });
+      toast({ title: t('cmplPg.updated'), description: t('cmplPg.statusUpdatedDesc') });
       setShowResolutionDialog(false);
       setResolutionNotes("");
       setComplaintToResolve(null);
       loadComplaints();
     } catch (error: any) {
-      toast({ title: "خطأ", description: "فشل في تحديث حالة الشكوى", variant: "destructive" });
+      toast({ title: t('cmplPg.error'), description: t('cmplPg.statusUpdateError'), variant: "destructive" });
     }
   };
 
@@ -227,12 +227,12 @@ const Complaints = () => {
         updated_at: new Date().toISOString()
       }).eq("id", editComplaintData.id);
       if (error) throw error;
-      toast({ title: "تم التحديث", description: "تم تحديث الشكوى بنجاح" });
+      toast({ title: t('cmplPg.updated'), description: t('cmplPg.complaintUpdatedDesc') });
       setIsEditingComplaint(false);
       setSelectedComplaint(null);
       loadComplaints();
     } catch (error: any) {
-      toast({ title: "خطأ", description: "فشل في تحديث الشكوى", variant: "destructive" });
+      toast({ title: t('cmplPg.error'), description: t('cmplPg.complaintUpdateError'), variant: "destructive" });
     }
   };
 
@@ -325,21 +325,21 @@ const Complaints = () => {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold">{t('complaints.title')}</h1>
-              {isAdmin && <Badge variant="default" className="bg-purple-600">مدير النظام</Badge>}
-              {isDean && !isAdmin && <Badge variant="default" className="bg-blue-600">العميد</Badge>}
-              {isProgramManager && !isAdmin && !isDean && <Badge variant="default" className="bg-green-600">مدير البرنامج</Badge>}
-              {isCoordinator && !isAdmin && !isDean && !isProgramManager && <Badge variant="secondary">منسق البرنامج</Badge>}
+              {isAdmin && <Badge variant="default" className="bg-purple-600">{t('cmplPg.roleAdmin')}</Badge>}
+              {isDean && !isAdmin && <Badge variant="default" className="bg-blue-600">{t('cmplPg.roleDean')}</Badge>}
+              {isProgramManager && !isAdmin && !isDean && <Badge variant="default" className="bg-green-600">{t('cmplPg.roleProgramManager')}</Badge>}
+              {isCoordinator && !isAdmin && !isDean && !isProgramManager && <Badge variant="secondary">{t('cmplPg.roleCoordinator')}</Badge>}
             </div>
             <p className="text-muted-foreground">
               {isAdmin || isDean 
-                ? "عرض جميع شكاوى الطلاب والموظفين" 
+                ? t('cmplPg.subtitleAdmin')
                 : isProgramManager
-                  ? "عرض شكاوى برنامجك (للعرض فقط)"
-                  : "متابعة ومعالجة شكاوى برنامجك"}
+                  ? t('cmplPg.subtitleProgramManager')
+                  : t('cmplPg.subtitleCoordinator')}
             </p>
             {(isDean || isProgramManager) && !isAdmin && !isCoordinator && (
               <p className="text-sm text-amber-600 mt-1">
-                ⚠️ صلاحية العرض فقط - لا يمكنك التعديل أو الرد
+                ⚠️ {t('cmplPg.viewOnlyWarning')}
               </p>
             )}
           </div>
@@ -350,11 +350,11 @@ const Complaints = () => {
             onClick={() => setShowDashboard(!showDashboard)}
           >
             <LayoutDashboard className="h-4 w-4 ml-2" />
-            {showDashboard ? 'إخفاء لوحة التحكم' : 'لوحة التحكم'}
+            {showDashboard ? t('cmplPg.hideDashboard') : t('cmplPg.showDashboard')}
           </Button>
           <Button variant="outline" onClick={() => setShowStatistics(true)}>
             <BarChart3 className="h-4 w-4 ml-2" />
-            التقارير الإحصائية
+            {t('cmplPg.statsReports')}
           </Button>
           {canManage && (
             <NewComplaintDialog
@@ -412,7 +412,7 @@ const Complaints = () => {
           {(isAdmin || isDean) && (
             <TabsTrigger value="all" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
-              جميع الشكاوى
+              {t('cmplPg.allComplaints')}
               <Badge variant="secondary" className="mr-1">{complaints.length}</Badge>
             </TabsTrigger>
           )}
@@ -431,7 +431,7 @@ const Complaints = () => {
           {(isAdmin || isDean) && complaints.some(c => !c.program_id) && (
             <TabsTrigger value="no-program" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
-              بدون برنامج
+              {t('cmplPg.noProgram')}
               <Badge variant="secondary" className="mr-1">
                 {complaints.filter(c => !c.program_id).length}
               </Badge>
@@ -457,20 +457,20 @@ const Complaints = () => {
             />
 
             <div className="space-y-6">
-              {renderStatusSection("pending", "جديدة", <Clock className="h-5 w-5 text-blue-600" />, filteredComplaints)}
-              {renderStatusSection("in_progress", "قيد الإجراء", <MessageSquare className="h-5 w-5 text-orange-600" />, filteredComplaints)}
-              {renderStatusSection("resolved", "تم الحل", <CheckCircle className="h-5 w-5 text-green-600" />, filteredComplaints)}
+              {renderStatusSection("pending", t('cmplPg.statusNew'), <Clock className="h-5 w-5 text-blue-600" />, filteredComplaints)}
+              {renderStatusSection("in_progress", t('cmplPg.statusInProgress'), <MessageSquare className="h-5 w-5 text-orange-600" />, filteredComplaints)}
+              {renderStatusSection("resolved", t('cmplPg.statusResolved'), <CheckCircle className="h-5 w-5 text-green-600" />, filteredComplaints)}
             </div>
 
             {filteredComplaints.length === 0 && (
               <Card>
                 <CardContent className="text-center py-12">
                   <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">لا توجد شكاوى</h3>
+                  <h3 className="text-lg font-semibold mb-2">{t('cmplPg.noComplaints')}</h3>
                   <p className="text-muted-foreground">
                     {searchTerm || selectedStatus !== "all" || selectedProgram !== "all"
-                      ? "لا توجد شكاوى تطابق معايير البحث"
-                      : "لم يتم تقديم أي شكاوى بعد"}
+                      ? t('cmplPg.noMatching')
+                      : t('cmplPg.noneYet')}
                   </p>
                 </CardContent>
               </Card>
@@ -508,20 +508,20 @@ const Complaints = () => {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Building2 className="h-5 w-5" />
-                      شكاوى برنامج {program.name}
+                      {t('cmplPg.programComplaintsTitle')} {program.name}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-muted-foreground mb-4">
-                      انقر على أي من الأيقونات أعلاه لعرض الشكاوى حسب الحالة مع تصنيفها حسب نوع مقدم الشكوى
+                      {t('cmplPg.programHint')}
                     </p>
                     {programComplaints.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
-                        لا توجد شكاوى في هذا البرنامج
+                        {t('cmplPg.noneInProgram')}
                       </div>
                     ) : (
                       <div className="text-sm text-muted-foreground">
-                        إجمالي الشكاوى: {programComplaints.length}
+                        {t('cmplPg.totalLabel')}: {programComplaints.length}
                       </div>
                     )}
                   </CardContent>
