@@ -6,6 +6,8 @@ import { useLanguage } from "@/contexts/LanguageContext";
 interface ReportHeaderProps {
   surveyTitle?: string;
   programName?: string;
+  reportTitle?: string;
+  reportTypeLabel?: string;
   isGenerating: boolean;
   isExporting: boolean;
   isGeneratingPreview: boolean;
@@ -17,7 +19,7 @@ interface ReportHeaderProps {
 }
 
 export const ReportHeader = ({
-  surveyTitle, programName, isGenerating, isExporting, isGeneratingPreview,
+  surveyTitle, programName, reportTitle, reportTypeLabel, isGenerating, isExporting, isGeneratingPreview,
   onRegenerate, onPreviewPDF, onExportPDF, onExportExcel, onDelete,
 }: ReportHeaderProps) => {
   const { t } = useLanguage();
@@ -26,8 +28,10 @@ export const ReportHeader = ({
       <div className="container mx-auto px-4 py-4">
         <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
-            <h1 className="text-2xl font-bold">{t('reports.surveyReport')}</h1>
-            <p className="text-sm text-muted-foreground">{surveyTitle} - {programName}</p>
+            <h1 className="text-2xl font-bold">{reportTitle || t('reports.surveyReport')}</h1>
+            <p className="text-sm text-muted-foreground">
+              {[surveyTitle, programName, reportTypeLabel].filter(Boolean).join(" - ")}
+            </p>
           </div>
           <div className="flex gap-2 flex-wrap">
             <DashboardButton />

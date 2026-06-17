@@ -1073,6 +1073,7 @@ export type Database = {
           start_date: string | null
           status: Database["public"]["Enums"]["survey_status"] | null
           survey_link: string | null
+          survey_type: string
           target_enrollment: number | null
           title: string
           updated_at: string | null
@@ -1091,6 +1092,7 @@ export type Database = {
           start_date?: string | null
           status?: Database["public"]["Enums"]["survey_status"] | null
           survey_link?: string | null
+          survey_type?: string
           target_enrollment?: number | null
           title: string
           updated_at?: string | null
@@ -1109,6 +1111,7 @@ export type Database = {
           start_date?: string | null
           status?: Database["public"]["Enums"]["survey_status"] | null
           survey_link?: string | null
+          survey_type?: string
           target_enrollment?: number | null
           title?: string
           updated_at?: string | null

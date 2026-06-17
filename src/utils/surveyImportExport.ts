@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 export interface SurveyExportData {
   title: string;
   description: string;
+  reportType?: "course_evaluation" | "workshop" | "program" | "general";
   programId?: string;
   isAnonymous: boolean;
   questions: Array<{

@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Users, BarChart3, Target, ListChecks, MessageSquare, AlertTriangle } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { getReportCopy, SurveyReportType } from "@/utils/reportType";
 
 interface ReportStatisticsCardsProps {
   filteredResponsesCount: number;
@@ -12,13 +13,16 @@ interface ReportStatisticsCardsProps {
   totalTextResponses: number;
   hasFilter: boolean;
   hasAnswersData: boolean;
+  reportType?: SurveyReportType;
 }
 
 export const ReportStatisticsCards = ({
   filteredResponsesCount, totalResponses, targetEnrollment, overallMean,
   questionsCount, totalTextResponses, hasFilter, hasAnswersData,
+  reportType = "course_evaluation",
 }: ReportStatisticsCardsProps) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const copy = getReportCopy(reportType, language);
   const responseRate = targetEnrollment > 0
     ? Math.min(100, Math.round((filteredResponsesCount / targetEnrollment) * 100))
     : null;
@@ -38,10 +42,12 @@ export const ReportStatisticsCards = ({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">{t('reports.totalResponses')}</p>
+                <p className="text-sm text-muted-foreground">{copy.totalResponses}</p>
                 <p className="text-3xl font-bold text-blue-600">{filteredResponsesCount}</p>
                 {targetEnrollment > 0 && (
-                  <p className="text-xs text-muted-foreground">{t('reports.fromStudents').replace('{0}', String(targetEnrollment))}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {language === "ar" ? `من ${targetEnrollment} ${copy.targetEntity}` : `of ${targetEnrollment} ${copy.targetEntity}s`}
+                  </p>
                 )}
                 {hasFilter && (
                   <p className="text-xs text-muted-foreground">{t('reports.filteredFrom').replace('{0}', String(totalResponses))}</p>
@@ -71,7 +77,7 @@ export const ReportStatisticsCards = ({
                 </div>
               )}
               {!targetEnrollment && (
-                <p className="text-xs text-muted-foreground">{t('reports.addStudentsInSurvey')}</p>
+                <p className="text-xs text-muted-foreground">{copy.targetHint}</p>
               )}
             </div>
           </CardContent>
@@ -81,7 +87,7 @@ export const ReportStatisticsCards = ({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">{t('reports.overallMean')}</p>
+                <p className="text-sm text-muted-foreground">{copy.overallMean}</p>
                 <p className="text-3xl font-bold text-green-600">{overallMean.toFixed(2)}</p>
                 <p className="text-xs text-muted-foreground">{t('reports.outOf5')}</p>
               </div>

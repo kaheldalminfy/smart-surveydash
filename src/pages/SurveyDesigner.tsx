@@ -15,6 +15,7 @@ import QuestionsListCard from "@/components/survey-designer/QuestionsListCard";
 import SurveyResponseWarning from "@/components/survey-designer/SurveyResponseWarning";
 import SurveySettingsSidebar from "@/components/survey-designer/SurveySettingsSidebar";
 import SaveTemplateDialog from "@/components/survey-designer/SaveTemplateDialog";
+import { DEFAULT_REPORT_TYPE, inferSurveyReportType } from "@/utils/reportType";
 
 const SurveyDesigner = () => {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ const SurveyDesigner = () => {
   const [currentTab, setCurrentTab] = useState(id || templateId ? "design" : "templates");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [survey, setSurvey] = useState<SurveyFormData>({
-    title: "", description: "", programId: "", isAnonymous: true,
+    title: "", description: "", reportType: DEFAULT_REPORT_TYPE, programId: "", isAnonymous: true,
     startDate: "", endDate: "", semester: "", academicYear: "", targetEnrollment: "",
   });
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -83,8 +84,10 @@ const SurveyDesigner = () => {
       const { data: surveyData, error: surveyError } = await supabase.from("surveys").select("*").eq("id", id).single();
       if (surveyError) throw surveyError;
       if (surveyData) {
+        const typedSurveyData = surveyData as any;
         setSurvey({
           title: surveyData.title, description: surveyData.description || "",
+          reportType: inferSurveyReportType(typedSurveyData),
           programId: surveyData.program_id, isAnonymous: surveyData.is_anonymous,
           startDate: surveyData.start_date ? new Date(surveyData.start_date).toISOString().split('T')[0] : "",
           endDate: surveyData.end_date ? new Date(surveyData.end_date).toISOString().split('T')[0] : "",
@@ -112,7 +115,13 @@ const SurveyDesigner = () => {
       const { data, error } = await supabase.from("survey_templates").select("*").eq("id", templateId).single();
       if (error) throw error;
       if (data && data.template_data) {
-        setSurvey(prev => ({ ...prev, title: data.template_data.title || "", description: data.template_data.description || "", isAnonymous: data.template_data.isAnonymous ?? true }));
+        setSurvey(prev => ({
+          ...prev,
+          title: data.template_data.title || "",
+          description: data.template_data.description || "",
+          reportType: data.template_data.reportType || inferSurveyReportType({ title: data.template_data.title }),
+          isAnonymous: data.template_data.isAnonymous ?? true
+        }));
         if (data.template_data.questions) {
           setQuestions(data.template_data.questions.map((q: any, index: number) => ({
             id: Date.now() + index, text: q.text, type: q.type, orderIndex: index, options: q.options || [], required: q.required ?? true,
@@ -152,7 +161,12 @@ const SurveyDesigner = () => {
   };
 
   const handleTemplateSelect = (template: any) => {
-    setSurvey(prev => ({ ...prev, title: template.name, description: template.description }));
+    setSurvey(prev => ({
+      ...prev,
+      title: template.name,
+      description: template.description,
+      reportType: template.reportType || inferSurveyReportType({ title: template.name })
+    }));
     setQuestions(template.questions.map((q: any, index: number) => ({
       id: Date.now() + index, text: q.text, type: q.type, orderIndex: index,
       options: q.options?.choices || q.options || [], required: q.is_required !== false && q.required !== false,
@@ -191,6 +205,33 @@ const SurveyDesigner = () => {
   };
   const handleDragEnd = () => { setDraggedQuestionId(null); setDragOverQuestionId(null); };
 
+  const isMissingSurveyTypeColumnError = (error: any) => {
+    const message = String(error?.message || error?.details || "");
+    return error?.code === "PGRST204" || message.includes("survey_type");
+  };
+
+  const saveSurveyRow = async (
+    mode: "insert" | "update",
+    payload: Record<string, any>,
+    surveyId?: string
+  ) => {
+    const payloadWithType = { ...payload, survey_type: survey.reportType };
+
+    if (mode === "update") {
+      let result = await supabase.from("surveys").update(payloadWithType as any).eq("id", surveyId!);
+      if (result.error && isMissingSurveyTypeColumnError(result.error)) {
+        result = await supabase.from("surveys").update(payload as any).eq("id", surveyId!);
+      }
+      return result;
+    }
+
+    let result = await supabase.from("surveys").insert(payloadWithType as any).select().single();
+    if (result.error && isMissingSurveyTypeColumnError(result.error)) {
+      result = await supabase.from("surveys").insert(payload as any).select().single();
+    }
+    return result;
+  };
+
   const handleSave = async () => {
     if (!survey.title || !survey.programId) {
       toast({ title: t('common.error'), description: t('designer.enterTitleAndProgram'), variant: "destructive" }); return;
@@ -206,12 +247,12 @@ const SurveyDesigner = () => {
         navigate("/auth"); return;
       }
       if (id) {
-        const { error: surveyError } = await supabase.from("surveys").update({
+        const { error: surveyError } = await saveSurveyRow("update", {
           title: survey.title, description: survey.description, program_id: survey.programId === 'college' ? null : survey.programId || null,
           is_anonymous: survey.isAnonymous, start_date: survey.startDate || null, end_date: survey.endDate || null,
           semester: survey.semester || null, academic_year: survey.academicYear || null,
           target_enrollment: survey.targetEnrollment ? parseInt(survey.targetEnrollment) : null,
-        }).eq("id", id);
+        }, id);
         if (surveyError) throw surveyError;
         await supabase.from("questions").delete().eq("survey_id", id);
         const questionsData = questions.map((q, index) => ({
@@ -223,13 +264,13 @@ const SurveyDesigner = () => {
         if (questionsError) throw questionsError;
         toast({ title: t('common.updated'), description: t('designer.surveyUpdated') });
       } else {
-        const { data: surveyData, error: surveyError } = await supabase.from("surveys").insert({
+        const { data: surveyData, error: surveyError } = await saveSurveyRow("insert", {
           title: survey.title, description: survey.description, program_id: survey.programId === 'college' ? null : survey.programId || null,
           is_anonymous: survey.isAnonymous, start_date: survey.startDate || null, end_date: survey.endDate || null,
           semester: survey.semester || null, academic_year: survey.academicYear || null,
           target_enrollment: survey.targetEnrollment ? parseInt(survey.targetEnrollment) : null,
           created_by: user.id, status: "draft",
-        }).select().single();
+        });
         if (surveyError) throw surveyError;
         const questionsData = questions.map((q, index) => ({
           survey_id: surveyData.id, text: q.text, type: q.type, order_index: index, is_required: q.required,
@@ -257,7 +298,7 @@ const SurveyDesigner = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const templateData = {
-        title: survey.title, description: survey.description, isAnonymous: survey.isAnonymous,
+        title: survey.title, description: survey.description, reportType: survey.reportType, isAnonymous: survey.isAnonymous,
         questions: questions.map(q => ({ text: q.text, type: q.type, required: q.required, options: q.options })),
       };
       const { error } = await supabase.from("survey_templates").insert({
@@ -304,7 +345,7 @@ const SurveyDesigner = () => {
     if (!survey.title || questions.length === 0) {
       toast({ title: t('common.error'), description: language === 'ar' ? "لا يوجد استبيان لتصديره" : "No survey to export", variant: "destructive" }); return;
     }
-    exportSurveyToJSON({ title: survey.title, description: survey.description, programId: survey.programId, isAnonymous: survey.isAnonymous,
+    exportSurveyToJSON({ title: survey.title, description: survey.description, reportType: survey.reportType, programId: survey.programId, isAnonymous: survey.isAnonymous,
       questions: questions.map(q => ({ text: q.text, type: q.type, required: q.required || false, options: q.options })),
     });
     toast({ title: t('common.success'), description: language === 'ar' ? "تم تصدير الاستبيان بصيغة JSON بنجاح" : "Survey exported as JSON" });
@@ -328,7 +369,14 @@ const SurveyDesigner = () => {
       if (file.name.endsWith('.json')) { importedData = await importSurveyFromJSON(file); }
       else if (file.name.endsWith('.csv')) { importedData = await importSurveyFromCSV(file); }
       else { toast({ title: t('common.error'), description: language === 'ar' ? "صيغة الملف غير مدعومة" : "Unsupported file format", variant: "destructive" }); return; }
-      setSurvey(prev => ({ ...prev, title: importedData.title, description: importedData.description, isAnonymous: importedData.isAnonymous, programId: importedData.programId || prev.programId }));
+      setSurvey(prev => ({
+        ...prev,
+        title: importedData.title,
+        description: importedData.description,
+        reportType: importedData.reportType || inferSurveyReportType({ title: importedData.title }),
+        isAnonymous: importedData.isAnonymous,
+        programId: importedData.programId || prev.programId
+      }));
       const importedQuestions = importedData.questions.map((q: any, index: number) => ({
         id: Date.now() + index, text: q.text, type: q.type, orderIndex: index, options: q.options, required: q.required,
       }));

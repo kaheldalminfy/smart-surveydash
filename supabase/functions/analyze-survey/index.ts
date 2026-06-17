@@ -79,8 +79,21 @@ Deno.serve(async (req) => {
       throw new Error("Survey not found");
     }
 
+    const validReportTypes = ["course_evaluation", "workshop", "program", "general"];
+    const rawReportType = (survey as any).survey_type;
+    const titleLower = String(survey.title || "").toLowerCase();
+    const reportType = validReportTypes.includes(rawReportType)
+      ? rawReportType
+      : titleLower.includes("interpreting booth simulation workshop") ||
+          titleLower.includes("workshop") ||
+          titleLower.includes("\u0648\u0631\u0634\u0629")
+        ? "workshop"
+        : "course_evaluation";
+    const isCourseEvaluation = reportType === "course_evaluation";
+
     // Calculate statistics
     const stats: any = {
+      report_type: reportType,
       total_responses: survey.responses.length,
       questions_stats: [],
     };
@@ -133,7 +146,11 @@ Deno.serve(async (req) => {
     let aiSummary = "";
     let aiRecommendations = "";
 
-    const courseContext = courseName ? ` للمقرر الدراسي "${courseName}"` : "";
+    const courseContext = isCourseEvaluation && courseName
+      ? ` للمقرر الدراسي "${courseName}"`
+      : reportType === "workshop"
+        ? ` لورشة العمل "${survey.title}"`
+        : "";
 
     const hasTextResponses = textResponses.length > 0;
     const hasNumericStats = stats.questions_stats.some((q: any) => q.type === "likert" || q.type === "rating");
@@ -170,7 +187,7 @@ Deno.serve(async (req) => {
         aiSummary = aiData.choices[0].message.content;
       }
 
-      const recPrompt = `بناءً على نتائج الاستبيان التالي${courseContext}:\n\nالإحصائيات: ${JSON.stringify(stats)}\n\n${aiSummary ? `التحليل: ${aiSummary}\n\n` : ''}قدم 3-5 توصيات قابلة للتنفيذ لتحسين الأداء${courseName ? ` في مقرر "${courseName}"` : ''}. يجب أن تكون التوصيات محددة وعملية ومرتبطة بنتائج الاستبيان.`;
+      const recPrompt = `بناءً على نتائج الاستبيان التالي${courseContext}:\n\nالإحصائيات: ${JSON.stringify(stats)}\n\n${aiSummary ? `التحليل: ${aiSummary}\n\n` : ''}قدم 3-5 توصيات قابلة للتنفيذ لتحسين التجربة${isCourseEvaluation && courseName ? ` في مقرر "${courseName}"` : reportType === "workshop" ? " في الورشة" : ''}. يجب أن تكون التوصيات محددة وعملية ومرتبطة بنتائج الاستبيان.`;
 
       const recResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",

@@ -10,6 +10,7 @@ export interface Question {
 export interface SurveyFormData {
   title: string;
   description: string;
+  reportType: "course_evaluation" | "workshop" | "program" | "general";
   programId: string;
   isAnonymous: boolean;
   startDate: string;

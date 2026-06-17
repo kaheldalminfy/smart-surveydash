@@ -15,14 +15,15 @@ import { ReportStatisticsCards } from "@/components/reports/ReportStatisticsCard
 import { ReportFilterCard } from "@/components/reports/ReportFilterCard";
 import { QuestionsSummaryChart } from "@/components/reports/QuestionsSummaryChart";
 import { QuestionAnalysisSection } from "@/components/reports/QuestionAnalysisSection";
-import { RecommendationsCard } from "@/components/reports/RecommendationsCard";
+import { ReportContentEditorCard } from "@/components/reports/ReportContentEditorCard";
 import { ReportDeleteDialog } from "@/components/reports/ReportDeleteDialog";
+import { getReportCopy, getReportTypeLabel, inferSurveyReportType } from "@/utils/reportType";
 
 const Reports = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [report, setReport] = useState<any>(null);
   const [survey, setSurvey] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -34,7 +35,6 @@ const Reports = () => {
   const [collegeLogo, setCollegeLogo] = useState("");
   const [collegeName, setCollegeName] = useState("كلية العلوم الإنسانية والاجتماعية");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [editRecommendationsOpen, setEditRecommendationsOpen] = useState(false);
   const [editedRecommendations, setEditedRecommendations] = useState("");
   const [detailedAnswers, setDetailedAnswers] = useState<any[]>([]);
   const [allQuestions, setAllQuestions] = useState<any[]>([]);
@@ -48,6 +48,9 @@ const Reports = () => {
   const [courseRecommendations, setCourseRecommendations] = useState<Record<string, string>>({});
   const [filteredResponseCount, setFilteredResponseCount] = useState(0);
   const [coordinatorName, setCoordinatorName] = useState("");
+  const [reportTitle, setReportTitle] = useState("");
+  const [editedSummary, setEditedSummary] = useState("");
+  const [isSavingReportContent, setIsSavingReportContent] = useState(false);
 
   useEffect(() => {
     loadReport();
@@ -59,7 +62,7 @@ const Reports = () => {
     try {
       const { data: reportData, error } = await supabase
         .from("reports")
-        .select("*, surveys(title, program_id, created_by, target_enrollment, programs(name))")
+        .select("*, surveys(*, programs(name))")
         .eq("survey_id", id)
         .order('generated_at', { ascending: false })
         .limit(1)
@@ -70,14 +73,21 @@ const Reports = () => {
       }
 
       if (reportData) {
+        const loadedSurvey = Array.isArray(reportData.surveys) ? reportData.surveys[0] : reportData.surveys;
+        const loadedReportType = inferSurveyReportType(loadedSurvey as any);
+        const savedStatistics = (reportData.statistics || {}) as Record<string, any>;
+        const defaultTitle = String(savedStatistics.report_title || getReportCopy(loadedReportType, language).reportTitle);
+
         setReport(reportData);
-        setSurvey(reportData.surveys);
+        setSurvey(loadedSurvey);
         setSemester(reportData.semester || "");
         setAcademicYear(reportData.academic_year || "");
         setReportStatus(reportData.status || "responding");
+        setReportTitle(defaultTitle);
+        setEditedSummary(reportData.summary || "");
         setEditedRecommendations(reportData.recommendations_text || "");
 
-        const createdBy = reportData.surveys?.created_by;
+        const createdBy = loadedSurvey?.created_by;
         if (createdBy) {
           const { data: profile } = await supabase
             .from("profiles")
@@ -299,8 +309,11 @@ const Reports = () => {
   };
 
   const hasAnswersData = allResponses.some(r => r.answers && r.answers.length > 0);
+  const getCurrentReportType = () => inferSurveyReportType(survey);
+  const isCourseEvaluationReport = () => getCurrentReportType() === "course_evaluation";
 
   const getSelectedCourseName = (): string => {
+    if (!isCourseEvaluationReport()) return '';
     if (!filterQuestion || filterValues.length === 0) return '';
     return filterValues[0] || '';
   };
@@ -370,24 +383,39 @@ const Reports = () => {
   };
 
   const handleSaveRecommendations = async () => {
+    setIsSavingReportContent(true);
     const courseName = getSelectedCourseName();
     if (courseName) {
       setCourseRecommendations(prev => ({ ...prev, [courseName]: editedRecommendations }));
     }
 
+    const currentReportType = getCurrentReportType();
+    const titleForSave = reportTitle.trim() || getReportCopy(currentReportType, language).reportTitle;
+    const nextStatistics = {
+      ...((report?.statistics || {}) as Record<string, any>),
+      report_title: titleForSave,
+      report_type: currentReportType,
+    };
+
     const { error } = await supabase
       .from("reports")
-      .update({ recommendations_text: editedRecommendations })
+      .update({
+        summary: editedSummary,
+        recommendations_text: editedRecommendations,
+        statistics: nextStatistics,
+      })
       .eq("id", report.id);
 
     if (error) {
+      setIsSavingReportContent(false);
       toast({ title: t("reports.toastError"), description: t("reports.toastSaveRecsErr"), variant: "destructive" });
       return;
     }
 
     toast({ title: t("reports.toastSaveOk"), description: courseName ? t("reports.toastSaveRecsCourse").replace("{0}", courseName) : t("reports.toastSaveRecs") });
-    setEditRecommendationsOpen(false);
-    loadReport();
+    setReportTitle(titleForSave);
+    await loadReport();
+    setIsSavingReportContent(false);
   };
 
   const handleSaveAndTransferRecommendations = async () => {
@@ -396,17 +424,31 @@ const Reports = () => {
       return;
     }
 
+    setIsSavingReportContent(true);
     const courseName = getSelectedCourseName();
     if (courseName) {
       setCourseRecommendations(prev => ({ ...prev, [courseName]: editedRecommendations }));
     }
 
+    const currentReportType = getCurrentReportType();
+    const titleForSave = reportTitle.trim() || getReportCopy(currentReportType, language).reportTitle;
+    const nextStatistics = {
+      ...((report?.statistics || {}) as Record<string, any>),
+      report_title: titleForSave,
+      report_type: currentReportType,
+    };
+
     const { error: saveError } = await supabase
       .from("reports")
-      .update({ recommendations_text: editedRecommendations })
+      .update({
+        summary: editedSummary,
+        recommendations_text: editedRecommendations,
+        statistics: nextStatistics,
+      })
       .eq("id", report.id);
 
     if (saveError) {
+      setIsSavingReportContent(false);
       toast({ title: t("reports.toastError"), description: t("reports.toastSaveRecsErr"), variant: "destructive" });
       return;
     }
@@ -430,6 +472,7 @@ const Reports = () => {
         .eq("id", existing.id);
 
       if (updateError) {
+        setIsSavingReportContent(false);
         toast({ title: t("reports.toastError"), description: t("reports.toastUpdateErr"), variant: "destructive" });
         return;
       }
@@ -451,6 +494,7 @@ const Reports = () => {
         });
 
       if (insertError) {
+        setIsSavingReportContent(false);
         toast({ title: t("reports.toastError"), description: t("reports.toastTransferErr"), variant: "destructive" });
         return;
       }
@@ -458,8 +502,9 @@ const Reports = () => {
       toast({ title: t("reports.toastTransferred"), description: t("reports.toastTransferredDesc") });
     }
 
-    setEditRecommendationsOpen(false);
-    loadReport();
+    setReportTitle(titleForSave);
+    await loadReport();
+    setIsSavingReportContent(false);
   };
 
   const buildFilterInfo = () => {
@@ -474,6 +519,8 @@ const Reports = () => {
   };
 
   const preparePDFData = () => {
+    const currentReportType = getCurrentReportType();
+    const selectedReportTitle = reportTitle.trim() || getReportCopy(currentReportType, language).reportTitle;
     const courseName = getSelectedCourseName();
     const pdfAnswers = filterQuestion
       ? detailedAnswers.filter(q => q.id !== filterQuestion)
@@ -499,6 +546,8 @@ const Reports = () => {
       .map((q: any) => ({ question: q.text, responses: q.textResponses }));
 
     const stats: any = {
+      reportType: currentReportType,
+      reportTitle: selectedReportTitle,
       totalResponses: responsesCount,
       targetEnrollment,
       responseRate,
@@ -515,7 +564,7 @@ const Reports = () => {
       })),
     };
 
-    if (!courseName && allQuestions.length > 0 && allResponses.length > 0) {
+    if (isCourseEvaluationReport() && !courseName && allQuestions.length > 0 && allResponses.length > 0) {
       const courseQuestion = allQuestions.find(q =>
         q.type === 'mcq' && (
           (q.text && (q.text.includes('مقرر') || q.text.includes('المقرر') || q.text.includes('المادة'))) ||
@@ -584,7 +633,16 @@ const Reports = () => {
       }
     }
 
-    const reportForPDF = { ...report };
+    const reportForPDF = {
+      ...report,
+      summary: editedSummary,
+      recommendations_text: editedRecommendations,
+      statistics: {
+        ...((report?.statistics || {}) as Record<string, any>),
+        report_title: selectedReportTitle,
+        report_type: currentReportType,
+      },
+    };
     if (courseName && courseRecommendations[courseName]) {
       reportForPDF.recommendations_text = courseRecommendations[courseName];
     }
@@ -664,6 +722,8 @@ const Reports = () => {
   };
 
   const handleExportExcel = () => {
+    const currentReportType = getCurrentReportType();
+    const selectedReportTitle = reportTitle.trim() || getReportCopy(currentReportType, language).reportTitle;
     const likertRatingQuestions = detailedAnswers.filter(q => q.type === 'likert' || q.type === 'rating');
     const overallMean = likertRatingQuestions.length > 0
       ? likertRatingQuestions.reduce((sum, q) => sum + (parseFloat(q.mean) || 0), 0) / likertRatingQuestions.length
@@ -679,6 +739,8 @@ const Reports = () => {
       : 0;
 
     const stats = {
+      reportType: currentReportType,
+      reportTitle: selectedReportTitle,
       totalResponses: allResponses.length,
       targetEnrollment,
       responseRate,
@@ -700,7 +762,16 @@ const Reports = () => {
         responses: q.textResponses,
       }));
 
-    exportToExcel(report, survey, stats, textResponses);
+    exportToExcel({
+      ...report,
+      summary: editedSummary,
+      recommendations_text: editedRecommendations,
+      statistics: {
+        ...((report?.statistics || {}) as Record<string, any>),
+        report_title: selectedReportTitle,
+        report_type: currentReportType,
+      },
+    }, survey, stats, textResponses);
     toast({ title: t("reports.toastExportOk"), description: t("reports.toastExportExcelOk") });
   };
 
@@ -746,12 +817,18 @@ const Reports = () => {
   const computedFilteredResponsesCount = filterQuestion && filterValues.length > 0
     ? filteredResponseCount
     : totalResponses;
+  const currentReportType = getCurrentReportType();
+  const currentReportCopy = getReportCopy(currentReportType, language);
+  const currentReportTypeLabel = getReportTypeLabel(currentReportType, language);
+  const visibleReportTitle = reportTitle.trim() || currentReportCopy.reportTitle;
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <ReportHeader
         surveyTitle={survey?.title}
         programName={survey?.programs?.name}
+        reportTitle={visibleReportTitle}
+        reportTypeLabel={currentReportTypeLabel}
         isGenerating={isGenerating}
         isExporting={isExporting}
         isGeneratingPreview={isGeneratingPreview}
@@ -782,6 +859,7 @@ const Reports = () => {
           totalTextResponses={totalTextResponses}
           hasFilter={!!(filterQuestion && filterValues.length > 0)}
           hasAnswersData={hasAnswersData}
+          reportType={currentReportType}
         />
 
         <ReportFilterCard
@@ -796,6 +874,7 @@ const Reports = () => {
           onClearFilter={clearFilter}
           onManualEnrollmentChange={setManualEnrollment}
           getFilterOptions={getFilterOptions}
+          reportType={currentReportType}
         />
 
         <QuestionsSummaryChart likertRatingQuestions={likertRatingQuestions} />
@@ -805,13 +884,15 @@ const Reports = () => {
           totalResponses={totalResponses}
         />
 
-        <RecommendationsCard
-          recommendationsText={report.recommendations_text}
-          editRecommendationsOpen={editRecommendationsOpen}
-          editedRecommendations={editedRecommendations}
-          onOpenEdit={() => setEditRecommendationsOpen(true)}
-          onCloseEdit={() => setEditRecommendationsOpen(false)}
-          onEditedRecommendationsChange={setEditedRecommendations}
+        <ReportContentEditorCard
+          reportTypeLabel={currentReportTypeLabel}
+          reportTitle={visibleReportTitle}
+          summaryText={editedSummary}
+          recommendationsText={editedRecommendations}
+          isSaving={isSavingReportContent}
+          onReportTitleChange={setReportTitle}
+          onSummaryChange={setEditedSummary}
+          onRecommendationsChange={setEditedRecommendations}
           onSave={handleSaveRecommendations}
           onSaveAndTransfer={handleSaveAndTransferRecommendations}
         />

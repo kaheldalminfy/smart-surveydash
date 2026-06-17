@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Filter, Target, Users } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { getReportCopy, SurveyReportType } from "@/utils/reportType";
 
 interface ReportFilterCardProps {
   allQuestions: any[];
@@ -20,14 +21,16 @@ interface ReportFilterCardProps {
   onClearFilter: () => void;
   onManualEnrollmentChange: (v: string) => void;
   getFilterOptions: () => string[];
+  reportType?: SurveyReportType;
 }
 
 export const ReportFilterCard = ({
   allQuestions, hasAnswersData, filterQuestion, filterValues, filteredResponsesCount,
   manualEnrollment, onFilterQuestionChange, onFilterValueChange, onClearFilter,
-  onManualEnrollmentChange, getFilterOptions,
+  onManualEnrollmentChange, getFilterOptions, reportType = "course_evaluation",
 }: ReportFilterCardProps) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const copy = getReportCopy(reportType, language);
   if (allQuestions.length === 0 || !hasAnswersData) return null;
 
   return (
@@ -104,8 +107,8 @@ export const ReportFilterCard = ({
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
               <div className="space-y-2">
-                <Label className="text-sm font-medium">{t('reports.actualStudents')}</Label>
-                <Input type="number" min="1" placeholder={t('reports.enterStudentCount')} value={manualEnrollment} onChange={(e) => onManualEnrollmentChange(e.target.value)} className="text-lg" />
+                <Label className="text-sm font-medium">{copy.targetCount}</Label>
+                <Input type="number" min="1" placeholder={copy.targetHint} value={manualEnrollment} onChange={(e) => onManualEnrollmentChange(e.target.value)} className="text-lg" />
               </div>
               <div className="space-y-2">
                 <Label className="text-sm font-medium">{t('reports.studentsEvaluated')}</Label>

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { SurveyFormData } from "./types";
+import { getReportTypeOptions } from "@/utils/reportType";
 
 interface SurveyInfoCardProps {
   survey: SurveyFormData;
@@ -16,6 +17,7 @@ interface SurveyInfoCardProps {
 
 const SurveyInfoCard = ({ survey, setSurvey, programs, getUniqueAcademicYears, getUniqueSemesters }: SurveyInfoCardProps) => {
   const { t, language } = useLanguage();
+  const reportTypeOptions = getReportTypeOptions(language);
 
   return (
     <Card>
@@ -33,7 +35,20 @@ const SurveyInfoCard = ({ survey, setSurvey, programs, getUniqueAcademicYears, g
           <Textarea id="description" placeholder={language === 'ar' ? "وصف مختصر للاستبيان وأهدافه" : "Brief description of survey and its objectives"} rows={3}
             value={survey.description} onChange={(e) => setSurvey({...survey, description: e.target.value})} />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="reportType">{language === 'ar' ? "نوع التقرير" : "Report Type"}</Label>
+            <select id="reportType" className="w-full rounded-md border border-input bg-background px-3 py-2"
+              value={survey.reportType}
+              onChange={(e) => setSurvey({...survey, reportType: e.target.value as SurveyFormData["reportType"]})}>
+              {reportTypeOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {reportTypeOptions.find((option) => option.value === survey.reportType)?.description}
+            </p>
+          </div>
           <div>
             <Label htmlFor="program">{t('designer.program')}</Label>
             <select id="program" className="w-full rounded-md border border-input bg-background px-3 py-2"
@@ -43,8 +58,10 @@ const SurveyInfoCard = ({ survey, setSurvey, programs, getUniqueAcademicYears, g
               {programs.map((program) => (<option key={program.id} value={program.id}>{program.name}</option>))}
             </select>
           </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="anonymous">{language === 'ar' ? "نوع الاستبيان" : "Survey Type"}</Label>
+            <Label htmlFor="anonymous">{language === 'ar' ? "هوية المشارك" : "Participant Identity"}</Label>
             <select id="anonymous" className="w-full rounded-md border border-input bg-background px-3 py-2"
               value={survey.isAnonymous ? "anonymous" : "identified"}
               onChange={(e) => setSurvey({...survey, isAnonymous: e.target.value === "anonymous"})}>
@@ -52,8 +69,6 @@ const SurveyInfoCard = ({ survey, setSurvey, programs, getUniqueAcademicYears, g
               <option value="identified">{language === 'ar' ? "محدد الهوية" : "Identified"}</option>
             </select>
           </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="academicYear">{t('designer.academicYear')}</Label>
             <select id="academicYear" className="w-full rounded-md border border-input bg-background px-3 py-2"

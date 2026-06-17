@@ -4,6 +4,7 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { loadEmbeddedArabicFont } from './embeddedArabicFont';
 import { toast } from '@/hooks/use-toast';
+import { getReportCopy, inferSurveyReportType, SurveyReportType } from './reportType';
 
 // Types
 interface ChartImage {
@@ -292,6 +293,10 @@ const buildPDFDocument = async (
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 12;
   let yPos = 0;
+  const reportType = (stats.reportType || inferSurveyReportType(survey)) as SurveyReportType;
+  const reportCopy = getReportCopy(reportType, 'ar');
+  const configuredReportTitle = String(stats.reportTitle || report?.statistics?.report_title || '').trim();
+  const pdfReportTitle = configuredReportTitle || reportCopy.reportTitle;
 
   // ============ PAGE 1: COVER PAGE ============
   yPos = drawColorBar(doc, 0, pageWidth);
@@ -334,7 +339,7 @@ const buildPDFDocument = async (
   doc.setTextColor(...COLORS.white);
   if (fontLoaded) doc.setFont('Amiri', 'normal');
   doc.setFontSize(20);
-  doc.text('تقرير نتائج الاستبيان', pageWidth / 2, yPos + 14, { align: 'center' });
+  doc.text(pdfReportTitle, pageWidth / 2, yPos + 14, { align: 'center' });
 
   doc.setFontSize(14);
   doc.text(survey?.title || 'استبيان', pageWidth / 2, yPos + 26, { align: 'center' });
@@ -397,8 +402,8 @@ const buildPDFDocument = async (
   const cardY = yPos;
 
   drawKPICard(doc, margin, cardY, cardWidth, cardHeight,
-    'إجمالي الاستجابات', String(effectiveResponses),
-    targetEnrollment > 0 ? `من ${targetEnrollment} طالب` : '',
+    reportCopy.totalResponses, String(effectiveResponses),
+    targetEnrollment > 0 ? `من ${targetEnrollment} ${reportCopy.targetEntity}` : '',
     [219, 234, 254], COLORS.blue, fontLoaded);
 
   drawKPICard(doc, margin + cardWidth + 4, cardY, cardWidth, cardHeight,
@@ -410,7 +415,7 @@ const buildPDFDocument = async (
     fontLoaded);
 
   drawKPICard(doc, margin + (cardWidth + 4) * 2, cardY, cardWidth, cardHeight,
-    'المتوسط العام', overallMean > 0 ? overallMean.toFixed(2) : '-',
+    reportCopy.overallMean, overallMean > 0 ? overallMean.toFixed(2) : '-',
     overallMean > 0 ? getMeanLevel(overallMean).label : 'من 5.0',
     [220, 252, 231], COLORS.green, fontLoaded);
 
@@ -429,11 +434,11 @@ const buildPDFDocument = async (
 
   const statsTableData = [
     ['القيمة', 'المؤشر'],
-    [String(effectiveResponses), 'إجمالي الاستجابات'],
-    [targetEnrollment > 0 ? String(targetEnrollment) : 'غير محدد', 'العدد المستهدف'],
+    [String(effectiveResponses), reportCopy.totalResponses],
+    [targetEnrollment > 0 ? String(targetEnrollment) : 'غير محدد', reportCopy.targetCount],
     [responseRate !== null ? `${responseRate}%` : 'غير متاح', 'معدل الاستجابة'],
-    [overallMean > 0 ? `${overallMean.toFixed(2)} / 5.00` : '-', 'المتوسط العام'],
-    [overallMean > 0 ? getMeanLevel(overallMean).label : '-', 'مستوى الأداء'],
+    [overallMean > 0 ? `${overallMean.toFixed(2)} / 5.00` : '-', reportCopy.overallMean],
+    [overallMean > 0 ? getMeanLevel(overallMean).label : '-', reportCopy.performanceLevel],
     [stats.overallStdDev > 0 ? stats.overallStdDev.toFixed(2) : '-', 'الانحراف المعياري'],
     [String(questionCount), 'عدد الأسئلة'],
     [String(textResponsesCount), 'عدد التعليقات النصية'],
@@ -454,7 +459,7 @@ const buildPDFDocument = async (
   yPos = (doc as any).lastAutoTable.finalY + 12;
 
   // ============ COURSES SUMMARY TABLE (only when no filter / comprehensive report) ============
-  if (!filterInfo?.courseName && stats.coursesSummary && stats.coursesSummary.length > 0) {
+  if (reportCopy.courseSummaryEnabled && !filterInfo?.courseName && stats.coursesSummary && stats.coursesSummary.length > 0) {
     yPos = checkNewPage(doc, yPos, 40, pageHeight);
     yPos = drawSectionHeader(doc, yPos, 'ملخص المقررات الدراسية', COLORS.darkBlue, pageWidth, margin, fontLoaded);
 
@@ -656,6 +661,52 @@ const buildPDFDocument = async (
     }
   }
 
+  // ============ MCQ DISTRIBUTIONS ============
+  const mcqStats = (stats.questionStats || []).filter((q: any) =>
+    q.type === 'mcq' && q.mcqDistribution && q.mcqDistribution.length > 0
+  );
+
+  if (mcqStats.length > 0) {
+    doc.addPage();
+    yPos = 15;
+    yPos = drawSectionHeader(doc, yPos, 'توزيع إجابات أسئلة الاختيار', COLORS.purple, pageWidth, margin, fontLoaded);
+
+    for (let idx = 0; idx < mcqStats.length; idx++) {
+      const q = mcqStats[idx];
+      yPos = checkNewPage(doc, yPos, 45, pageHeight);
+      if (fontLoaded) doc.setFont('Amiri', 'normal');
+      doc.setTextColor(...COLORS.darkBlue);
+      doc.setFontSize(9);
+      doc.text(`س${idx + 1}: ${(q.question || '').substring(0, 85)}`, pageWidth - margin - 4, yPos, { align: 'right' });
+      yPos += 5;
+
+      const total = q.mcqDistribution.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
+      const body = q.mcqDistribution.map((item: any) => [
+        total > 0 ? `${((item.value || 0) / total * 100).toFixed(1)}%` : '0%',
+        String(item.value || 0),
+        item.name || '-',
+      ]);
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['النسبة', 'العدد', 'الخيار']],
+        body,
+        styles: { font: fontLoaded ? 'Amiri' : 'helvetica', fontStyle: 'normal', fontSize: 8, cellPadding: 2.5, halign: 'right' },
+        headStyles: { fillColor: COLORS.purple, halign: 'center', fontStyle: 'normal', textColor: [255, 255, 255] },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 24 },
+          1: { halign: 'center', cellWidth: 20 },
+          2: { halign: 'right', cellWidth: 'auto' },
+        },
+        alternateRowStyles: { fillColor: COLORS.lightGray },
+        margin: { left: margin, right: margin },
+        theme: 'grid',
+      });
+
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+  }
+
   // ============ QUESTION DETAILS TABLE ============
   if (stats.questionStats && stats.questionStats.length > 0) {
     doc.addPage();
@@ -715,19 +766,13 @@ const buildPDFDocument = async (
 
       doc.setTextColor(...COLORS.text);
       doc.setFontSize(9);
-      const maxResp = Math.min(item.responses.length, 10);
+      const maxResp = item.responses.length;
       for (let i = 0; i < maxResp; i++) {
         yPos = checkNewPage(doc, yPos, 12, pageHeight);
         const respText = `• ${item.responses[i]}`;
         const respLines = doc.splitTextToSize(respText, pageWidth - margin * 2 - 15);
         doc.text(respLines, pageWidth - margin - 8, yPos, { align: 'right' });
         yPos += respLines.length * 4 + 3;
-      }
-      if (item.responses.length > 10) {
-        doc.setTextColor(...COLORS.muted);
-        doc.setFontSize(8);
-        doc.text(`... و ${item.responses.length - 10} ردود إضافية`, pageWidth / 2, yPos, { align: 'center' });
-        yPos += 6;
       }
       yPos += 8;
     }
@@ -748,7 +793,7 @@ const buildPDFDocument = async (
     const parts: string[] = [];
     parts.push(`بلغ إجمالي الاستجابات ${effectiveResponses} استجابة`);
     if (targetEnrollment > 0 && responseRate !== null) {
-      parts.push(`بنسبة استجابة ${responseRate}% من أصل ${targetEnrollment} طالب`);
+      parts.push(`بنسبة استجابة ${responseRate}% من أصل ${targetEnrollment} ${reportCopy.targetEntity}`);
     }
     if (likertQs.length > 0) {
       const sortedByMean = [...likertQs].sort((a: any, b: any) => (b.mean || 0) - (a.mean || 0));
@@ -866,18 +911,22 @@ export const generatePDFBlob = async (
  */
 export const exportToExcel = (report: any, survey: any, stats: any, textResponses?: TextResponse[]) => {
   try {
+    const reportType = (stats.reportType || inferSurveyReportType(survey)) as SurveyReportType;
+    const reportCopy = getReportCopy(reportType, 'ar');
+    const excelReportTitle = String(stats.reportTitle || report?.statistics?.report_title || reportCopy.reportTitle);
     const wb = XLSX.utils.book_new();
     const summaryData = [
-      ['تقرير الاستبيان الشامل'], [''],
+      [excelReportTitle], [''],
       ['العنوان', survey?.title || ''],
       ['البرنامج', survey?.programs?.name || ''],
+      ['نوع التقرير', reportCopy.reportSubtitle],
       ['الفصل الدراسي', report?.semester || ''],
       ['العام الأكاديمي', report?.academic_year || ''],
       [''], ['الإحصائيات'],
-      ['إجمالي الاستجابات', stats.totalResponses || 0],
-      ['العدد المستهدف', stats.targetEnrollment || 'غير محدد'],
+      [reportCopy.totalResponses, stats.totalResponses || 0],
+      [reportCopy.targetCount, stats.targetEnrollment || 'غير محدد'],
       ['معدل الاستجابة', `${stats.responseRate || 0}%`],
-      ['المتوسط العام', stats.overallMean ? Number(stats.overallMean).toFixed(2) : '-'],
+      [reportCopy.overallMean, stats.overallMean ? Number(stats.overallMean).toFixed(2) : '-'],
       ['الانحراف المعياري', stats.overallStdDev ? Number(stats.overallStdDev).toFixed(2) : '-'],
       [''], ['الملخص التنفيذي'], [report?.summary || 'لا يوجد'],
       [''], ['التوصيات'], [report?.recommendations_text || 'لا توجد'],
