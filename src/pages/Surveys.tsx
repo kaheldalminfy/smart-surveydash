@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, BarChart3, Link2, QrCode, Edit, Trash2, FileText, Filter, ArrowRightLeft } from "lucide-react";
+import { Plus, Search, BarChart3, Link2, QrCode, Edit, Trash2, FileText, Filter, ArrowRightLeft, Loader2 } from "lucide-react";
 import DashboardButton from "@/components/DashboardButton";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +37,11 @@ const Surveys = () => {
   const [transferDialog, setTransferDialog] = useState<{open: boolean, surveyId: string, surveyTitle: string, currentProgramId: string | null}>({open: false, surveyId: '', surveyTitle: '', currentProgramId: null});
   const [transferTarget, setTransferTarget] = useState<string>('');
   const [transferring, setTransferring] = useState(false);
+  const [openProgramNames, setOpenProgramNames] = useState<string[]>([]);
+  const [statusUpdatingIds, setStatusUpdatingIds] = useState<Set<string>>(new Set());
+
+  const getProgramName = useCallback((survey: { programs?: { name?: string | null } | null }) =>
+    survey.programs?.name || (language === 'ar' ? "بدون برنامج" : "No Program"), [language]);
 
   const groupedSurveys = useMemo(() => {
     const filtered = surveys.filter(s => 
@@ -44,12 +49,12 @@ const Surveys = () => {
     );
     const groups: Record<string, any[]> = {};
     filtered.forEach(survey => {
-      const programName = survey.programs?.name || (language === 'ar' ? "بدون برنامج" : "No Program");
+      const programName = getProgramName(survey);
       if (!groups[programName]) groups[programName] = [];
       groups[programName].push(survey);
     });
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b, language === 'ar' ? 'ar' : 'en'));
-  }, [surveys, searchQuery, language]);
+  }, [surveys, searchQuery, language, getProgramName]);
 
   const getFilteredProgramSurveys = (programName: string, programSurveys: any[]) => {
     const localSearch = programSearchQueries[programName] || "";
@@ -66,6 +71,18 @@ const Surveys = () => {
     loadTemplates();
     loadPrograms();
   }, []);
+
+  useEffect(() => {
+    if (groupedSurveys.length === 0) return;
+
+    const availableProgramNames = groupedSurveys.map(([programName]) => programName);
+    setOpenProgramNames(prev => {
+      const retained = prev.filter(programName => availableProgramNames.includes(programName));
+      const next = retained.length > 0 ? retained : availableProgramNames;
+      const unchanged = next.length === prev.length && next.every((name, index) => name === prev[index]);
+      return unchanged ? prev : next;
+    });
+  }, [groupedSurveys]);
 
   const loadSurveys = async () => {
     setLoading(true);
@@ -235,6 +252,12 @@ const Surveys = () => {
 
   const toggleSurveyStatus = async (surveyId: string, currentStatus: string) => {
     const newStatus = currentStatus === "active" ? "draft" : "active";
+    const survey = surveys.find(s => s.id === surveyId);
+    const programName = survey ? getProgramName(survey) : undefined;
+    const currentProgramFilter = programName ? programStatusFilters[programName] : undefined;
+
+    setStatusUpdatingIds(prev => new Set(prev).add(surveyId));
+
     const { error } = await supabase
       .from("surveys")
       .update({ status: newStatus })
@@ -247,12 +270,23 @@ const Surveys = () => {
         variant: "destructive",
       });
     } else {
+      setSurveys(prev => prev.map(s => s.id === surveyId ? { ...s, status: newStatus } : s));
+
+      if (programName && currentProgramFilter && currentProgramFilter !== "all" && currentProgramFilter !== newStatus) {
+        setProgramStatusFilters(prev => ({ ...prev, [programName]: "all" }));
+      }
+
       toast({
         title: t('common.updated'),
         description: `${t('surveys.statusUpdated') || "تم تحديث حالة الاستبيان"}`,
       });
-      loadSurveys();
     }
+
+    setStatusUpdatingIds(prev => {
+      const next = new Set(prev);
+      next.delete(surveyId);
+      return next;
+    });
   };
 
   const regenerateAllQRCodes = async () => {
@@ -418,7 +452,7 @@ const Surveys = () => {
                 </CardContent>
               </Card>
             ) : (
-              <Accordion type="multiple" defaultValue={[]} className="space-y-4">
+              <Accordion type="multiple" value={openProgramNames} onValueChange={setOpenProgramNames} className="space-y-4">
                 {groupedSurveys.map(([programName, programSurveys]) => {
                   const filteredSurveys = getFilteredProgramSurveys(programName, programSurveys);
                   const currentFilter = programStatusFilters[programName] || "all";
@@ -469,6 +503,7 @@ const Surveys = () => {
                             {filteredSurveys.map((survey) => {
                               const status = getSurveyStatus(survey);
                               const responsesCount = survey.responses?.[0]?.count || 0;
+                              const isStatusUpdating = statusUpdatingIds.has(survey.id);
 
                               return (
                                 <Card key={survey.id} className="hover-scale">
@@ -476,7 +511,7 @@ const Surveys = () => {
                                     <div className="flex justify-between items-start">
                                       <div className="flex-1">
                                         <div className="flex items-center gap-2 mb-1">
-                                          <CardTitle className="text-lg">{survey.title}</CardTitle>
+                                          <CardTitle className="text-base sm:text-lg break-words">{survey.title}</CardTitle>
                                           <Badge variant={status.variant}>{status.label}</Badge>
                                         </div>
                                         <CardDescription>
@@ -487,20 +522,22 @@ const Surveys = () => {
                                     </div>
                                   </CardHeader>
                                   <CardContent>
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                       <div className="flex items-center gap-6 text-sm">
                                         <div>
                                           <span className="font-semibold">{responsesCount}</span>
                                           <span className="text-muted-foreground"> استجابة</span>
                                         </div>
                                       </div>
-                                      <div className="flex gap-2 flex-wrap">
+                                      <div className="flex w-full flex-wrap gap-2 sm:w-auto">
                                         <Button
                                           variant={survey.status === "active" ? "destructive" : "default"}
                                           size="sm"
+                                          disabled={isStatusUpdating}
                                           onClick={() => toggleSurveyStatus(survey.id, survey.status)}
                                         >
-                                          {survey.status === "active" ? "إيقاف" : "تفعيل"}
+                                          {isStatusUpdating && <Loader2 className="h-4 w-4 animate-spin" />}
+                                          {survey.status === "active" ? t('surveys.deactivate') : t('surveys.activate')}
                                         </Button>
                                         <Button variant="outline" size="sm" onClick={() => navigate(`/surveys/edit/${survey.id}`)}>
                                           <Edit className="h-4 w-4 ml-2" />
