@@ -50,6 +50,11 @@ const QuestionItem = ({
             <Badge variant={question.type === 'section' ? 'default' : 'outline'}>
               {question.type === 'section' ? t('designer.section') : `${language === 'ar' ? 'سؤال' : 'Q'} ${questions.slice(0, index).filter(q => q.type !== 'section').length + 1}`}
             </Badge>
+            {question.type === 'section' && (
+              <Badge variant="secondary" className="text-xs">
+                {language === 'ar' ? 'اختياري' : 'Optional'}
+              </Badge>
+            )}
             <select value={question.type} onChange={(e) => onUpdate(question.id, 'type', e.target.value)}
               className="text-sm rounded-md border border-input bg-background px-2 py-1">
               {questionTypes.map(type => (<option key={type.value} value={type.value}>{type.label}</option>))}
@@ -61,9 +66,14 @@ const QuestionItem = ({
               </div>
             )}
           </div>
-          <Input placeholder={question.type === 'section' ? (language === 'ar' ? 'اكتب عنوان القسم هنا' : 'Enter section title') : (language === 'ar' ? 'اكتب نص السؤال هنا' : 'Enter question text')}
+          <Input placeholder={question.type === 'section' ? (language === 'ar' ? 'عنوان القسم (اختياري)' : 'Section title (optional)') : (language === 'ar' ? 'اكتب نص السؤال هنا' : 'Enter question text')}
             value={question.text} onChange={(e) => onUpdate(question.id, 'text', e.target.value)}
             className={question.type === 'section' ? 'font-bold text-lg' : ''} />
+          {question.type === 'section' && (
+            <p className="text-xs text-muted-foreground">
+              {language === 'ar' ? 'هذا عنوان تنظيمي فقط، وليس سؤالًا مطلوبًا أو عنصرًا يحتاج إلى تقييم.' : 'This is only a section heading, not a required question or an item that needs evaluation.'}
+            </p>
+          )}
 
           {question.type === "likert" && (
             <div className="flex gap-2 text-sm text-muted-foreground">
