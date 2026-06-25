@@ -2,7 +2,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { SurveyFormData } from "./types";
 import { getReportTypeOptions } from "@/utils/reportType";
@@ -84,21 +83,6 @@ const SurveyInfoCard = ({ survey, setSurvey, programs, getUniqueAcademicYears, g
               <option value="">{language === 'ar' ? "اختر الفصل الدراسي" : "Select Semester"}</option>
               {getUniqueSemesters().map((sem) => (<option key={sem} value={sem}>{sem}</option>))}
             </select>
-          </div>
-        </div>
-        <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-          <div className="flex items-start gap-3">
-            <Users className="h-5 w-5 text-primary mt-1" />
-            <div className="flex-1 space-y-2">
-              <Label htmlFor="targetEnrollment" className="text-sm font-medium">
-                {t('designer.targetEnrollment')} ({language === 'ar' ? "اختياري" : "optional"})
-              </Label>
-              <Input id="targetEnrollment" type="number" min="0" placeholder={language === 'ar' ? "مثال: 100" : "e.g. 100"}
-                value={survey.targetEnrollment} onChange={(e) => setSurvey({...survey, targetEnrollment: e.target.value})} className="max-w-[200px]" />
-              <p className="text-xs text-muted-foreground">
-                {language === 'ar' ? "أدخل عدد الطلبة لحساب نسبة الاستجابة بدقة في التقارير" : "Enter student count for accurate response rate in reports"}
-              </p>
-            </div>
           </div>
         </div>
       </CardContent>

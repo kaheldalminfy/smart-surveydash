@@ -32,6 +32,7 @@ const Reports = () => {
   const [semester, setSemester] = useState("");
   const [academicYear, setAcademicYear] = useState("");
   const [reportStatus, setReportStatus] = useState("responding");
+  const [targetEnrollment, setTargetEnrollment] = useState("");
   const [collegeLogo, setCollegeLogo] = useState("");
   const [collegeName, setCollegeName] = useState("كلية العلوم الإنسانية والاجتماعية");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -83,6 +84,7 @@ const Reports = () => {
         setSemester(reportData.semester || "");
         setAcademicYear(reportData.academic_year || "");
         setReportStatus(reportData.status || "responding");
+        setTargetEnrollment(loadedSurvey?.target_enrollment ? String(loadedSurvey.target_enrollment) : "");
         setReportTitle(defaultTitle);
         setEditedSummary(reportData.summary || "");
         setEditedRecommendations(reportData.recommendations_text || "");
@@ -351,6 +353,11 @@ const Reports = () => {
     }
   };
 
+  const getTargetEnrollmentNumber = () => {
+    const parsed = parseInt(targetEnrollment, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  };
+
   const saveReportMetadata = async () => {
     const { error } = await supabase
       .from("reports")
@@ -365,6 +372,23 @@ const Reports = () => {
       toast({ title: t("reports.toastError"), description: t("reports.toastSaveMetaErr"), variant: "destructive" });
       return;
     }
+
+    const { error: surveyError } = await supabase
+      .from("surveys")
+      .update({
+        target_enrollment: targetEnrollment.trim() ? getTargetEnrollmentNumber() || null : null,
+      })
+      .eq("id", report.survey_id);
+
+    if (surveyError) {
+      toast({ title: t("reports.toastError"), description: t("reports.toastSaveMetaErr"), variant: "destructive" });
+      return;
+    }
+
+    setSurvey(prev => ({
+      ...prev,
+      target_enrollment: getTargetEnrollmentNumber() || null,
+    }));
 
     toast({ title: t("reports.toastSaveOk"), description: t("reports.toastSaveMeta") });
     loadReport();
@@ -535,10 +559,10 @@ const Reports = () => {
       : 0;
 
     const manualNum = parseInt(manualEnrollment);
-    const targetEnrollment = (!isNaN(manualNum) && manualNum > 0) ? manualNum : (survey?.target_enrollment || 0);
+    const selectedTargetEnrollment = (!isNaN(manualNum) && manualNum > 0) ? manualNum : getTargetEnrollmentNumber();
     const responsesCount = filterQuestion && filterValues.length > 0 ? computedFilteredResponsesCount : allResponses.length;
-    const responseRate = targetEnrollment > 0
-      ? Math.min(100, Math.round((responsesCount / targetEnrollment) * 100))
+    const responseRate = selectedTargetEnrollment > 0
+      ? Math.min(100, Math.round((responsesCount / selectedTargetEnrollment) * 100))
       : 0;
 
     const textResponses = pdfAnswers
@@ -549,7 +573,7 @@ const Reports = () => {
       reportType: currentReportType,
       reportTitle: selectedReportTitle,
       totalResponses: responsesCount,
-      targetEnrollment,
+      targetEnrollment: selectedTargetEnrollment,
       responseRate,
       overallMean,
       overallStdDev,
@@ -733,16 +757,16 @@ const Reports = () => {
       ? likertRatingQuestions.reduce((sum, q) => sum + (parseFloat(q.stdDev) || 0), 0) / likertRatingQuestions.length
       : 0;
 
-    const targetEnrollment = survey?.target_enrollment || 0;
-    const responseRate = targetEnrollment > 0
-      ? Math.min(100, Math.round((allResponses.length / targetEnrollment) * 100))
+    const selectedTargetEnrollment = getTargetEnrollmentNumber();
+    const responseRate = selectedTargetEnrollment > 0
+      ? Math.min(100, Math.round((allResponses.length / selectedTargetEnrollment) * 100))
       : 0;
 
     const stats = {
       reportType: currentReportType,
       reportTitle: selectedReportTitle,
       totalResponses: allResponses.length,
-      targetEnrollment,
+      targetEnrollment: selectedTargetEnrollment,
       responseRate,
       overallMean,
       overallStdDev,
@@ -844,16 +868,19 @@ const Reports = () => {
           semester={semester}
           academicYear={academicYear}
           reportStatus={reportStatus}
+          targetEnrollment={targetEnrollment}
+          reportType={currentReportType}
           onSemesterChange={setSemester}
           onAcademicYearChange={setAcademicYear}
           onReportStatusChange={setReportStatus}
+          onTargetEnrollmentChange={setTargetEnrollment}
           onSave={saveReportMetadata}
         />
 
         <ReportStatisticsCards
           filteredResponsesCount={computedFilteredResponsesCount}
           totalResponses={totalResponses}
-          targetEnrollment={survey?.target_enrollment || 0}
+          targetEnrollment={getTargetEnrollmentNumber()}
           overallMean={overallMean}
           questionsCount={detailedAnswers.length}
           totalTextResponses={totalTextResponses}
