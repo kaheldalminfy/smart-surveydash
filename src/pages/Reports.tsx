@@ -143,6 +143,7 @@ const Reports = () => {
         .from("questions")
         .select("*")
         .eq("survey_id", id)
+        .eq("is_archived", false)
         .neq("type", "section")
         .order("order_index");
 

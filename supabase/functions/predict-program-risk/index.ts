@@ -28,7 +28,8 @@ Deno.serve(async (req) => {
     // Load Likert/rating answers with period + program
     const { data: answers, error: aerr } = await supabase
       .from("answers")
-      .select("numeric_value, responses!inner(submitted_at, surveys!inner(program_id, academic_year, semester)), questions!inner(type)")
+      .select("numeric_value, responses!inner(submitted_at, surveys!inner(program_id, academic_year, semester)), questions!inner(type, is_archived)")
+      .eq("questions.is_archived", false)
       .in("questions.type", ["rating", "likert"])
       .limit(10000);
     if (aerr) throw aerr;

@@ -169,9 +169,10 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
         if (responseIds.length > 0) {
           const { data: surveyAnswers } = await supabase
             .from('answers')
-            .select('numeric_value, questions!inner(type)')
+            .select('numeric_value, questions!inner(type, is_archived)')
             .in('response_id', responseIds)
             .not('numeric_value', 'is', null)
+            .eq('questions.is_archived', false)
             .in('questions.type', ['likert', 'rating']);
 
           const validAnswers = (surveyAnswers || []).filter((a: any) => 
@@ -203,7 +204,8 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
     if (surveyIds.length > 0) {
       const { data: textAnswers } = await supabase
         .from('answers')
-        .select('value, question_id, questions!inner(type, survey_id)')
+        .select('value, question_id, questions!inner(type, survey_id, is_archived)')
+        .eq('questions.is_archived', false)
         .not('value', 'is', null);
 
       if (textAnswers) {
@@ -266,9 +268,10 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
           if (responseIds.length > 0) {
             const { data: courseAnswers } = await supabase
               .from('answers')
-              .select('numeric_value, questions!inner(type)')
+              .select('numeric_value, questions!inner(type, is_archived)')
               .in('response_id', responseIds)
               .not('numeric_value', 'is', null)
+              .eq('questions.is_archived', false)
               .in('questions.type', ['likert', 'rating']);
 
             const validCourseAnswers = (courseAnswers || []).filter((a: any) => 
@@ -358,9 +361,10 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
         if (responseIds.length > 0) {
           const { data: surveyAnswers } = await supabase
             .from('answers')
-            .select('numeric_value, questions!inner(type)')
+            .select('numeric_value, questions!inner(type, is_archived)')
             .in('response_id', responseIds)
             .not('numeric_value', 'is', null)
+            .eq('questions.is_archived', false)
             .in('questions.type', ['likert', 'rating']);
 
           const validAnswers = (surveyAnswers || []).filter((a: any) => 

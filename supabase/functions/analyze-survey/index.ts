@@ -79,6 +79,8 @@ Deno.serve(async (req) => {
       throw new Error("Survey not found");
     }
 
+    const activeQuestions = (survey.questions || []).filter((q) => !q.is_archived);
+
     const validReportTypes = ["course_evaluation", "workshop", "program", "general"];
     const rawReportType = (survey as any).survey_type;
     const titleLower = String(survey.title || "").toLowerCase();
@@ -98,7 +100,7 @@ Deno.serve(async (req) => {
       questions_stats: [],
     };
 
-    for (const question of survey.questions) {
+    for (const question of activeQuestions) {
       const answers = survey.responses.flatMap((r: any) =>
         r.answers.filter((a: any) => a.question_id === question.id)
       );
@@ -138,7 +140,7 @@ Deno.serve(async (req) => {
     const textResponses = survey.responses
       .flatMap((r: any) => r.answers)
       .filter((a: any) => {
-        const q = survey.questions.find((q: any) => q.id === a.question_id);
+        const q = activeQuestions.find((q) => q.id === a.question_id);
         return q?.type === "text" && a.value;
       })
       .map((a: any) => a.value);

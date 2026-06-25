@@ -96,7 +96,12 @@ const SurveyDesigner = () => {
           semester: surveyData.semester || "", academicYear: surveyData.academic_year || "",
           targetEnrollment: surveyData.target_enrollment ? String(surveyData.target_enrollment) : "",
         });
-        const { data: questionsData, error: questionsError } = await supabase.from("questions").select("*").eq("survey_id", id).order("order_index");
+        const { data: questionsData, error: questionsError } = await supabase
+          .from("questions")
+          .select("*")
+          .eq("survey_id", id)
+          .eq("is_archived", false)
+          .order("order_index");
         if (questionsError) throw questionsError;
         if (questionsData) {
           setQuestions(questionsData.map((q: any) => ({
@@ -253,6 +258,7 @@ const SurveyDesigner = () => {
     text: q.text.trim() || (q.type === "section" ? getSectionTitle(index) : q.text),
     type: q.type,
     order_index: index,
+    is_archived: false,
     is_required: q.type === "section" ? false : q.required !== false,
     options: q.type === "likert" ? { scale: ["\u063A\u064A\u0631 \u0645\u0648\u0627\u0641\u0642 \u0628\u0634\u062F\u0629", "\u063A\u064A\u0631 \u0645\u0648\u0627\u0641\u0642", "\u0645\u062D\u0627\u064A\u062F", "\u0645\u0648\u0627\u0641\u0642", "\u0645\u0648\u0627\u0641\u0642 \u0628\u0634\u062F\u0629"] }
       : q.type === "mcq" && q.options ? { choices: q.options } : null,
@@ -262,7 +268,8 @@ const SurveyDesigner = () => {
     const { data: existingQuestions, error: existingError } = await supabase
       .from("questions")
       .select("id")
-      .eq("survey_id", surveyId);
+      .eq("survey_id", surveyId)
+      .eq("is_archived", false);
     if (existingError) throw existingError;
 
     const existingIds = new Set((existingQuestions || []).map(q => q.id));
@@ -273,24 +280,33 @@ const SurveyDesigner = () => {
       const { data: linkedAnswers, error: answersError } = await supabase
         .from("answers")
         .select("question_id")
-        .in("question_id", removedIds)
-        .limit(1);
+        .in("question_id", removedIds);
       if (answersError) throw answersError;
-      if (linkedAnswers && linkedAnswers.length > 0) {
-        throw new Error(language === "ar"
-          ? "لا يمكن حذف سؤال أو قسم مرتبط بإجابات محفوظة. احذف الأسئلة الجديدة فقط أو أنشئ نسخة جديدة من الاستبيان للتعديلات الكبيرة."
-          : "Cannot delete a question or section that is linked to saved answers. Remove only new unanswered items or create a new survey copy for major edits.");
+      const answeredIds = new Set((linkedAnswers || []).map(answer => answer.question_id));
+      const archiveIds = removedIds.filter(questionId => answeredIds.has(questionId));
+      const deleteIds = removedIds.filter(questionId => !answeredIds.has(questionId));
+
+      if (archiveIds.length > 0) {
+        const { error: archiveError } = await supabase
+          .from("questions")
+          .update({ is_archived: true })
+          .in("id", archiveIds);
+        if (archiveError) throw archiveError;
       }
 
-      const { error: deleteError } = await supabase.from("questions").delete().in("id", removedIds);
-      if (deleteError) throw deleteError;
+      if (deleteIds.length > 0) {
+        const { error: deleteError } = await supabase.from("questions").delete().in("id", deleteIds);
+        if (deleteError) throw deleteError;
+      }
     }
 
     const questionRows = questions.map((q, index) => buildQuestionPayload(q, index, surveyId));
-    const { error: upsertError } = await supabase
-      .from("questions")
-      .upsert(questionRows, { onConflict: "id" });
-    if (upsertError) throw upsertError;
+    if (questionRows.length > 0) {
+      const { error: upsertError } = await supabase
+        .from("questions")
+        .upsert(questionRows, { onConflict: "id" });
+      if (upsertError) throw upsertError;
+    }
   };
 
   const handleSave = async () => {

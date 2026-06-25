@@ -70,7 +70,7 @@ const TakeSurvey = () => {
       }
       setSurvey(surveyData);
       const { data: questionsData, error: questionsError } = await supabase
-        .from("questions").select("*").eq("survey_id", id).order("order_index");
+        .from("questions").select("*").eq("survey_id", id).eq("is_archived", false).order("order_index");
       if (questionsError) throw questionsError;
       setQuestions(questionsData || []);
     } catch (error: any) {
@@ -123,7 +123,7 @@ const TakeSurvey = () => {
     setIsSubmitting(true);
     try {
       const { data: freshQuestions, error: questionsError } = await supabase
-        .from("questions").select("*").eq("survey_id", id).order("order_index");
+        .from("questions").select("*").eq("survey_id", id).eq("is_archived", false).order("order_index");
       if (questionsError) throw new Error(language === 'ar' ? "فشل في التحقق من الأسئلة" : "Failed to verify questions");
       if (!freshQuestions || freshQuestions.length === 0) throw new Error(language === 'ar' ? "لا توجد أسئلة في هذا الاستبيان" : "No questions in this survey");
       const dbQuestionMap = new Map(freshQuestions.map(q => [q.id, q]));

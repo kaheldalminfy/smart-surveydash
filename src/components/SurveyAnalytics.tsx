@@ -48,7 +48,7 @@ const SurveyAnalytics = ({ surveyId }: SurveyAnalyticsProps) => {
         .from("responses").select(`*, answers (*, questions (*))`).eq("survey_id", surveyId);
       if (responsesError) throw responsesError;
       const { data: questions, error: questionsError } = await supabase
-        .from("questions").select("*").eq("survey_id", surveyId).order("order_index");
+        .from("questions").select("*").eq("survey_id", surveyId).eq("is_archived", false).order("order_index");
       if (questionsError) throw questionsError;
       const processedData = processAnalyticsData(responses || [], questions || []);
       setAnalytics(processedData);

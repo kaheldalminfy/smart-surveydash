@@ -132,7 +132,7 @@ async function runTool(name: string, args: any, supabase: any) {
       return { total: count };
     }
     case "query_avg_ratings": {
-      let q = supabase.from("answers").select("numeric_value, responses!inner(surveys!inner(program_id, academic_year, semester)), questions!inner(type)");
+      let q = supabase.from("answers").select("numeric_value, responses!inner(surveys!inner(program_id, academic_year, semester)), questions!inner(type, is_archived)").eq("questions.is_archived", false);
       if (args.academic_year) q = q.eq("responses.surveys.academic_year", args.academic_year);
       if (args.semester) q = q.eq("responses.surveys.semester", args.semester);
       const { data, error } = await q.limit(5000);

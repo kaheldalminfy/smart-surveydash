@@ -229,12 +229,12 @@ const ProgramComparison = () => {
           .from("surveys")
           .select(`
             id, title,
-            questions (id, text, type, order_index),
+            questions (id, text, type, order_index, is_archived),
             responses (
               id,
               answers (
                 numeric_value,
-                questions (type)
+                questions (type, is_archived)
               )
             )
           `)
@@ -251,7 +251,7 @@ const ProgramComparison = () => {
         for (const s of surveys) {
           // Extract likert/rating question texts
           const likertQuestions = ((s.questions || []) as any[])
-            .filter((q: any) => q.type === 'likert' || q.type === 'rating')
+            .filter((q: any) => !q.is_archived && (q.type === 'likert' || q.type === 'rating'))
             .sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0))
             .map((q: any) => q.text);
 
@@ -262,7 +262,7 @@ const ProgramComparison = () => {
             respCount++;
             for (const a of (r.answers || []) as any[]) {
               const q = a.questions as any;
-              if ((q?.type === 'likert' || q?.type === 'rating') && a.numeric_value && a.numeric_value >= 1 && a.numeric_value <= 5) {
+              if (!q?.is_archived && (q?.type === 'likert' || q?.type === 'rating') && a.numeric_value && a.numeric_value >= 1 && a.numeric_value <= 5) {
                 scores.push(a.numeric_value);
               }
             }
