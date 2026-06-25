@@ -42,8 +42,10 @@ const SurveyDesigner = () => {
   const [academicCalendar, setAcademicCalendar] = useState<any[]>([]);
   const [responseCount, setResponseCount] = useState(0);
   const [hasExistingAnswers, setHasExistingAnswers] = useState(false);
-  const [draggedQuestionId, setDraggedQuestionId] = useState<number | null>(null);
-  const [dragOverQuestionId, setDragOverQuestionId] = useState<number | null>(null);
+  const [draggedQuestionId, setDraggedQuestionId] = useState<string | null>(null);
+  const [dragOverQuestionId, setDragOverQuestionId] = useState<string | null>(null);
+
+  const createQuestionId = () => crypto.randomUUID();
 
   useEffect(() => {
     loadPrograms();
@@ -97,9 +99,9 @@ const SurveyDesigner = () => {
         const { data: questionsData, error: questionsError } = await supabase.from("questions").select("*").eq("survey_id", id).order("order_index");
         if (questionsError) throw questionsError;
         if (questionsData) {
-          setQuestions(questionsData.map((q: any, index) => ({
-            id: Date.now() + index, text: q.text, type: q.type, orderIndex: q.order_index,
-            options: q.type === "mcq" && q.options?.choices ? q.options.choices : [], required: q.is_required,
+          setQuestions(questionsData.map((q: any) => ({
+            id: q.id, text: q.text, type: q.type, orderIndex: q.order_index,
+            options: q.type === "mcq" && q.options?.choices ? q.options.choices : [], required: q.type === "section" ? false : q.is_required,
           })));
         }
       }
@@ -124,7 +126,7 @@ const SurveyDesigner = () => {
         }));
         if (data.template_data.questions) {
           setQuestions(data.template_data.questions.map((q: any, index: number) => ({
-            id: Date.now() + index, text: q.text, type: q.type, orderIndex: index, options: q.options || [], required: q.required ?? true,
+            id: createQuestionId(), text: q.text, type: q.type, orderIndex: index, options: q.options || [], required: q.type === "section" ? false : q.required ?? true,
           })));
         }
         toast({ title: t('common.success'), description: language === 'ar' ? `تم تحميل النموذج "${data.name}" بنجاح` : `Template "${data.name}" loaded successfully` });
@@ -150,14 +152,22 @@ const SurveyDesigner = () => {
     { value: "rating", label: t('designer.rating'), description: t('designer.ratingDesc') },
   ];
 
-  const addSection = () => { setQuestions([...questions, { id: Date.now(), text: "", type: "section", orderIndex: questions.length, required: false }]); };
-  const addQuestion = () => { setQuestions([...questions, { id: Date.now(), text: "", type: "likert", orderIndex: questions.length, required: true }]); };
-  const removeQuestion = (id: number) => { setQuestions(questions.filter(q => q.id !== id)); };
-  const updateQuestion = (id: number, field: string, value: any) => { setQuestions(questions.map(q => q.id === id ? { ...q, [field]: value } : q)); };
+  const addSection = () => { setQuestions([...questions, { id: createQuestionId(), text: "", type: "section", orderIndex: questions.length, required: false }]); };
+  const addQuestion = () => { setQuestions([...questions, { id: createQuestionId(), text: "", type: "likert", orderIndex: questions.length, required: true }]); };
+  const removeQuestion = (id: string) => { setQuestions(questions.filter(q => q.id !== id)); };
+  const updateQuestion = (id: string, field: string, value: any) => {
+    setQuestions(prev => prev.map(q => {
+      if (q.id !== id) return q;
+      const updated = { ...q, [field]: value };
+      if (field === "type" && value === "section") updated.required = false;
+      if (field === "type" && q.type === "section" && value !== "section") updated.required = true;
+      return updated;
+    }));
+  };
 
-  const duplicateQuestion = (id: number) => {
+  const duplicateQuestion = (id: string) => {
     const q = questions.find(q => q.id === id);
-    if (q) { setQuestions([...questions, { ...q, id: Date.now(), text: q.text + (language === 'ar' ? " (نسخة)" : " (copy)"), orderIndex: questions.length }]); }
+    if (q) { setQuestions([...questions, { ...q, id: createQuestionId(), required: q.type === "section" ? false : q.required, text: q.text + (language === 'ar' ? " (نسخة)" : " (copy)"), orderIndex: questions.length }]); }
   };
 
   const handleTemplateSelect = (template: any) => {
@@ -168,8 +178,8 @@ const SurveyDesigner = () => {
       reportType: template.reportType || inferSurveyReportType({ title: template.name })
     }));
     setQuestions(template.questions.map((q: any, index: number) => ({
-      id: Date.now() + index, text: q.text, type: q.type, orderIndex: index,
-      options: q.options?.choices || q.options || [], required: q.is_required !== false && q.required !== false,
+      id: createQuestionId(), text: q.text, type: q.type, orderIndex: index,
+      options: q.options?.choices || q.options || [], required: q.type === "section" ? false : q.is_required !== false && q.required !== false,
     })));
     setCurrentTab("design");
     toast({ title: t('common.success'), description: language === 'ar' ? `تم تحميل قالب "${template.name}" بنجاح` : `Template "${template.name}" loaded` });
@@ -177,20 +187,20 @@ const SurveyDesigner = () => {
 
   const handleCreateCustom = () => {
     setCurrentTab("design");
-    if (questions.length === 0) { setQuestions([{ id: Date.now(), text: "", type: "likert", orderIndex: 0, required: true }]); }
+    if (questions.length === 0) { setQuestions([{ id: createQuestionId(), text: "", type: "likert", orderIndex: 0, required: true }]); }
   };
 
   // Drag and drop handlers
-  const handleDragStart = (e: React.DragEvent, questionId: number) => {
+  const handleDragStart = (e: React.DragEvent, questionId: string) => {
     setDraggedQuestionId(questionId); e.dataTransfer.effectAllowed = 'move';
     if (e.currentTarget instanceof HTMLElement) e.dataTransfer.setDragImage(e.currentTarget, 0, 0);
   };
-  const handleDragOver = (e: React.DragEvent, questionId: number) => {
+  const handleDragOver = (e: React.DragEvent, questionId: string) => {
     e.preventDefault(); e.dataTransfer.dropEffect = 'move';
     if (draggedQuestionId !== null && draggedQuestionId !== questionId) setDragOverQuestionId(questionId);
   };
   const handleDragLeave = () => { setDragOverQuestionId(null); };
-  const handleDrop = (e: React.DragEvent, targetQuestionId: number) => {
+  const handleDrop = (e: React.DragEvent, targetQuestionId: string) => {
     e.preventDefault();
     if (draggedQuestionId === null || draggedQuestionId === targetQuestionId) return;
     const dragIndex = questions.findIndex(q => q.id === draggedQuestionId);
@@ -232,11 +242,62 @@ const SurveyDesigner = () => {
     return result;
   };
 
+  const getSectionTitle = (index: number) => {
+    const sectionNumber = questions.slice(0, index + 1).filter(q => q.type === "section").length;
+    return language === "ar" ? `قسم ${sectionNumber || 1}` : `Section ${sectionNumber || 1}`;
+  };
+
+  const buildQuestionPayload = (q: Question, index: number, surveyId: string) => ({
+    id: q.id,
+    survey_id: surveyId,
+    text: q.text.trim() || (q.type === "section" ? getSectionTitle(index) : q.text),
+    type: q.type,
+    order_index: index,
+    is_required: q.type === "section" ? false : q.required !== false,
+    options: q.type === "likert" ? { scale: ["\u063A\u064A\u0631 \u0645\u0648\u0627\u0641\u0642 \u0628\u0634\u062F\u0629", "\u063A\u064A\u0631 \u0645\u0648\u0627\u0641\u0642", "\u0645\u062D\u0627\u064A\u062F", "\u0645\u0648\u0627\u0641\u0642", "\u0645\u0648\u0627\u0641\u0642 \u0628\u0634\u062F\u0629"] }
+      : q.type === "mcq" && q.options ? { choices: q.options } : null,
+  });
+
+  const syncQuestionsWithoutDroppingAnswers = async (surveyId: string) => {
+    const { data: existingQuestions, error: existingError } = await supabase
+      .from("questions")
+      .select("id")
+      .eq("survey_id", surveyId);
+    if (existingError) throw existingError;
+
+    const existingIds = new Set((existingQuestions || []).map(q => q.id));
+    const currentIds = new Set(questions.map(q => q.id));
+    const removedIds = [...existingIds].filter(questionId => !currentIds.has(questionId));
+
+    if (removedIds.length > 0) {
+      const { data: linkedAnswers, error: answersError } = await supabase
+        .from("answers")
+        .select("question_id")
+        .in("question_id", removedIds)
+        .limit(1);
+      if (answersError) throw answersError;
+      if (linkedAnswers && linkedAnswers.length > 0) {
+        throw new Error(language === "ar"
+          ? "لا يمكن حذف سؤال أو قسم مرتبط بإجابات محفوظة. احذف الأسئلة الجديدة فقط أو أنشئ نسخة جديدة من الاستبيان للتعديلات الكبيرة."
+          : "Cannot delete a question or section that is linked to saved answers. Remove only new unanswered items or create a new survey copy for major edits.");
+      }
+
+      const { error: deleteError } = await supabase.from("questions").delete().in("id", removedIds);
+      if (deleteError) throw deleteError;
+    }
+
+    const questionRows = questions.map((q, index) => buildQuestionPayload(q, index, surveyId));
+    const { error: upsertError } = await supabase
+      .from("questions")
+      .upsert(questionRows, { onConflict: "id" });
+    if (upsertError) throw upsertError;
+  };
+
   const handleSave = async () => {
     if (!survey.title || !survey.programId) {
       toast({ title: t('common.error'), description: t('designer.enterTitleAndProgram'), variant: "destructive" }); return;
     }
-    if (questions.some(q => !q.text)) {
+    if (questions.some(q => q.type !== "section" && !q.text.trim())) {
       toast({ title: t('common.error'), description: t('designer.enterAllQuestions'), variant: "destructive" }); return;
     }
     setIsLoading(true);
@@ -254,14 +315,7 @@ const SurveyDesigner = () => {
           target_enrollment: survey.targetEnrollment ? parseInt(survey.targetEnrollment) : null,
         }, id);
         if (surveyError) throw surveyError;
-        await supabase.from("questions").delete().eq("survey_id", id);
-        const questionsData = questions.map((q, index) => ({
-          survey_id: id, text: q.text, type: q.type, order_index: index, is_required: q.required,
-          options: q.type === "likert" ? { scale: ["غير موافق بشدة", "غير موافق", "محايد", "موافق", "موافق بشدة"] }
-            : q.type === "mcq" && q.options ? { choices: q.options } : null,
-        }));
-        const { error: questionsError } = await supabase.from("questions").insert(questionsData);
-        if (questionsError) throw questionsError;
+        await syncQuestionsWithoutDroppingAnswers(id);
         toast({ title: t('common.updated'), description: t('designer.surveyUpdated') });
       } else {
         const { data: surveyData, error: surveyError } = await saveSurveyRow("insert", {
@@ -272,11 +326,7 @@ const SurveyDesigner = () => {
           created_by: user.id, status: "draft",
         });
         if (surveyError) throw surveyError;
-        const questionsData = questions.map((q, index) => ({
-          survey_id: surveyData.id, text: q.text, type: q.type, order_index: index, is_required: q.required,
-          options: q.type === "likert" ? { scale: ["غير موافق بشدة", "غير موافق", "محايد", "موافق", "موافق بشدة"] }
-            : q.type === "mcq" && q.options ? { choices: q.options } : null,
-        }));
+        const questionsData = questions.map((q, index) => buildQuestionPayload(q, index, surveyData.id));
         const { error: questionsError } = await supabase.from("questions").insert(questionsData);
         if (questionsError) throw questionsError;
         const surveyLink = `${window.location.origin}/take/${surveyData.id}`;
@@ -299,7 +349,7 @@ const SurveyDesigner = () => {
       if (!user) return;
       const templateData = {
         title: survey.title, description: survey.description, reportType: survey.reportType, isAnonymous: survey.isAnonymous,
-        questions: questions.map(q => ({ text: q.text, type: q.type, required: q.required, options: q.options })),
+        questions: questions.map(q => ({ text: q.text, type: q.type, required: q.type === "section" ? false : q.required, options: q.options })),
       };
       const { error } = await supabase.from("survey_templates").insert({
         name: templateName, description: templateDescription, template_data: templateData, is_public: templatePublic, created_by: user.id,
@@ -324,7 +374,7 @@ const SurveyDesigner = () => {
       if (error) throw error;
       if (data && data.questions) {
         const newQuestions = data.questions.map((q: any, index: number) => ({
-          id: Date.now() + index, text: q.text, type: "likert", orderIndex: questions.length + index, options: q.choices || [], required: true,
+          id: createQuestionId(), text: q.text, type: "likert", orderIndex: questions.length + index, options: q.choices || [], required: true,
         }));
         setQuestions([...questions, ...newQuestions]);
         toast({ title: t('common.success'), description: language === 'ar' ? `تم إضافة ${newQuestions.length} أسئلة مقترحة من الذكاء الاصطناعي` : `Added ${newQuestions.length} AI-suggested questions` });
@@ -346,7 +396,7 @@ const SurveyDesigner = () => {
       toast({ title: t('common.error'), description: language === 'ar' ? "لا يوجد استبيان لتصديره" : "No survey to export", variant: "destructive" }); return;
     }
     exportSurveyToJSON({ title: survey.title, description: survey.description, reportType: survey.reportType, programId: survey.programId, isAnonymous: survey.isAnonymous,
-      questions: questions.map(q => ({ text: q.text, type: q.type, required: q.required || false, options: q.options })),
+      questions: questions.map(q => ({ text: q.text, type: q.type, required: q.type === "section" ? false : q.required || false, options: q.options })),
     });
     toast({ title: t('common.success'), description: language === 'ar' ? "تم تصدير الاستبيان بصيغة JSON بنجاح" : "Survey exported as JSON" });
   };
@@ -356,7 +406,7 @@ const SurveyDesigner = () => {
       toast({ title: t('common.error'), description: language === 'ar' ? "لا يوجد استبيان لتصديره" : "No survey to export", variant: "destructive" }); return;
     }
     exportSurveyToCSV({ title: survey.title, description: survey.description, programId: survey.programId, isAnonymous: survey.isAnonymous,
-      questions: questions.map(q => ({ text: q.text, type: q.type, required: q.required || false, options: q.options })),
+      questions: questions.map(q => ({ text: q.text, type: q.type, required: q.type === "section" ? false : q.required || false, options: q.options })),
     });
     toast({ title: t('common.success'), description: language === 'ar' ? "تم تصدير الاستبيان بصيغة CSV بنجاح" : "Survey exported as CSV" });
   };
@@ -378,7 +428,7 @@ const SurveyDesigner = () => {
         programId: importedData.programId || prev.programId
       }));
       const importedQuestions = importedData.questions.map((q: any, index: number) => ({
-        id: Date.now() + index, text: q.text, type: q.type, orderIndex: index, options: q.options, required: q.required,
+        id: createQuestionId(), text: q.text, type: q.type, orderIndex: index, options: q.options, required: q.type === "section" ? false : q.required,
       }));
       setQuestions(importedQuestions); setCurrentTab("design");
       toast({ title: t('common.success'), description: language === 'ar' ? `تم استيراد ${importedQuestions.length} سؤال بنجاح` : `Imported ${importedQuestions.length} questions` });

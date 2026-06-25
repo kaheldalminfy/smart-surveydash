@@ -8,7 +8,7 @@ import { Star, Printer, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLanguage } from "@/contexts/LanguageContext";
 
-interface Question { id: number; text: string; type: string; required?: boolean; options?: string[]; }
+interface Question { id: string; text: string; type: string; required?: boolean; options?: string[]; }
 interface SurveyPreviewProps {
   isOpen: boolean; onClose: () => void;
   survey: { title: string; description: string; isAnonymous: boolean; };

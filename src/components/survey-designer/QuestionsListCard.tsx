@@ -9,18 +9,18 @@ interface QuestionsListCardProps {
   questions: Question[];
   questionTypes: { value: string; label: string; description: string }[];
   likertLabels: string[];
-  draggedQuestionId: number | null;
-  dragOverQuestionId: number | null;
+  draggedQuestionId: string | null;
+  dragOverQuestionId: string | null;
   onAddSection: () => void;
   onAddQuestion: () => void;
-  onDragStart: (e: React.DragEvent, id: number) => void;
-  onDragOver: (e: React.DragEvent, id: number) => void;
+  onDragStart: (e: React.DragEvent, id: string) => void;
+  onDragOver: (e: React.DragEvent, id: string) => void;
   onDragLeave: () => void;
-  onDrop: (e: React.DragEvent, id: number) => void;
+  onDrop: (e: React.DragEvent, id: string) => void;
   onDragEnd: () => void;
-  onUpdateQuestion: (id: number, field: string, value: any) => void;
-  onDuplicateQuestion: (id: number) => void;
-  onRemoveQuestion: (id: number) => void;
+  onUpdateQuestion: (id: string, field: string, value: any) => void;
+  onDuplicateQuestion: (id: string) => void;
+  onRemoveQuestion: (id: string) => void;
 }
 
 const QuestionsListCard = ({

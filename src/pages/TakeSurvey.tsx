@@ -89,6 +89,7 @@ const TakeSurvey = () => {
   const validateCurrentQuestion = () => {
     const currentQuestion = questions[currentQuestionIndex];
     if (!currentQuestion) return true;
+    if (currentQuestion.type === 'section') return true;
     if (currentQuestion.is_required && (responses[currentQuestion.id] === undefined || responses[currentQuestion.id] === null || responses[currentQuestion.id] === "")) {
       setValidationErrors(prev => ({ ...prev, [currentQuestion.id]: t('takeSurvey.questionRequired') }));
       return false;

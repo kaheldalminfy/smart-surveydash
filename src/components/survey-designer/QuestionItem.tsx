@@ -13,16 +13,16 @@ interface QuestionItemProps {
   questions: Question[];
   questionTypes: { value: string; label: string; description: string }[];
   likertLabels: string[];
-  draggedQuestionId: number | null;
-  dragOverQuestionId: number | null;
-  onDragStart: (e: React.DragEvent, id: number) => void;
-  onDragOver: (e: React.DragEvent, id: number) => void;
+  draggedQuestionId: string | null;
+  dragOverQuestionId: string | null;
+  onDragStart: (e: React.DragEvent, id: string) => void;
+  onDragOver: (e: React.DragEvent, id: string) => void;
   onDragLeave: () => void;
-  onDrop: (e: React.DragEvent, id: number) => void;
+  onDrop: (e: React.DragEvent, id: string) => void;
   onDragEnd: () => void;
-  onUpdate: (id: number, field: string, value: any) => void;
-  onDuplicate: (id: number) => void;
-  onRemove: (id: number) => void;
+  onUpdate: (id: string, field: string, value: any) => void;
+  onDuplicate: (id: string) => void;
+  onRemove: (id: string) => void;
 }
 
 const QuestionItem = ({
