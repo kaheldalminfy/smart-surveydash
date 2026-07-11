@@ -1,0 +1,268 @@
+{
+  "version": 1,
+  "sdk_version": "0.20.1",
+  "path": "/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://dzjglpfhwmgbsprpgzbk.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "quality-hss-mcp",
+      "version": "0.1.0",
+      "title": "Quality HSS"
+    },
+    "tools": [
+      {
+        "name": "get_me",
+        "title": "Get current user",
+        "description": "Return the signed-in user's profile and roles in Quality HSS.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_programs",
+        "title": "List academic programs",
+        "description": "List the academic programs the signed-in user can access.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_surveys",
+        "title": "List surveys",
+        "description": "List surveys visible to the signed-in user, optionally filtered by status, academic year, semester, or program.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "active",
+                    "closed"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by survey status."
+            },
+            "academic_year": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Filter by academic year, e.g. 2025-2026."
+            },
+            "semester": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Filter by semester."
+            },
+            "program_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by program UUID."
+            },
+            "limit": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Max rows to return (default 50)."
+            }
+          },
+          "required": [
+            "status",
+            "academic_year",
+            "semester",
+            "program_id",
+            "limit"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_complaints",
+        "title": "List complaints",
+        "description": "List complaints visible to the signed-in user, optionally filtered by status, program, academic year or semester.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "in_progress",
+                    "resolved"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by complaint status."
+            },
+            "program_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by program UUID."
+            },
+            "academic_year": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Filter by academic year."
+            },
+            "semester": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Filter by semester."
+            },
+            "limit": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Max rows to return (default 50)."
+            }
+          },
+          "required": [
+            "status",
+            "program_id",
+            "academic_year",
+            "semester",
+            "limit"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_recommendations",
+        "title": "List recommendations",
+        "description": "List quality recommendations visible to the signed-in user, optionally filtered by status or program.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Filter by recommendation status."
+            },
+            "program_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by program UUID."
+            },
+            "limit": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Max rows to return (default 50)."
+            }
+          },
+          "required": [
+            "status",
+            "program_id",
+            "limit"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
