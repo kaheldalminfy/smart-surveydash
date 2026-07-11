@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +20,7 @@ const loginSchema = z.object({
 
 const Auth = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const { t, language } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
@@ -29,13 +30,17 @@ const Auth = () => {
     password: "",
   });
 
+  // Preserve ?next= so OAuth-consent (or any deep-link) returns after login.
+  const rawNext = searchParams.get("next");
+  const nextPath = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/dashboard";
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        navigate("/dashboard");
+        navigate(nextPath);
       }
     });
-  }, [navigate]);
+  }, [navigate, nextPath]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,7 +100,7 @@ const Auth = () => {
         description: language === 'ar' ? "مرحباً بك في منظومة الاستبيانات الذكية" : "Welcome to the Smart Survey System",
       });
       
-      navigate("/dashboard");
+      navigate(nextPath);
     } catch (error: any) {
       toast({
         title: language === 'ar' ? "خطأ في تسجيل الدخول" : "Login error",
@@ -113,7 +118,7 @@ const Auth = () => {
       <ForcePasswordChange
         onPasswordChanged={() => {
           setForcePasswordChange(false);
-          navigate("/dashboard");
+          navigate(nextPath);
         }}
       />
     );
