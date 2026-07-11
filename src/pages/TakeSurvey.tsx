@@ -337,6 +337,7 @@ const TakeSurvey = () => {
                 {survey.description && <p className="text-muted-foreground text-base">{survey.description}</p>}
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
+                <LanguageToggle />
                 {survey.is_anonymous && (
                   <Badge variant="secondary" className="text-xs">
                     <CheckCircle2 className="h-3 w-3 ml-1" />
