@@ -294,7 +294,8 @@ const TakeSurvey = () => {
 
   if (!survey) {
     return (
-      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center relative">
+        <div className="absolute top-4 right-4"><LanguageToggle /></div>
         <Card className="w-full max-w-md">
           <CardContent className="text-center py-8">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
