@@ -100,7 +100,7 @@ const Auth = () => {
         description: language === 'ar' ? "مرحباً بك في منظومة الاستبيانات الذكية" : "Welcome to the Smart Survey System",
       });
       
-      navigate("/dashboard");
+      navigate(nextPath);
     } catch (error: any) {
       toast({
         title: language === 'ar' ? "خطأ في تسجيل الدخول" : "Login error",
@@ -118,7 +118,7 @@ const Auth = () => {
       <ForcePasswordChange
         onPasswordChanged={() => {
           setForcePasswordChange(false);
-          navigate("/dashboard");
+          navigate(nextPath);
         }}
       />
     );
