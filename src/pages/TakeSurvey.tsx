@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 interface Question {
   id: string;
@@ -281,7 +282,8 @@ const TakeSurvey = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center relative">
+        <div className="absolute top-4 right-4"><LanguageToggle /></div>
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">{t('takeSurvey.loading')}</p>
@@ -292,7 +294,8 @@ const TakeSurvey = () => {
 
   if (!survey) {
     return (
-      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center relative">
+        <div className="absolute top-4 right-4"><LanguageToggle /></div>
         <Card className="w-full max-w-md">
           <CardContent className="text-center py-8">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
@@ -306,7 +309,8 @@ const TakeSurvey = () => {
 
   if (questions.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center relative">
+        <div className="absolute top-4 right-4"><LanguageToggle /></div>
         <Card className="w-full max-w-md">
           <CardContent className="text-center py-8">
             <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
@@ -333,6 +337,7 @@ const TakeSurvey = () => {
                 {survey.description && <p className="text-muted-foreground text-base">{survey.description}</p>}
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
+                <LanguageToggle />
                 {survey.is_anonymous && (
                   <Badge variant="secondary" className="text-xs">
                     <CheckCircle2 className="h-3 w-3 ml-1" />
