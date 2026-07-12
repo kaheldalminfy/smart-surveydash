@@ -1,7 +1,7 @@
 // PDF Export Utilities v7 - Enhanced with Filter Support, Bar Charts, Reordered Sections
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+import writeXlsxFile, { type SheetData } from 'write-excel-file/browser';
 import { loadEmbeddedArabicFont } from './embeddedArabicFont';
 import { toast } from '@/hooks/use-toast';
 import { getReportCopy, inferSurveyReportType, SurveyReportType } from './reportType';
@@ -17,6 +17,29 @@ interface ChartImage {
 interface TextResponse {
   question: string;
   responses: string[];
+}
+
+interface RawExcelAnswer {
+  question_id: string;
+  value: string | null;
+  numeric_value: number | null;
+}
+
+interface RawExcelResponse {
+  id: string;
+  submitted_at: string | null;
+  answers: RawExcelAnswer[];
+}
+
+interface RawExcelQuestion {
+  id: string;
+  text: string;
+  order_index: number;
+}
+
+interface RawExcelData {
+  responses: RawExcelResponse[];
+  questions: RawExcelQuestion[];
 }
 
 interface QuestionStat {
@@ -753,28 +776,34 @@ const buildPDFDocument = async (
     yPos = drawSectionHeader(doc, yPos, 'الردود النصية المفتوحة', COLORS.amber, pageWidth, margin, fontLoaded);
 
     for (const item of textResponses) {
-      yPos = checkNewPage(doc, yPos, 35, pageHeight);
-      doc.setFillColor(...COLORS.lightGray);
-      if (fontLoaded) doc.setFont('Amiri', 'normal');
-      doc.setFontSize(10);
-      const qLines = doc.splitTextToSize(item.question, pageWidth - margin * 2 - 8);
-      const qHeight = qLines.length * 4.5 + 6;
-      doc.roundedRect(margin, yPos, pageWidth - margin * 2, qHeight, 2, 2, 'F');
-      doc.setTextColor(...COLORS.darkBlue);
-      doc.text(qLines, pageWidth - margin - 4, yPos + 5, { align: 'right' });
-      yPos += qHeight + 4;
-
-      doc.setTextColor(...COLORS.text);
-      doc.setFontSize(9);
-      const maxResp = item.responses.length;
-      for (let i = 0; i < maxResp; i++) {
-        yPos = checkNewPage(doc, yPos, 12, pageHeight);
-        const respText = `• ${item.responses[i]}`;
-        const respLines = doc.splitTextToSize(respText, pageWidth - margin * 2 - 15);
-        doc.text(respLines, pageWidth - margin - 8, yPos, { align: 'right' });
-        yPos += respLines.length * 4 + 3;
-      }
-      yPos += 8;
+      yPos = checkNewPage(doc, yPos, 25, pageHeight);
+      autoTable(doc, {
+        startY: yPos,
+        head: [[item.question]],
+        body: item.responses.map((response, index) => [`${index + 1}. ${response}`]),
+        styles: {
+          font: fontLoaded ? 'Amiri' : 'helvetica',
+          fontStyle: 'normal',
+          fontSize: 9,
+          cellPadding: 3,
+          halign: 'right',
+          overflow: 'linebreak',
+          valign: 'top',
+        },
+        headStyles: {
+          fillColor: COLORS.lightGray,
+          textColor: COLORS.darkBlue,
+          fontSize: 10,
+          halign: 'right',
+        },
+        bodyStyles: { textColor: COLORS.text },
+        margin: { left: margin, right: margin, bottom: 30 },
+        pageBreak: 'auto',
+        rowPageBreak: 'auto',
+        showHead: 'firstPage',
+        theme: 'grid',
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 8;
     }
   }
 
@@ -909,66 +938,123 @@ export const generatePDFBlob = async (
 /**
  * Export to Excel
  */
-export const exportToExcel = (report: any, survey: any, stats: any, textResponses?: TextResponse[]) => {
-  try {
-    const reportType = (stats.reportType || inferSurveyReportType(survey)) as SurveyReportType;
-    const reportCopy = getReportCopy(reportType, 'ar');
-    const excelReportTitle = String(stats.reportTitle || report?.statistics?.report_title || reportCopy.reportTitle);
-    const wb = XLSX.utils.book_new();
-    const summaryData = [
-      [excelReportTitle], [''],
-      ['العنوان', survey?.title || ''],
-      ['البرنامج', survey?.programs?.name || ''],
-      ['نوع التقرير', reportCopy.reportSubtitle],
-      ['الفصل الدراسي', report?.semester || ''],
-      ['العام الأكاديمي', report?.academic_year || ''],
-      [''], ['الإحصائيات'],
-      [reportCopy.totalResponses, stats.totalResponses || 0],
-      [reportCopy.targetCount, stats.targetEnrollment || 'غير محدد'],
-      ['معدل الاستجابة', `${stats.responseRate || 0}%`],
-      [reportCopy.overallMean, stats.overallMean ? Number(stats.overallMean).toFixed(2) : '-'],
-      ['الانحراف المعياري', stats.overallStdDev ? Number(stats.overallStdDev).toFixed(2) : '-'],
-      [''], ['الملخص التنفيذي'], [report?.summary || 'لا يوجد'],
-      [''], ['التوصيات'], [report?.recommendations_text || 'لا توجد'],
+export const exportToExcel = async (
+  report: any,
+  survey: any,
+  stats: any,
+  textResponses?: TextResponse[],
+  rawData?: RawExcelData,
+) => {
+  const reportType = (stats.reportType || inferSurveyReportType(survey)) as SurveyReportType;
+  const reportCopy = getReportCopy(reportType, 'ar');
+  const excelReportTitle = String(stats.reportTitle || report?.statistics?.report_title || reportCopy.reportTitle);
+  const sheets: Array<{
+    data: SheetData;
+    sheet: string;
+    columns: Array<{ width: number }>;
+    rightToLeft: boolean;
+    stickyRowsCount?: number;
+  }> = [];
+
+  const summaryData: SheetData = [
+    [excelReportTitle], [''],
+    ['العنوان', survey?.title || ''],
+    ['البرنامج', survey?.programs?.name || ''],
+    ['نوع التقرير', reportCopy.reportSubtitle],
+    ['الفصل الدراسي', report?.semester || ''],
+    ['العام الأكاديمي', report?.academic_year || ''],
+    [''], ['الإحصائيات'],
+    [reportCopy.totalResponses, stats.totalResponses || 0],
+    [reportCopy.targetCount, stats.targetEnrollment || 'غير محدد'],
+    ['معدل الاستجابة', `${stats.responseRate || 0}%`],
+    [reportCopy.overallMean, stats.overallMean ? Number(stats.overallMean).toFixed(2) : '-'],
+    ['الانحراف المعياري', stats.overallStdDev ? Number(stats.overallStdDev).toFixed(2) : '-'],
+    [''], ['الملخص التنفيذي'], [report?.summary || 'لا يوجد'],
+    [''], ['التوصيات'], [report?.recommendations_text || 'لا توجد'],
+  ];
+  sheets.push({
+    data: summaryData,
+    sheet: 'الملخص',
+    columns: [{ width: 30 }, { width: 60 }],
+    rightToLeft: true,
+  });
+
+  if (stats.questionStats?.length > 0) {
+    const questionsData: SheetData = [
+      ['#', 'السؤال', 'النوع', 'المتوسط', 'الانحراف المعياري', 'عدد الردود', 'التقييم'],
+      ...stats.questionStats.map((question: QuestionStat, index: number) => [
+        index + 1,
+        question.question,
+        question.type === 'likert' ? 'ليكرت' : question.type === 'mcq' ? 'اختيار' : question.type === 'rating' ? 'تقييم' : 'نصي',
+        question.mean ? Number(question.mean).toFixed(2) : '-',
+        question.stdDev ? Number(question.stdDev).toFixed(2) : '-',
+        question.responseCount || 0,
+        question.mean ? getMeanLevel(question.mean).label : '-',
+      ]),
     ];
-    const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
-    summarySheet['!cols'] = [{ wch: 30 }, { wch: 60 }];
-    XLSX.utils.book_append_sheet(wb, summarySheet, 'الملخص');
+    sheets.push({
+      data: questionsData,
+      sheet: 'الأسئلة',
+      columns: [{ width: 6 }, { width: 60 }, { width: 14 }, { width: 12 }, { width: 18 }, { width: 14 }, { width: 14 }],
+      rightToLeft: true,
+      stickyRowsCount: 1,
+    });
+  }
 
-    if (stats.questionStats?.length > 0) {
-      const questionsData = [
-        ['#', 'السؤال', 'النوع', 'المتوسط', 'الانحراف المعياري', 'عدد الردود', 'التقييم'],
-        ...stats.questionStats.map((q: any, i: number) => [
-          i + 1, q.question,
-          q.type === 'likert' ? 'ليكرت' : q.type === 'mcq' ? 'اختيار' : q.type === 'rating' ? 'تقييم' : 'نصي',
-          q.mean ? Number(q.mean).toFixed(2) : '-',
-          q.stdDev ? Number(q.stdDev).toFixed(2) : '-',
-          q.responseCount || 0,
-          q.mean ? getMeanLevel(q.mean).label : '-',
-        ]),
-      ];
-      const questionsSheet = XLSX.utils.aoa_to_sheet(questionsData);
-      questionsSheet['!cols'] = [{ wch: 5 }, { wch: 60 }, { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 12 }, { wch: 12 }];
-      XLSX.utils.book_append_sheet(wb, questionsSheet, 'الأسئلة');
-    }
+  if (rawData?.responses.length && rawData.questions.length) {
+    const orderedQuestions = [...rawData.questions].sort((a, b) => a.order_index - b.order_index);
+    const rawAnswersData: SheetData = [
+      ['رقم الاستجابة', 'وقت الإرسال', ...orderedQuestions.map(question => question.text)],
+      ...rawData.responses.map((response, responseIndex) => {
+        const answerByQuestion = new Map(response.answers.map(answer => [answer.question_id, answer]));
+        return [
+          responseIndex + 1,
+          response.submitted_at ? new Date(response.submitted_at) : '',
+          ...orderedQuestions.map(question => {
+            const answer = answerByQuestion.get(question.id);
+            return answer?.value ?? answer?.numeric_value ?? '';
+          }),
+        ];
+      }),
+    ];
+    sheets.push({
+      data: rawAnswersData,
+      sheet: 'جميع الإجابات',
+      columns: [
+        { width: 15 },
+        { width: 24 },
+        ...orderedQuestions.map(() => ({ width: 36 })),
+      ],
+      rightToLeft: true,
+      stickyRowsCount: 1,
+    });
+  }
 
-    if (textResponses?.length) {
-      const textData: any[][] = [['السؤال', 'الرد']];
-      textResponses.forEach(item => {
-        item.responses.forEach((resp, i) => textData.push([i === 0 ? item.question : '', resp]));
-        textData.push(['', '']);
-      });
-      const textSheet = XLSX.utils.aoa_to_sheet(textData);
-      textSheet['!cols'] = [{ wch: 50 }, { wch: 80 }];
-      XLSX.utils.book_append_sheet(wb, textSheet, 'الردود النصية');
-    }
+  if (textResponses?.length) {
+    const textData: SheetData = [['السؤال', 'الرد']];
+    textResponses.forEach(item => {
+      item.responses.forEach((response, index) => textData.push([index === 0 ? item.question : '', response]));
+      textData.push(['', '']);
+    });
+    sheets.push({
+      data: textData,
+      sheet: 'الردود النصية',
+      columns: [{ width: 50 }, { width: 80 }],
+      rightToLeft: true,
+      stickyRowsCount: 1,
+    });
+  }
 
-    const filename = `تقرير_${(survey?.title || 'استبيان').substring(0, 30)}_${new Date().toISOString().split('T')[0]}.xlsx`;
-    XLSX.writeFile(wb, filename);
-    toast({ title: 'تم التصدير بنجاح', description: `تم حفظ ملف Excel` });
+  const safeTitle = String(survey?.title || 'استبيان')
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .substring(0, 40);
+  const filename = `تقرير_${safeTitle}_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+  try {
+    await writeXlsxFile(sheets, { fontFamily: 'Arial', fontSize: 11 }).toFile(filename);
   } catch (error) {
     console.error('Excel Export Error:', error);
-    toast({ title: 'خطأ في التصدير', description: 'حدث خطأ أثناء إنشاء ملف Excel.', variant: 'destructive' });
+    throw error;
   }
 };
 

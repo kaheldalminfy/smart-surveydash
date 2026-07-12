@@ -78,16 +78,29 @@ const Archives = () => {
     try {
       toast({ title: language === 'ar' ? 'جاري إنشاء PDF...' : 'Generating PDF...' });
       await downloadArchivePDF(item as any);
-      // Bump export_count (best-effort, allowed by trigger even on frozen)
-      await supabase
-        .from('archives')
-        .update({ export_count: ((item as any).export_count ?? 0) + 1 })
-        .eq('id', item.id);
-      await supabase.from('archive_audit_log').insert({
-        archive_id: item.id,
-        action: 'exported_pdf',
-        metadata: { format: 'pdf' },
-      } as any);
+      const { error: auditError } = await supabase.rpc('record_archive_export', {
+        p_archive_id: item.id,
+        p_format: 'pdf',
+      });
+
+      if (auditError) {
+        const message = `${auditError.message || ''} ${auditError.details || ''}`.toLowerCase();
+        const isMissingRpc = auditError.code === 'PGRST202'
+          || (message.includes('record_archive_export') && message.includes('function'));
+        if (isMissingRpc) {
+          await supabase
+            .from('archives')
+            .update({ export_count: ((item as any).export_count ?? 0) + 1 })
+            .eq('id', item.id);
+          await supabase.from('archive_audit_log').insert({
+            archive_id: item.id,
+            action: 'exported',
+            metadata: { format: 'pdf' },
+          } as any);
+        } else {
+          console.warn('Archive export audit failed', auditError);
+        }
+      }
       toast({ title: language === 'ar' ? 'تم التنزيل' : 'Downloaded' });
     } catch (e: any) {
       toast({

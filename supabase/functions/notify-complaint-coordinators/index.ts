@@ -17,9 +17,9 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, serviceKey)
 
-    const { complaintId } = await req.json()
-    if (!complaintId) {
-      return json({ error: 'complaintId required' }, 400)
+    const { complaintId, submissionToken } = await req.json()
+    if (!complaintId || !submissionToken) {
+      return json({ error: 'complaintId and submissionToken are required' }, 400)
     }
 
     // Fetch complaint
@@ -27,6 +27,7 @@ Deno.serve(async (req) => {
       .from('complaints')
       .select('*')
       .eq('id', complaintId)
+      .eq('submission_token', submissionToken)
       .maybeSingle()
 
     if (cErr || !complaint) {

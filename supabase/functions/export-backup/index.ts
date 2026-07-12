@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import JSZip from "https://esm.sh/jszip@3.10.1";
+import JSZip from "npm:jszip@3.10.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -78,11 +78,11 @@ Deno.serve(async (req) => {
         const { data, error } = await supabaseAdmin
           .from(table.name)
           .select("*")
+          .order("id", { ascending: true })
           .range(offset, offset + pageSize - 1);
 
         if (error) {
-          console.error(`Error fetching ${table.name}:`, error);
-          break;
+          throw new Error(`Failed to export ${table.name}: ${error.message}`);
         }
 
         if (data && data.length > 0) {
@@ -121,16 +121,18 @@ Deno.serve(async (req) => {
     }
 
     const zipBuffer = await zip.generateAsync({ type: "uint8array" });
+    const zipBody = Uint8Array.from(zipBuffer).buffer;
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const filename = `backup-survey-data-${timestamp}.zip`;
 
-    return new Response(zipBuffer, {
+    return new Response(zipBody, {
       status: 200,
       headers: {
         ...corsHeaders,
         "Content-Type": "application/zip",
         "Content-Disposition": `attachment; filename="${filename}"`,
+        "Cache-Control": "private, no-store",
       },
     });
   } catch (error: unknown) {

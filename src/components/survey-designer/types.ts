@@ -17,5 +17,4 @@ export interface SurveyFormData {
   endDate: string;
   semester: string;
   academicYear: string;
-  targetEnrollment: string;
 }

@@ -38,7 +38,15 @@ export default function AICopilotWidget() {
   const send = async (text: string) => {
     const q = text.trim();
     if (!q || loading) return;
-    const next = [...messages, { role: "user" as const, content: q }];
+    if (q.length > 4000) {
+      toast({
+        title: language === "ar" ? "خطأ" : "Error",
+        description: language === "ar" ? "الرسالة طويلة جدًا." : "The message is too long.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const next = [...messages, { role: "user" as const, content: q }].slice(-20);
     setMessages(next);
     setInput("");
     setLoading(true);

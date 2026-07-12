@@ -6,6 +6,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const PAGE_SIZE = 500;
+const MAX_ANALYTICS_ROWS = 100_000;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
@@ -21,27 +24,40 @@ Deno.serve(async (req) => {
     const { data: u } = await supabase.auth.getUser();
     if (!u?.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    // Load programs
-    const { data: programs } = await supabase.from("programs").select("id, name");
+    const { data: programs, error: programsError } = await supabase.from("programs").select("id, name").order("id");
+    if (programsError) throw programsError;
     if (!programs?.length) return new Response(JSON.stringify({ programs: [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    // Load Likert/rating answers with period + program
-    const { data: answers, error: aerr } = await supabase
-      .from("answers")
-      .select("numeric_value, responses!inner(submitted_at, surveys!inner(program_id, academic_year, semester)), questions!inner(type, is_archived)")
-      .eq("questions.is_archived", false)
-      .in("questions.type", ["rating", "likert"])
-      .limit(10000);
-    if (aerr) throw aerr;
-
-    // Open-ended complaints per program
-    const { data: complaints } = await supabase
-      .from("complaints")
-      .select("program_id, status, created_at");
+    const answers: any[] = [];
+    const complaints: any[] = [];
+    for (let from = 0; from < MAX_ANALYTICS_ROWS; from += PAGE_SIZE) {
+      const { data: page, error } = await supabase
+        .from("answers")
+        .select("numeric_value, responses!inner(is_complete, submitted_at, surveys!inner(program_id, academic_year, semester)), questions!inner(type)")
+        .eq("responses.is_complete", true)
+        .in("questions.type", ["rating", "likert"])
+        .order("id")
+        .range(from, from + PAGE_SIZE - 1);
+      if (error) throw error;
+      answers.push(...(page || []));
+      if ((page || []).length < PAGE_SIZE) break;
+      if (from + PAGE_SIZE >= MAX_ANALYTICS_ROWS) throw new Error("Rating analysis limit exceeded");
+    }
+    for (let from = 0; from < MAX_ANALYTICS_ROWS; from += PAGE_SIZE) {
+      const { data: page, error } = await supabase
+        .from("complaints")
+        .select("id, program_id, status, created_at")
+        .order("id")
+        .range(from, from + PAGE_SIZE - 1);
+      if (error) throw error;
+      complaints.push(...(page || []));
+      if ((page || []).length < PAGE_SIZE) break;
+      if (from + PAGE_SIZE >= MAX_ANALYTICS_ROWS) throw new Error("Complaint analysis limit exceeded");
+    }
 
     // Group by program & period (year+semester)
     const periods: Record<string, Record<string, { sum: number; n: number }>> = {};
-    (answers || []).forEach((a: any) => {
+    answers.forEach((a: any) => {
       const v = a.numeric_value;
       const s = a.responses?.surveys;
       if (!s || v == null || v < 1 || v > 5) return;
@@ -61,7 +77,7 @@ Deno.serve(async (req) => {
       const last = series.at(-1)?.avg ?? null;
       const prev = series.at(-2)?.avg ?? null;
       const trend = last != null && prev != null ? +(last - prev).toFixed(2) : null;
-      const complaintsOpen = (complaints || []).filter((c: any) => c.program_id === p.id && c.status !== "resolved").length;
+      const complaintsOpen = complaints.filter((c: any) => c.program_id === p.id && c.status !== "resolved" && c.status !== "closed").length;
       return { id: p.id, name: p.name, series, last, prev, trend, complaintsOpen };
     });
 

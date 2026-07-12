@@ -6,6 +6,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const PAGE_SIZE = 500;
+const MAX_ANALYTICS_ROWS = 100_000;
+
 const tools = [
   {
     type: "function",
@@ -97,16 +100,24 @@ const tools = [
 async function runTool(name: string, args: any, supabase: any) {
   switch (name) {
     case "query_complaints": {
-      let q = supabase.from("complaints").select("status, program_id", { count: "exact" });
+      let q = supabase.from("complaints").select("status, program_id", { count: "exact", head: true });
       if (args.status) q = q.eq("status", args.status);
       if (args.academic_year) q = q.eq("academic_year", args.academic_year);
       if (args.semester) q = q.eq("semester", args.semester);
       if (args.program_id) q = q.eq("program_id", args.program_id);
-      const { data, count, error } = await q;
+      const { count, error } = await q;
       if (error) return { error: error.message };
       if (args.group_by_status) {
         const grouped: Record<string, number> = {};
-        (data || []).forEach((r: any) => { grouped[r.status] = (grouped[r.status] || 0) + 1; });
+        for (const status of ["pending", "in_progress", "resolved", "closed"]) {
+          let statusQuery = supabase.from("complaints").select("id", { count: "exact", head: true }).eq("status", status);
+          if (args.academic_year) statusQuery = statusQuery.eq("academic_year", args.academic_year);
+          if (args.semester) statusQuery = statusQuery.eq("semester", args.semester);
+          if (args.program_id) statusQuery = statusQuery.eq("program_id", args.program_id);
+          const { count: statusCount, error: statusError } = await statusQuery;
+          if (statusError) return { error: statusError.message };
+          grouped[status] = statusCount || 0;
+        }
         return { total: count, by_status: grouped };
       }
       return { total: count };
@@ -124,6 +135,7 @@ async function runTool(name: string, args: any, supabase: any) {
     }
     case "query_responses_count": {
       let q = supabase.from("responses").select("survey_id, surveys!inner(academic_year, semester, program_id)", { count: "exact", head: true });
+      q = q.eq("is_complete", true);
       if (args.academic_year) q = q.eq("surveys.academic_year", args.academic_year);
       if (args.semester) q = q.eq("surveys.semester", args.semester);
       if (args.program_id) q = q.eq("surveys.program_id", args.program_id);
@@ -132,13 +144,24 @@ async function runTool(name: string, args: any, supabase: any) {
       return { total: count };
     }
     case "query_avg_ratings": {
-      let q = supabase.from("answers").select("numeric_value, responses!inner(surveys!inner(program_id, academic_year, semester)), questions!inner(type, is_archived)").eq("questions.is_archived", false);
-      if (args.academic_year) q = q.eq("responses.surveys.academic_year", args.academic_year);
-      if (args.semester) q = q.eq("responses.surveys.semester", args.semester);
-      const { data, error } = await q.limit(5000);
-      if (error) return { error: error.message };
+      const data: any[] = [];
+      for (let from = 0; from < MAX_ANALYTICS_ROWS; from += PAGE_SIZE) {
+        let q = supabase
+          .from("answers")
+          .select("numeric_value, responses!inner(is_complete, surveys!inner(program_id, academic_year, semester)), questions!inner(type)")
+          .eq("responses.is_complete", true)
+          .in("questions.type", ["rating", "likert"])
+          .order("id", { ascending: true });
+        if (args.academic_year) q = q.eq("responses.surveys.academic_year", args.academic_year);
+        if (args.semester) q = q.eq("responses.surveys.semester", args.semester);
+        const { data: page, error } = await q.range(from, from + PAGE_SIZE - 1);
+        if (error) return { error: error.message };
+        data.push(...(page || []));
+        if ((page || []).length < PAGE_SIZE) break;
+        if (from + PAGE_SIZE >= MAX_ANALYTICS_ROWS) return { error: "Rating analysis limit exceeded" };
+      }
       const buckets: Record<string, { sum: number; n: number }> = {};
-      (data || []).forEach((a: any) => {
+      data.forEach((a: any) => {
         const t = a.questions?.type;
         const v = a.numeric_value;
         if (!t || v == null || v < 1 || v > 5) return;
@@ -152,7 +175,7 @@ async function runTool(name: string, args: any, supabase: any) {
       return { averages: result };
     }
     case "query_recommendations": {
-      let q = supabase.from("recommendations").select("status", { count: "exact" });
+      let q = supabase.from("recommendations").select("status", { count: "exact", head: true });
       if (args.status) q = q.eq("status", args.status);
       if (args.program_id) q = q.eq("program_id", args.program_id);
       const { count, error } = await q;
@@ -188,7 +211,16 @@ Deno.serve(async (req) => {
     }
 
     const { messages } = await req.json();
-    if (!Array.isArray(messages)) {
+    if (!Array.isArray(messages) || messages.length > 20
+      || messages.some((message: unknown) => {
+        if (!message || typeof message !== 'object') return true;
+        const row = message as Record<string, unknown>;
+        return !['user', 'assistant'].includes(String(row.role))
+          || typeof row.content !== 'string'
+          || row.content.length < 1
+          || row.content.length > 4000;
+      })
+      || messages.reduce((sum: number, message: { content: string }) => sum + message.content.length, 0) > 20000) {
       return new Response(JSON.stringify({ error: "messages array required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -202,13 +234,13 @@ Deno.serve(async (req) => {
 - عند الإشارة لبرنامج، استخدم اسمه (استدع list_programs عند الحاجة).
 - نتائج المتوسطات على مقياس Likert من 1 إلى 5.`;
 
-    let convo: any[] = [{ role: "system", content: systemPrompt }, ...messages];
+    const convo: any[] = [{ role: "system", content: systemPrompt }, ...messages];
 
     for (let i = 0; i < 6; i++) {
       const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "google/gemini-2.5-flash", messages: convo, tools, tool_choice: "auto" }),
+        body: JSON.stringify({ model: "google/gemini-2.5-flash", messages: convo, tools, tool_choice: "auto", max_tokens: 1500 }),
       });
       if (!resp.ok) {
         if (resp.status === 429) return new Response(JSON.stringify({ error: "تم تجاوز حد الطلبات" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -224,7 +256,11 @@ Deno.serve(async (req) => {
         convo.push(msg);
         for (const call of msg.tool_calls) {
           let args = {};
-          try { args = JSON.parse(call.function.arguments || "{}"); } catch {}
+          try {
+            args = JSON.parse(call.function.arguments || "{}");
+          } catch {
+            args = {};
+          }
           const result = await runTool(call.function.name, args, supabase);
           convo.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
         }

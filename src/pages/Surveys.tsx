@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import QRCodeDialog from "@/components/QRCodeDialog";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { isMissingCompletionColumn } from "@/lib/paginatedSurveyData";
 
 const Surveys = () => {
   const navigate = useNavigate();
@@ -104,30 +105,32 @@ const Surveys = () => {
     const isDean = userRoles?.some(r => r.role === 'dean');
     const userProgramIds = userRoles?.map(r => r.program_id).filter(Boolean);
 
-    // Build query based on role
-    let query = supabase
-      .from("surveys")
-      .select(`
-        *,
-        programs(name),
-        responses(count)
-      `);
+    const fetchSurveys = (requireComplete: boolean) => {
+      let query = supabase
+        .from("surveys")
+        .select(`
+          *,
+          programs(name),
+          responses(count)
+        `);
+      if (requireComplete) query = query.eq("responses.is_complete", true);
+      if (!isAdmin && !isDean && userProgramIds && userProgramIds.length > 0) {
+        query = query.in("program_id", userProgramIds);
+      }
+      return query.order("created_at", { ascending: false });
+    };
 
-    // Filter by program if not admin or dean
-    if (!isAdmin && !isDean && userProgramIds && userProgramIds.length > 0) {
-      query = query.in("program_id", userProgramIds);
-    }
+    let result = await fetchSurveys(true);
+    if (result.error && isMissingCompletionColumn(result.error)) result = await fetchSurveys(false);
 
-    const { data, error } = await query.order("created_at", { ascending: false });
-
-    if (error) {
+    if (result.error) {
       toast({
         title: t('common.error'),
         description: t('surveys.loadError') || "فشل في تحميل الاستبيانات",
         variant: "destructive",
       });
-    } else if (data) {
-      setSurveys(data);
+    } else if (result.data) {
+      setSurveys(result.data);
     }
     setLoading(false);
   };
@@ -336,6 +339,42 @@ const Surveys = () => {
   };
 
   const handleDeleteSurvey = async () => {
+    const { count, error: countError } = await supabase
+      .from("responses")
+      .select("id", { count: "exact", head: true })
+      .eq("survey_id", deleteDialog.id);
+
+    if (countError) {
+      toast({
+        title: t('common.error'),
+        description: language === 'ar' ? "تعذر التحقق من الاستجابات، لذلك لم يتم الحذف." : "Could not verify responses, so the survey was not deleted.",
+        variant: "destructive",
+      });
+      setDeleteDialog({open: false, id: '', type: 'survey'});
+      return;
+    }
+
+    if ((count || 0) > 0) {
+      const { error: closeError } = await supabase
+        .from("surveys")
+        .update({ status: "closed" })
+        .eq("id", deleteDialog.id);
+
+      if (closeError) {
+        toast({ title: t('common.error'), description: t('surveys.deleteError') || "Failed to close survey", variant: "destructive" });
+      } else {
+        toast({
+          title: t('common.updated'),
+          description: language === 'ar'
+            ? "تم إغلاق الاستبيان بدلاً من حذفه لحماية الإجابات والتقارير."
+            : "The survey was closed instead of deleted to protect responses and reports.",
+        });
+        await loadSurveys();
+      }
+      setDeleteDialog({open: false, id: '', type: 'survey'});
+      return;
+    }
+
     const { error } = await supabase
       .from("surveys")
       .delete()
@@ -378,6 +417,11 @@ const Surveys = () => {
     }
     setDeleteDialog({open: false, id: '', type: 'template'});
   };
+
+  const selectedDeleteSurvey = deleteDialog.type === 'survey'
+    ? surveys.find(survey => survey.id === deleteDialog.id)
+    : null;
+  const selectedSurveyResponseCount = Number(selectedDeleteSurvey?.responses?.[0]?.count || 0);
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
@@ -663,14 +707,21 @@ const Surveys = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
             <AlertDialogDescription>
-              هل أنت متأكد من حذف {deleteDialog.type === 'survey' ? 'هذا الاستبيان' : 'هذا النموذج'}؟ 
-              لا يمكن التراجع عن هذا الإجراء.
+              {deleteDialog.type === 'survey' && selectedSurveyResponseCount > 0
+                ? (language === 'ar'
+                  ? `يحتوي الاستبيان على ${selectedSurveyResponseCount} استجابة، لذلك سيتم إغلاقه مع الاحتفاظ بجميع البيانات.`
+                  : `This survey has ${selectedSurveyResponseCount} responses, so it will be closed and all data will be preserved.`)
+                : (language === 'ar'
+                  ? `هل أنت متأكد من حذف ${deleteDialog.type === 'survey' ? 'هذا الاستبيان' : 'هذا النموذج'}؟ لا يمكن التراجع عن هذا الإجراء.`
+                  : `Delete this ${deleteDialog.type === 'survey' ? 'survey' : 'template'}? This action cannot be undone.`)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
             <AlertDialogAction onClick={deleteDialog.type === 'survey' ? handleDeleteSurvey : handleDeleteTemplate}>
-              حذف
+              {deleteDialog.type === 'survey' && selectedSurveyResponseCount > 0
+                ? (language === 'ar' ? 'إغلاق وحفظ البيانات' : 'Close and preserve data')
+                : (language === 'ar' ? 'حذف' : 'Delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +23,7 @@ interface Question {
   order_index: number;
   is_required: boolean;
   help_text?: string;
-  options?: any;
+  options?: { choices?: string[]; scale?: string[] } | string[] | null;
 }
 
 interface Survey {
@@ -32,8 +32,24 @@ interface Survey {
   description: string;
   is_anonymous: boolean;
   status: string;
-  settings?: any;
 }
+
+type ResponseValue = string | number;
+
+const isMissingSubmissionRpcError = (error: { code?: string; message?: string; details?: string }) => {
+  const message = `${error.message || ""} ${error.details || ""}`.toLowerCase();
+  return error.code === "PGRST202"
+    || (message.includes("submit_survey_response") && message.includes("function"));
+};
+
+const questionMeaningChanged = (
+  localQuestion: Question,
+  freshQuestion: Pick<Question, "text" | "type" | "order_index" | "is_required"> & { options: unknown },
+) => localQuestion.text !== freshQuestion.text
+  || localQuestion.type !== freshQuestion.type
+  || localQuestion.order_index !== freshQuestion.order_index
+  || localQuestion.is_required !== freshQuestion.is_required
+  || JSON.stringify(localQuestion.options ?? null) !== JSON.stringify(freshQuestion.options ?? null);
 
 const TakeSurvey = () => {
   const { id } = useParams();
@@ -43,12 +59,13 @@ const TakeSurvey = () => {
   
   const [survey, setSurvey] = useState<Survey | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [responses, setResponses] = useState<Record<string, any>>({});
+  const [responses, setResponses] = useState<Record<string, ResponseValue>>({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const submissionToken = useRef(crypto.randomUUID());
 
   useEffect(() => { if (id) loadSurvey(); }, [id]);
 
@@ -80,7 +97,7 @@ const TakeSurvey = () => {
     } finally { setIsLoading(false); }
   };
 
-  const handleResponseChange = (questionId: string, value: any) => {
+  const handleResponseChange = (questionId: string, value: ResponseValue) => {
     setResponses(prev => ({ ...prev, [questionId]: value }));
     if (validationErrors[questionId]) {
       setValidationErrors(prev => { const newErrors = { ...prev }; delete newErrors[questionId]; return newErrors; });
@@ -101,8 +118,44 @@ const TakeSurvey = () => {
   const nextQuestion = () => { if (validateCurrentQuestion() && currentQuestionIndex < questions.length - 1) setCurrentQuestionIndex(prev => prev + 1); };
   const previousQuestion = () => { if (currentQuestionIndex > 0) setCurrentQuestionIndex(prev => prev - 1); };
 
-  const isAnswered = (val: any) =>
+  const isAnswered = (val: ResponseValue | undefined) =>
     val !== undefined && val !== null && String(val).trim() !== "";
+
+  const submitWithLegacyFlow = async (
+    answersData: Array<{ question_id: string; value: string; numeric_value: number | null }>,
+    userId: string | null,
+  ) => {
+    const responseId = crypto.randomUUID();
+    const { error: responseError } = await supabase.from("responses").insert({
+      id: responseId,
+      survey_id: id!,
+      respondent_id: survey?.is_anonymous || !userId ? null : userId,
+    });
+    if (responseError) throw responseError;
+
+    const { error: answersError } = await supabase.from("answers").insert(
+      answersData.map(answer => ({ ...answer, response_id: responseId })),
+    );
+
+    if (answersError) {
+      // Best-effort cleanup for environments where the atomic RPC has not yet
+      // been applied. The migration remains the authoritative integrity fix.
+      await supabase.from("responses").delete().eq("id", responseId);
+      throw answersError;
+    }
+
+    const { error: completionError } = await supabase
+      .from("responses")
+      .update({ is_complete: true })
+      .eq("id", responseId);
+
+    if (completionError) {
+      // The legacy anonymous policy may not allow this update. The answers are
+      // already committed, so do not report a failed submission and invite a
+      // duplicate retry. The integrity migration backfills this flag safely.
+      console.warn("Could not mark legacy response as complete", completionError);
+    }
+  };
 
   const submitSurvey = async () => {
     // Initial client-side check against current local questions
@@ -131,7 +184,11 @@ const TakeSurvey = () => {
       const localQuestionIds = new Set(questions.map(q => q.id));
       const questionsChanged =
         questions.some(q => !dbQuestionMap.has(q.id)) ||
-        freshQuestions.some(q => !localQuestionIds.has(q.id));
+        freshQuestions.some(q => !localQuestionIds.has(q.id)) ||
+        questions.some(q => {
+          const freshQuestion = dbQuestionMap.get(q.id);
+          return freshQuestion ? questionMeaningChanged(q, freshQuestion) : true;
+        });
       if (questionsChanged) {
         toast({ title: t('common.error'), description: language === 'ar' ? "تغيرت أسئلة الاستبيان. يرجى إعادة تحميل الصفحة" : "Survey questions changed. Please reload.", variant: "destructive" });
         setQuestions(freshQuestions); setResponses({}); setCurrentQuestionIndex(0); setIsSubmitting(false); return;
@@ -154,8 +211,13 @@ const TakeSurvey = () => {
         return;
       }
 
-      let userId = null;
-      try { const { data: { user }, error: authError } = await supabase.auth.getUser(); if (!authError && user) userId = user.id; } catch (authError) {}
+      let userId: string | null = null;
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (!authError && user) userId = user.id;
+      } catch {
+        userId = null;
+      }
 
       // Build answers from FRESH DB questions (source of truth)
       const seen = new Set<string>();
@@ -164,34 +226,29 @@ const TakeSurvey = () => {
         .map(question => {
           const responseValue = responses[question.id];
           const hasValue = isAnswered(responseValue);
-          return {
+          return hasValue ? {
             question_id: question.id,
-            is_required: question.is_required,
-            value: hasValue ? String(responseValue) : null,
+            value: String(responseValue),
             numeric_value: hasValue && !isNaN(Number(responseValue)) ? Number(responseValue) : null,
-          };
+          } : null;
         })
-        // Keep all required questions (even if somehow null — shouldn't happen after validation)
-        // and only optional answers that have a value. This prevents silently dropping required answers.
-        .filter(a => a.is_required || a.value !== null || a.numeric_value !== null)
-        .map(({ is_required, ...rest }) => rest);
-
-      // Final guard: ensure no required answer slipped through as null
-      const requiredCount = freshQuestions.filter(q => q.type !== 'section' && q.is_required).length;
-      const answeredRequiredCount = answersData.filter(a => a.value !== null || a.numeric_value !== null).length;
-      if (answeredRequiredCount < requiredCount) {
-        throw new Error(language === 'ar' ? "إجابات مطلوبة مفقودة. لا يمكن الإرسال." : "Missing required answers. Cannot submit.");
-      }
+        .filter((answer): answer is { question_id: string; value: string; numeric_value: number | null } => answer !== null);
 
       if (answersData.length === 0) throw new Error(language === 'ar' ? "لا توجد إجابات للإرسال" : "No answers to submit");
 
-      const responseId = crypto.randomUUID();
-      const { error: responseError } = await supabase.from("responses").insert({ id: responseId, survey_id: id, respondent_id: survey?.is_anonymous || !userId ? null : userId });
-      if (responseError) throw responseError;
+      const { error: submissionError } = await supabase.rpc("submit_survey_response", {
+        p_survey_id: id!,
+        p_answers: answersData,
+        p_submission_token: submissionToken.current,
+      });
 
-      const answersWithResponseId = answersData.map(a => ({ ...a, response_id: responseId }));
-      const { error: answersError } = await supabase.from("answers").insert(answersWithResponseId);
-      if (answersError) throw answersError;
+      if (submissionError) {
+        if (isMissingSubmissionRpcError(submissionError)) {
+          await submitWithLegacyFlow(answersData, userId);
+        } else {
+          throw submissionError;
+        }
+      }
 
       toast({ title: t('takeSurvey.submitted'), description: t('takeSurvey.thankYou') });
       navigate("/survey-complete", { state: { surveyId: id } });
@@ -216,7 +273,7 @@ const TakeSurvey = () => {
       case "section": return null;
       case "likert":
         return (
-          <RadioGroup key={uniqueKey} value={String(value) || ""} onValueChange={(val) => handleResponseChange(question.id, val)} className="space-y-3">
+          <RadioGroup key={uniqueKey} value={value == null ? "" : String(value)} onValueChange={(val) => handleResponseChange(question.id, val)} className="space-y-3">
             {likertOptions.map((option, index) => {
               const optionId = `q-${question.id}-opt-${index}-${question.order_index}`;
               const isSelected = String(value) === option.value;
@@ -231,10 +288,12 @@ const TakeSurvey = () => {
             })}
           </RadioGroup>
         );
-      case "mcq":
-        const mcqOptions = question.options?.choices || [];
+      case "mcq": {
+        const mcqOptions = Array.isArray(question.options)
+          ? question.options
+          : question.options?.choices || [];
         return (
-          <RadioGroup key={uniqueKey} value={String(value) || ""} onValueChange={(val) => handleResponseChange(question.id, val)} className="space-y-3">
+          <RadioGroup key={uniqueKey} value={value == null ? "" : String(value)} onValueChange={(val) => handleResponseChange(question.id, val)} className="space-y-3">
             {mcqOptions.map((option: string, index: number) => {
               const optionId = `q-${question.id}-opt-${index}-${question.order_index}`;
               const isSelected = String(value) === option;
@@ -249,13 +308,14 @@ const TakeSurvey = () => {
             })}
           </RadioGroup>
         );
+      }
       case "rating":
         return (
           <div className="flex flex-col items-center gap-4 py-6">
             <div className="flex items-center gap-3">
               {[1, 2, 3, 4, 5].map((rating) => (
                 <button key={`rating-${question.id}-${rating}`} type="button" onClick={() => handleResponseChange(question.id, rating)}
-                  className={`p-3 rounded-xl transition-all transform hover:scale-110 ${value >= rating ? 'text-accent scale-110' : 'text-muted-foreground hover:text-accent/70'}`}>
+                  className={`p-3 rounded-xl transition-all transform hover:scale-110 ${Number(value) >= rating ? 'text-accent scale-110' : 'text-muted-foreground hover:text-accent/70'}`}>
                   <Star className="h-10 w-10 fill-current" />
                 </button>
               ))}

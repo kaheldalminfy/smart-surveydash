@@ -3,10 +3,26 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { MessageSquare, Trash2, Printer } from "lucide-react";
+import { Download, Loader2, MessageSquare, Paperclip, Printer, Trash2 } from "lucide-react";
 import { Complaint, getStatusOptions, getCategoryLabel } from "./complaintsHelpers";
 import { useStatusBadge } from "./ComplaintCard";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+
+interface ComplaintAttachment {
+  name: string;
+  path: string;
+  type?: string;
+  size?: number;
+}
+
+const isComplaintAttachment = (value: unknown): value is ComplaintAttachment => {
+  if (!value || typeof value !== 'object') return false;
+  const attachment = value as Record<string, unknown>;
+  return typeof attachment.name === 'string' && typeof attachment.path === 'string';
+};
 
 interface ComplaintDetailsDialogProps {
   complaint: Complaint | null;
@@ -19,11 +35,45 @@ interface ComplaintDetailsDialogProps {
 
 const ComplaintDetailsDialog = ({ complaint, canManage, onClose, onEdit, onDelete, onStatusChange }: ComplaintDetailsDialogProps) => {
   const { t, language } = useLanguage();
+  const { toast } = useToast();
   const statusBadge = useStatusBadge();
   const statusOptions = getStatusOptions(t);
   const locale = language === 'ar' ? 'ar-SA' : 'en-US';
+  const [downloadingPath, setDownloadingPath] = useState<string | null>(null);
 
   if (!complaint) return null;
+
+  const attachments = Array.isArray(complaint.attachments)
+    ? complaint.attachments.filter(isComplaintAttachment)
+    : [];
+
+  const downloadAttachment = async (attachment: ComplaintAttachment) => {
+    setDownloadingPath(attachment.path);
+    try {
+      const { data, error } = await supabase.storage
+        .from('complaint-attachments')
+        .download(attachment.path);
+      if (error) throw error;
+
+      const url = URL.createObjectURL(data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = attachment.name.replace(/[\\/:*?"<>|]/g, '_');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Complaint attachment download failed', error);
+      toast({
+        title: t('common.error'),
+        description: language === 'ar' ? 'تعذر تنزيل المرفق.' : 'Could not download the attachment.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloadingPath(null);
+    }
+  };
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
@@ -133,6 +183,34 @@ const ComplaintDetailsDialog = ({ complaint, canManage, onClose, onEdit, onDelet
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
               <h4 className="font-semibold text-green-900 mb-2">{t('complaintsUI.resolutionNotes')}</h4>
               <p className="text-green-800 whitespace-pre-wrap">{complaint.resolution_notes}</p>
+            </div>
+          )}
+
+          {attachments.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="flex items-center gap-2 font-medium">
+                <Paperclip className="h-4 w-4" />
+                {t('complaints.attachments')} ({attachments.length})
+              </h4>
+              <div className="space-y-2">
+                {attachments.map((attachment) => (
+                  <div key={attachment.path} className="flex items-center justify-between gap-3 rounded-md border p-3">
+                    <span className="min-w-0 flex-1 truncate text-sm" title={attachment.name}>{attachment.name}</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={downloadingPath === attachment.path}
+                      onClick={() => void downloadAttachment(attachment)}
+                    >
+                      {downloadingPath === attachment.path
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : <Download className="h-4 w-4" />}
+                      <span className="sr-only">{language === 'ar' ? 'تنزيل المرفق' : 'Download attachment'}</span>
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
           

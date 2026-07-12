@@ -12,6 +12,7 @@ import { TrendingUp, Award, Star, BarChart3, Radar as RadarIcon, TableIcon, Load
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { fetchAllCompleteSurveyResponses, fetchAllSurveyQuestions, mapWithConcurrency } from "@/lib/paginatedSurveyData";
 
 const PROGRAM_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'];
 
@@ -227,17 +228,7 @@ const ProgramComparison = () => {
       for (const programId of selectedPrograms) {
         let query = supabase
           .from("surveys")
-          .select(`
-            id, title,
-            questions (id, text, type, order_index, is_archived),
-            responses (
-              id,
-              answers (
-                numeric_value,
-                questions (type, is_archived)
-              )
-            )
-          `)
+          .select("id, title")
           .eq("program_id", programId)
           .eq("academic_year", selectedAcademicYear);
 
@@ -245,38 +236,39 @@ const ProgramComparison = () => {
           query = query.eq("semester", selectedSemester);
         }
 
-        const { data: surveys } = await query;
-        if (!surveys) continue;
+        const { data: surveys, error: surveysError } = await query;
+        if (surveysError) throw surveysError;
 
-        for (const s of surveys) {
-          // Extract likert/rating question texts
-          const likertQuestions = ((s.questions || []) as any[])
-            .filter((q: any) => !q.is_archived && (q.type === 'likert' || q.type === 'rating'))
-            .sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0))
-            .map((q: any) => q.text);
+        const programSurveys = await mapWithConcurrency(surveys || [], 6, async (survey) => {
+          const [questions, responses] = await Promise.all([
+            fetchAllSurveyQuestions(survey.id),
+            fetchAllCompleteSurveyResponses(survey.id),
+          ]);
+          const ratingQuestionIds = new Set(
+            questions
+              .filter(question => question.type === 'likert' || question.type === 'rating')
+              .map(question => question.id),
+          );
+          const likertQuestions = questions
+            .filter(question => !question.is_archived && ratingQuestionIds.has(question.id))
+            .sort((a, b) => a.order_index - b.order_index)
+            .map(question => question.text);
+          const scores = responses
+            .flatMap(response => response.answers)
+            .filter(answer => ratingQuestionIds.has(answer.question_id))
+            .map(answer => answer.numeric_value)
+            .filter((value): value is number => value !== null && value >= 1 && value <= 5);
 
-          // Extract scores
-          const scores: number[] = [];
-          let respCount = 0;
-          for (const r of (s.responses || [])) {
-            respCount++;
-            for (const a of (r.answers || []) as any[]) {
-              const q = a.questions as any;
-              if (!q?.is_archived && (q?.type === 'likert' || q?.type === 'rating') && a.numeric_value && a.numeric_value >= 1 && a.numeric_value <= 5) {
-                scores.push(a.numeric_value);
-              }
-            }
-          }
-
-          allSurveysFlat.push({
-            id: s.id,
-            title: s.title,
+          return {
+            id: survey.id,
+            title: survey.title,
             programId,
             likertQuestions,
             scores,
-            responseCount: respCount,
-          });
-        }
+            responseCount: responses.length,
+          };
+        });
+        allSurveysFlat.push(...programSurveys);
       }
 
       // Cluster surveys by question similarity

@@ -3,32 +3,34 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { lazy, Suspense } from "react";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import SurveyDesigner from "./pages/SurveyDesigner";
-import Surveys from "./pages/Surveys";
-import Reports from "./pages/Reports";
-import TakeSurvey from "./pages/TakeSurvey";
-import SurveyComplete from "./pages/SurveyComplete";
-import Complaints from "./pages/Complaints";
-import SubmitComplaint from "./pages/SubmitComplaint";
-import ComplaintSubmitted from "./pages/ComplaintSubmitted";
-import Recommendations from "./pages/Recommendations";
-import Archives from "./pages/Archives";
-import ProgramComparison from "./pages/ProgramComparison";
-import Users from "./pages/Users";
-import SystemSettings from "./pages/SystemSettings";
-import AcademicCalendar from "./pages/AcademicCalendar";
-import Accreditation from "./pages/Accreditation";
-import AccreditationFramework from "./pages/AccreditationFramework";
-import IndicatorDetails from "./pages/IndicatorDetails";
-import BackupExport from "./pages/BackupExport";
-import Unsubscribe from "./pages/Unsubscribe";
-import OAuthConsent from "./pages/OAuthConsent";
-import NotFound from "./pages/NotFound";
+
+const Index = lazy(() => import("./pages/Index"));
+const Auth = lazy(() => import("./pages/Auth"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const SurveyDesigner = lazy(() => import("./pages/SurveyDesigner"));
+const Surveys = lazy(() => import("./pages/Surveys"));
+const Reports = lazy(() => import("./pages/Reports"));
+const TakeSurvey = lazy(() => import("./pages/TakeSurvey"));
+const SurveyComplete = lazy(() => import("./pages/SurveyComplete"));
+const Complaints = lazy(() => import("./pages/Complaints"));
+const SubmitComplaint = lazy(() => import("./pages/SubmitComplaint"));
+const ComplaintSubmitted = lazy(() => import("./pages/ComplaintSubmitted"));
+const Recommendations = lazy(() => import("./pages/Recommendations"));
+const Archives = lazy(() => import("./pages/Archives"));
+const ProgramComparison = lazy(() => import("./pages/ProgramComparison"));
+const Users = lazy(() => import("./pages/Users"));
+const SystemSettings = lazy(() => import("./pages/SystemSettings"));
+const AcademicCalendar = lazy(() => import("./pages/AcademicCalendar"));
+const Accreditation = lazy(() => import("./pages/Accreditation"));
+const AccreditationFramework = lazy(() => import("./pages/AccreditationFramework"));
+const IndicatorDetails = lazy(() => import("./pages/IndicatorDetails"));
+const BackupExport = lazy(() => import("./pages/BackupExport"));
+const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
+const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
 
@@ -39,6 +41,11 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <Suspense fallback={(
+            <div className="min-h-screen flex items-center justify-center bg-background" role="status" aria-live="polite">
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-muted border-t-primary" />
+            </div>
+          )}>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
@@ -67,6 +74,7 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
         </BrowserRouter>
       </TooltipProvider>
     </LanguageProvider>

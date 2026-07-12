@@ -12,6 +12,7 @@ import { LanguageToggle } from "@/components/LanguageToggle";
 import RoleBasedDashboard from "@/components/dashboard/RoleBasedDashboard";
 import AICopilotWidget from "@/components/ai/AICopilotWidget";
 import ProgramRiskPanel from "@/components/ai/ProgramRiskPanel";
+import { isMissingCompletionColumn } from "@/lib/paginatedSurveyData";
 
 type AppRole = 'admin' | 'dean' | 'coordinator' | 'program_manager' | 'faculty';
 
@@ -84,9 +85,17 @@ const Dashboard = () => {
       .eq("status", "active");
 
     // Get total responses count
-    const { count: totalResponses } = await supabase
+    let responseCountResult = await supabase
       .from("responses")
-      .select("*", { count: "exact", head: true });
+      .select("*", { count: "exact", head: true })
+      .eq("is_complete", true);
+    if (responseCountResult.error && isMissingCompletionColumn(responseCountResult.error)) {
+      responseCountResult = await supabase
+        .from("responses")
+        .select("*", { count: "exact", head: true });
+    }
+    if (responseCountResult.error) console.error("Could not load response count", responseCountResult.error);
+    const totalResponses = responseCountResult.count;
 
     // Get ready reports count
     const { count: readyReports } = await supabase
@@ -125,18 +134,25 @@ const Dashboard = () => {
   };
 
   const loadRecentSurveys = async () => {
-    const { data } = await supabase
-      .from("surveys")
-      .select(`
-        *,
-        programs(name),
-        responses(count)
-      `)
-      .order("created_at", { ascending: false })
-      .limit(3);
+    const fetchRecent = (requireComplete: boolean) => {
+      let query = supabase
+        .from("surveys")
+        .select(`
+          *,
+          programs(name),
+          responses(count)
+        `);
+      if (requireComplete) query = query.eq("responses.is_complete", true);
+      return query.order("created_at", { ascending: false }).limit(3);
+    };
 
-    if (data) {
-      setRecentSurveys(data);
+    let result = await fetchRecent(true);
+    if (result.error && isMissingCompletionColumn(result.error)) result = await fetchRecent(false);
+
+    if (result.error) {
+      console.error("Could not load recent surveys", result.error);
+    } else if (result.data) {
+      setRecentSurveys(result.data);
     }
   };
 

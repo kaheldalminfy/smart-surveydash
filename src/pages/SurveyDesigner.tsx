@@ -17,6 +17,12 @@ import SurveySettingsSidebar from "@/components/survey-designer/SurveySettingsSi
 import SaveTemplateDialog from "@/components/survey-designer/SaveTemplateDialog";
 import { DEFAULT_REPORT_TYPE, inferSurveyReportType } from "@/utils/reportType";
 
+const isMissingQuestionSyncRpcError = (error: { code?: string; message?: string; details?: string }) => {
+  const message = `${error.message || ""} ${error.details || ""}`.toLowerCase();
+  return error.code === "PGRST202"
+    || (message.includes("sync_survey_questions") && message.includes("function"));
+};
+
 const SurveyDesigner = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -33,7 +39,7 @@ const SurveyDesigner = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [survey, setSurvey] = useState<SurveyFormData>({
     title: "", description: "", reportType: DEFAULT_REPORT_TYPE, programId: "", isAnonymous: true,
-    startDate: "", endDate: "", semester: "", academicYear: "", targetEnrollment: "",
+    startDate: "", endDate: "", semester: "", academicYear: "",
   });
   const [questions, setQuestions] = useState<Question[]>([]);
   const [templateName, setTemplateName] = useState("");
@@ -94,7 +100,6 @@ const SurveyDesigner = () => {
           startDate: surveyData.start_date ? new Date(surveyData.start_date).toISOString().split('T')[0] : "",
           endDate: surveyData.end_date ? new Date(surveyData.end_date).toISOString().split('T')[0] : "",
           semester: surveyData.semester || "", academicYear: surveyData.academic_year || "",
-          targetEnrollment: surveyData.target_enrollment ? String(surveyData.target_enrollment) : "",
         });
         const { data: questionsData, error: questionsError } = await supabase
           .from("questions")
@@ -265,6 +270,18 @@ const SurveyDesigner = () => {
   });
 
   const syncQuestionsWithoutDroppingAnswers = async (surveyId: string) => {
+    const questionRows = questions.map((q, index) => buildQuestionPayload(q, index, surveyId));
+    const { error: rpcError } = await supabase.rpc("sync_survey_questions", {
+      p_survey_id: surveyId,
+      p_questions: questionRows,
+    });
+
+    if (!rpcError) return;
+    if (!isMissingQuestionSyncRpcError(rpcError)) throw rpcError;
+
+    // Compatibility path for the short deployment window before the new SQL
+    // migration is applied. Once present, the RPC performs this work in one
+    // transaction and versions answered questions automatically.
     const { data: existingQuestions, error: existingError } = await supabase
       .from("questions")
       .select("id")
@@ -300,7 +317,6 @@ const SurveyDesigner = () => {
       }
     }
 
-    const questionRows = questions.map((q, index) => buildQuestionPayload(q, index, surveyId));
     if (questionRows.length > 0) {
       const { error: upsertError } = await supabase
         .from("questions")
@@ -316,6 +332,22 @@ const SurveyDesigner = () => {
     if (questions.some(q => q.type !== "section" && !q.text.trim())) {
       toast({ title: t('common.error'), description: t('designer.enterAllQuestions'), variant: "destructive" }); return;
     }
+    if (!questions.some(q => q.type !== "section")) {
+      toast({
+        title: t('common.error'),
+        description: language === 'ar' ? "يجب إضافة سؤال واحد على الأقل، فعنوان القسم ليس سؤالاً." : "Add at least one question; a section heading is not a question.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (questions.some(q => q.type === "mcq" && (!q.options || q.options.filter(option => option.trim()).length === 0))) {
+      toast({
+        title: t('common.error'),
+        description: language === 'ar' ? "يجب إضافة خيار واحد على الأقل لكل سؤال اختيار." : "Each multiple-choice question needs at least one option.",
+        variant: "destructive",
+      });
+      return;
+    }
     setIsLoading(true);
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -328,7 +360,6 @@ const SurveyDesigner = () => {
           title: survey.title, description: survey.description, program_id: survey.programId === 'college' ? null : survey.programId || null,
           is_anonymous: survey.isAnonymous, start_date: survey.startDate || null, end_date: survey.endDate || null,
           semester: survey.semester || null, academic_year: survey.academicYear || null,
-          target_enrollment: survey.targetEnrollment ? parseInt(survey.targetEnrollment) : null,
         }, id);
         if (surveyError) throw surveyError;
         await syncQuestionsWithoutDroppingAnswers(id);
@@ -338,13 +369,10 @@ const SurveyDesigner = () => {
           title: survey.title, description: survey.description, program_id: survey.programId === 'college' ? null : survey.programId || null,
           is_anonymous: survey.isAnonymous, start_date: survey.startDate || null, end_date: survey.endDate || null,
           semester: survey.semester || null, academic_year: survey.academicYear || null,
-          target_enrollment: survey.targetEnrollment ? parseInt(survey.targetEnrollment) : null,
           created_by: user.id, status: "draft",
         });
         if (surveyError) throw surveyError;
-        const questionsData = questions.map((q, index) => buildQuestionPayload(q, index, surveyData.id));
-        const { error: questionsError } = await supabase.from("questions").insert(questionsData);
-        if (questionsError) throw questionsError;
+        await syncQuestionsWithoutDroppingAnswers(surveyData.id);
         const surveyLink = `${window.location.origin}/take/${surveyData.id}`;
         const qrCodeDataURL = await QRCode.toDataURL(surveyLink, { width: 400, margin: 2, color: { dark: '#000000', light: '#FFFFFF' } });
         await supabase.from("surveys").update({ qr_code: qrCodeDataURL, survey_link: surveyLink }).eq("id", surveyData.id);

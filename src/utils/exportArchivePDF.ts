@@ -250,7 +250,7 @@ export async function downloadArchivePDF(item: ArchiveItem) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  const safeName = (item.programs?.name || 'archive').replace(/[^\w\u0600-\u06FF\-]+/g, '_');
+  const safeName = (item.programs?.name || 'archive').replace(/[^\w\u0600-\u06FF-]+/g, '_');
   a.download = `${safeName}_${item.academic_year}_${item.semester}.pdf`;
   document.body.appendChild(a);
   a.click();

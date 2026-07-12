@@ -29,6 +29,14 @@ Deno.serve(async (req) => {
     }
 
     const { surveyTitle, surveyDescription, questionType } = await req.json();
+    if (typeof surveyTitle !== 'string' || !surveyTitle.trim() || surveyTitle.length > 500
+      || (surveyDescription != null && (typeof surveyDescription !== 'string' || surveyDescription.length > 2000))
+      || !['likert', 'mcq', 'rating', 'text'].includes(questionType)) {
+      return new Response(JSON.stringify({ error: 'Invalid suggestion request' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     if (!LOVABLE_API_KEY) {
@@ -97,6 +105,17 @@ ${questionType === 'mcq' ? 'قدم 4 خيارات مناسبة لكل سؤال.'
     }
     
     const suggestions = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(suggestions?.questions) || suggestions.questions.length > 10
+      || suggestions.questions.some((question: unknown) => {
+        if (!question || typeof question !== 'object') return true;
+        const row = question as Record<string, unknown>;
+        if (typeof row.text !== 'string' || !row.text.trim() || row.text.length > 2000) return true;
+        if (questionType !== 'mcq') return false;
+        return !Array.isArray(row.choices) || row.choices.length < 1 || row.choices.length > 20
+          || row.choices.some(choice => typeof choice !== 'string' || !choice.trim() || choice.length > 500);
+      })) {
+      throw new Error('AI returned an invalid question payload');
+    }
 
     return new Response(
       JSON.stringify(suggestions),

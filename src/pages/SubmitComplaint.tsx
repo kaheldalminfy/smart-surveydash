@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,13 +28,44 @@ const complaintSchema = z.object({
   description: z.string().trim().min(10).max(5000)
 });
 
+const MAX_ATTACHMENTS = 5;
+const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024;
+const ATTACHMENT_TYPES: Record<string, string> = {
+  pdf: "application/pdf",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+
+interface AttachmentMetadata {
+  name: string;
+  path: string;
+  type: string;
+  size: number;
+}
+
+interface ComplaintSubmissionContext {
+  complaintId: string;
+  submissionToken: string;
+  attachmentMetadata: AttachmentMetadata[];
+}
+
+const isMissingComplaintRpc = (error: { code?: string; message?: string; details?: string }) => {
+  const message = `${error.message || ""} ${error.details || ""}`.toLowerCase();
+  return error.code === "PGRST202"
+    || (message.includes("submit_public_complaint") && message.includes("function"));
+};
+
 const SubmitComplaint = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t, language } = useLanguage();
   const [loading, setLoading] = useState(false);
-  const [programs, setPrograms] = useState<any[]>([]);
+  const [programs, setPrograms] = useState<Array<{ id: string; name: string; name_en: string | null }>>([]);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const submissionContextRef = useRef<ComplaintSubmissionContext | null>(null);
 
   const [formData, setFormData] = useState({
     studentName: "",
@@ -47,43 +78,66 @@ const SubmitComplaint = () => {
     description: "",
   });
 
-  // Load programs on mount
-  useState(() => {
+  useEffect(() => {
     const loadPrograms = async () => {
-      const { data } = await supabase.from("programs").select("*").order("name");
+      const { data } = await supabase.from("programs").select("id, name, name_en").order("name");
       if (data) setPrograms(data);
     };
-    loadPrograms();
-  });
+    void loadPrograms();
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setAttachments(Array.from(e.target.files));
+    if (!e.target.files) return;
+    if (submissionContextRef.current) {
+      toast({
+        title: t('common.error'),
+        description: language === 'ar' ? "لا يمكن تغيير الملفات بعد بدء محاولة الإرسال." : "Files cannot be changed after submission has started.",
+        variant: "destructive",
+      });
+      e.target.value = "";
+      return;
     }
+
+    const selectedFiles = Array.from(e.target.files);
+    const invalidFile = selectedFiles.find(file => {
+      const extension = file.name.split('.').pop()?.toLowerCase() || '';
+      const expectedType = ATTACHMENT_TYPES[extension];
+      return !expectedType || file.size < 1 || file.size > MAX_ATTACHMENT_SIZE
+        || (file.type !== '' && file.type !== expectedType);
+    });
+    if (selectedFiles.length > MAX_ATTACHMENTS || invalidFile) {
+      toast({
+        title: t('common.error'),
+        description: language === 'ar'
+          ? "يسمح بحد أقصى 5 ملفات، وحجم 5MB لكل ملف، بصيغ PDF أو JPG أو PNG أو DOC أو DOCX."
+          : "Use at most 5 files, up to 5MB each, in PDF, JPG, PNG, DOC, or DOCX format.",
+        variant: "destructive",
+      });
+      e.target.value = "";
+      setAttachments([]);
+      return;
+    }
+    setAttachments(selectedFiles);
   };
 
-  const uploadAttachments = async (complaintId: string) => {
-    const uploadedFiles = [];
-    
-    for (const file of attachments) {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${complaintId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-      
+  const uploadAttachments = async (metadata: AttachmentMetadata[]) => {
+    const successfulPaths: string[] = [];
+    for (let index = 0; index < attachments.length; index++) {
+      const file = attachments[index];
+      const attachment = metadata[index];
       const { error: uploadError } = await supabase.storage
         .from('complaint-attachments')
-        .upload(fileName, file);
+        .upload(attachment.path, file, { contentType: attachment.type, upsert: false });
 
-      if (!uploadError) {
-        uploadedFiles.push({
-          name: file.name,
-          path: fileName,
-          type: file.type,
-          size: file.size
-        });
+      const alreadyExists = uploadError
+        && /already exists|duplicate/i.test(uploadError.message || "");
+      if (!uploadError || alreadyExists) {
+        successfulPaths.push(attachment.path);
+      } else {
+        console.error("Complaint attachment upload failed", attachment.path, uploadError.message);
       }
     }
-    
-    return uploadedFiles;
+    return successfulPaths;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -123,21 +177,57 @@ const SubmitComplaint = () => {
       return;
     }
 
+    if (!formData.complainantType || !formData.complaintCategory) {
+      toast({
+        title: t('common.error'),
+        description: language === 'ar' ? "يرجى اختيار نوع مقدم الشكوى ونوع الشكوى." : "Select the complainant type and complaint category.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const complaintId = crypto.randomUUID();
-      
-      let attachmentData = null;
-      if (attachments.length > 0) {
-        const uploadedFiles = await uploadAttachments(complaintId);
-        attachmentData = uploadedFiles;
+      if (!submissionContextRef.current) {
+        const complaintId = crypto.randomUUID();
+        submissionContextRef.current = {
+          complaintId,
+          submissionToken: crypto.randomUUID(),
+          attachmentMetadata: attachments.map(file => {
+            const extension = file.name.split('.').pop()?.toLowerCase() || '';
+            return {
+              name: file.name,
+              path: `${complaintId}/${crypto.randomUUID()}.${extension}`,
+              type: ATTACHMENT_TYPES[extension],
+              size: file.size,
+            };
+          }),
+        };
       }
+      const context = submissionContextRef.current;
 
-      const { error: complaintError } = await supabase
-        .from("complaints")
-        .insert({
-          id: complaintId,
+      const { data: submittedComplaintId, error: complaintRpcError } = await supabase.rpc("submit_public_complaint", {
+        p_complaint_id: context.complaintId,
+        p_submission_token: context.submissionToken,
+        p_student_name: formData.studentName,
+        p_student_email: formData.studentEmail,
+        p_complainant_academic_id: formData.complainantAcademicId,
+        p_complainant_type: formData.complainantType,
+        p_program_id: formData.programId || null,
+        p_complaint_category: formData.complaintCategory,
+        p_subject: formData.subject,
+        p_description: formData.description,
+        p_attachments: context.attachmentMetadata,
+      });
+
+      let complaintId = submittedComplaintId || context.complaintId;
+      let usedAtomicSubmission = !complaintRpcError;
+      if (complaintRpcError) {
+        if (!isMissingComplaintRpc(complaintRpcError)) throw complaintRpcError;
+
+        const { error: legacyError } = await supabase.from("complaints").insert({
+          id: context.complaintId,
           student_name: formData.studentName,
           student_email: formData.studentEmail,
           complainant_academic_id: formData.complainantAcademicId,
@@ -146,21 +236,46 @@ const SubmitComplaint = () => {
           complaint_category: formData.complaintCategory,
           subject: formData.subject,
           description: formData.description,
-          type: formData.complaintCategory as any || 'other',
+          type: formData.complaintCategory as "academic" | "administrative" | "technical" | "other",
           status: 'pending',
-          attachments: attachmentData,
+          attachments: null,
         });
+        if (legacyError) throw legacyError;
+        complaintId = context.complaintId;
+        usedAtomicSubmission = false;
+      }
 
-      if (complaintError) throw complaintError;
+      let failedAttachmentCount = 0;
+      if (usedAtomicSubmission && context.attachmentMetadata.length > 0) {
+        const successfulPaths = await uploadAttachments(context.attachmentMetadata);
+        failedAttachmentCount = context.attachmentMetadata.length - successfulPaths.length;
+        const { error: finalizeError } = await supabase.rpc("finalize_public_complaint_attachments", {
+          p_complaint_id: complaintId,
+          p_submission_token: context.submissionToken,
+          p_successful_paths: successfulPaths,
+        });
+        if (finalizeError) {
+          console.error("Complaint attachment finalization failed", finalizeError);
+          failedAttachmentCount = context.attachmentMetadata.length;
+        }
+      } else if (!usedAtomicSubmission) {
+        failedAttachmentCount = context.attachmentMetadata.length;
+      }
 
       // Notify program coordinator(s) — fire-and-forget; don't block UX
       supabase.functions
-        .invoke("notify-complaint-coordinators", { body: { complaintId } })
+        .invoke("notify-complaint-coordinators", {
+          body: { complaintId, submissionToken: context.submissionToken },
+        })
         .catch((err) => console.error("Coordinator notify failed:", err));
 
       toast({
         title: language === 'ar' ? "تم إرسال الشكوى بنجاح" : "Complaint submitted successfully",
-        description: language === 'ar' ? "شكراً لك، سيتم مراجعة شكواك في أقرب وقت ممكن" : "Thank you, your complaint will be reviewed as soon as possible",
+        description: failedAttachmentCount > 0
+          ? (language === 'ar'
+            ? `تم حفظ الشكوى، لكن تعذر رفع ${failedAttachmentCount} من المرفقات.`
+            : `The complaint was saved, but ${failedAttachmentCount} attachment(s) could not be uploaded.`)
+          : (language === 'ar' ? "شكراً لك، سيتم مراجعة شكواك في أقرب وقت ممكن" : "Thank you, your complaint will be reviewed as soon as possible"),
       });
 
       navigate("/complaint-submitted");
@@ -350,6 +465,7 @@ const SubmitComplaint = () => {
                           type="file"
                           multiple
                           onChange={handleFileChange}
+                          disabled={loading || Boolean(submissionContextRef.current)}
                           className="hidden"
                           accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                         />

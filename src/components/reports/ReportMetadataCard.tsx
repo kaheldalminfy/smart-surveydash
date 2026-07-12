@@ -60,7 +60,8 @@ export const ReportMetadataCard = ({
             <Input
               id="report-target-enrollment"
               type="number"
-              min="0"
+              min="1"
+              max="1000000"
               placeholder={copy.targetHint}
               value={targetEnrollment}
               onChange={(e) => onTargetEnrollmentChange(e.target.value)}

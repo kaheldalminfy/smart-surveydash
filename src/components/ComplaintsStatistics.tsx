@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
+import writeXlsxFile, { type SheetData } from "write-excel-file/browser";
 
 interface Program {
   id: string;
@@ -252,7 +252,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
     toast({ title: t('complaintStats.exported'), description: t('complaintStats.exportedPdf') });
   };
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     const programName = selectedProgram === "all" 
       ? "جميع البرامج" 
       : programs.find(p => p.id === selectedProgram)?.name || "";
@@ -262,7 +262,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
       : complaints.filter(c => c.program_id === selectedProgram);
 
     // Summary sheet
-    const summaryData = [
+    const summaryData: SheetData = [
       ["تقرير إحصائيات الشكاوى"],
       ["البرنامج", programName],
       ["تاريخ التقرير", new Date().toLocaleDateString("ar-SA")],
@@ -276,7 +276,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
     ];
 
     // Type distribution sheet
-    const typeData = [
+    const typeData: SheetData = [
       ["توزيع الشكاوى حسب النوع"],
       ["النوع", "العدد", "النسبة"],
       ...stats.byType.map(t => [
@@ -287,7 +287,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
     ];
 
     // Status distribution sheet
-    const statusData = [
+    const statusData: SheetData = [
       ["توزيع الشكاوى حسب الحالة"],
       ["الحالة", "العدد", "النسبة"],
       ...stats.byStatus.map(s => [
@@ -311,7 +311,7 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
       other: "أخرى",
     };
 
-    const detailsData = [
+    const detailsData: SheetData = [
       ["تفاصيل الشكاوى"],
       ["الموضوع", "النوع", "الحالة", "البرنامج", "تاريخ الإنشاء"],
       ...filtered.map(c => [
@@ -323,23 +323,20 @@ const ComplaintsStatistics = ({ isOpen, onClose }: ComplaintsStatisticsProps) =>
       ]),
     ];
 
-    const wb = XLSX.utils.book_new();
-    
-    const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
-    XLSX.utils.book_append_sheet(wb, ws1, "ملخص");
-    
-    const ws2 = XLSX.utils.aoa_to_sheet(typeData);
-    XLSX.utils.book_append_sheet(wb, ws2, "حسب النوع");
-    
-    const ws3 = XLSX.utils.aoa_to_sheet(statusData);
-    XLSX.utils.book_append_sheet(wb, ws3, "حسب الحالة");
-    
-    const ws4 = XLSX.utils.aoa_to_sheet(detailsData);
-    XLSX.utils.book_append_sheet(wb, ws4, "التفاصيل");
-
-    XLSX.writeFile(wb, `complaints-report-${selectedProgram === "all" ? "all" : selectedProgram}.xlsx`);
-    
-    toast({ title: t('complaintStats.exported'), description: t('complaintStats.exportedExcel') });
+    try {
+      await writeXlsxFile([
+        { data: summaryData, sheet: "ملخص", columns: [{ width: 30 }, { width: 50 }], rightToLeft: true },
+        { data: typeData, sheet: "حسب النوع", columns: [{ width: 30 }, { width: 15 }, { width: 15 }], rightToLeft: true, stickyRowsCount: 2 },
+        { data: statusData, sheet: "حسب الحالة", columns: [{ width: 30 }, { width: 15 }, { width: 15 }], rightToLeft: true, stickyRowsCount: 2 },
+        { data: detailsData, sheet: "التفاصيل", columns: [{ width: 50 }, { width: 18 }, { width: 18 }, { width: 30 }, { width: 20 }], rightToLeft: true, stickyRowsCount: 2 },
+      ], { fontFamily: "Arial", fontSize: 11 }).toFile(
+        `complaints-report-${selectedProgram === "all" ? "all" : selectedProgram}.xlsx`,
+      );
+      toast({ title: t('complaintStats.exported'), description: t('complaintStats.exportedExcel') });
+    } catch (error) {
+      console.error("Complaint Excel export failed:", error);
+      toast({ title: t('cmplPg.error'), description: t('complaintStats.loadError'), variant: "destructive" });
+    }
   };
 
   if (!isOpen) return null;

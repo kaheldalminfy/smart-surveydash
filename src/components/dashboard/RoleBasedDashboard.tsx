@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { fetchAllCompleteSurveyResponses, fetchAllSurveyQuestions, mapWithConcurrency } from "@/lib/paginatedSurveyData";
 import ProgramSection from "./ProgramSection";
 
 interface Program {
@@ -81,6 +82,39 @@ interface RoleBasedDashboardProps {
   userProgramIds: string[];
 }
 
+interface SurveyMetric {
+  responseCount: number;
+  ratingScores: number[];
+  textCommentsCount: number;
+}
+
+const loadSurveyMetrics = async (surveyIds: string[]) => {
+  const entries = await mapWithConcurrency(surveyIds, 6, async (surveyId) => {
+    const [questions, responses] = await Promise.all([
+      fetchAllSurveyQuestions(surveyId),
+      fetchAllCompleteSurveyResponses(surveyId),
+    ]);
+    const ratingQuestionIds = new Set(
+      questions.filter(question => question.type === 'likert' || question.type === 'rating').map(question => question.id),
+    );
+    const textQuestionIds = new Set(
+      questions.filter(question => question.type === 'text').map(question => question.id),
+    );
+    const answers = responses.flatMap(response => response.answers);
+    const ratingScores = answers
+      .filter(answer => ratingQuestionIds.has(answer.question_id))
+      .map(answer => answer.numeric_value)
+      .filter((value): value is number => value !== null && value >= 1 && value <= 5);
+    const textCommentsCount = answers.filter(answer =>
+      textQuestionIds.has(answer.question_id) && Boolean(answer.value?.trim())
+    ).length;
+
+    return [surveyId, { responseCount: responses.length, ratingScores, textCommentsCount }] as const;
+  });
+
+  return new Map<string, SurveyMetric>(entries);
+};
+
 const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProps) => {
   const { language, t } = useLanguage();
   const [programs, setPrograms] = useState<Program[]>([]);
@@ -132,97 +166,41 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
   };
 
   const loadProgramStats = async (program: Program, colorIndex: number): Promise<ProgramStats> => {
-    // Get surveys for this program with titles
-    const { data: surveys } = await supabase
+    const { data: surveys, error: surveysError } = await supabase
       .from('surveys')
       .select('id, title')
       .eq('program_id', program.id);
+    if (surveysError) throw surveysError;
 
-    const surveyIds = surveys?.map(s => s.id) || [];
-    
-    // Get total responses for program's surveys
-    let totalResponses = 0;
-    if (surveyIds.length > 0) {
-      const { count } = await supabase
-        .from('responses')
-        .select('*', { count: 'exact', head: true })
-        .in('survey_id', surveyIds);
-      totalResponses = count || 0;
-    }
-
-    // Build survey details with per-survey averages
-    const surveyDetails: SurveyDetail[] = [];
-    const surveyAverages: number[] = [];
-
-    if (surveys && surveys.length > 0) {
-      for (const survey of surveys) {
-        // Get responses for this survey
-        const { data: surveyResponses } = await supabase
-          .from('responses')
-          .select('id')
-          .eq('survey_id', survey.id);
-
-        const responseCount = surveyResponses?.length || 0;
-        const responseIds = surveyResponses?.map(r => r.id) || [];
-
-        let avgSatisfaction = 0;
-        if (responseIds.length > 0) {
-          const { data: surveyAnswers } = await supabase
-            .from('answers')
-            .select('numeric_value, questions!inner(type, is_archived)')
-            .in('response_id', responseIds)
-            .not('numeric_value', 'is', null)
-            .eq('questions.is_archived', false)
-            .in('questions.type', ['likert', 'rating']);
-
-          const validAnswers = (surveyAnswers || []).filter((a: any) => 
-            a.numeric_value != null && a.numeric_value >= 1 && a.numeric_value <= 5
-          );
-          if (validAnswers.length > 0) {
-            const sum = validAnswers.reduce((acc: number, curr: any) => acc + curr.numeric_value, 0);
-            avgSatisfaction = sum / validAnswers.length;
-            surveyAverages.push(avgSatisfaction);
-          }
-        }
-
-        surveyDetails.push({
-          id: survey.id,
-          title: survey.title,
-          responseCount,
-          avgSatisfaction,
-        });
-      }
-    }
-
-    // Average of averages (more fair)
-    const averageSatisfaction = surveyAverages.length > 0
-      ? surveyAverages.reduce((a, b) => a + b, 0) / surveyAverages.length
+    const surveyIds = (surveys || []).map(survey => survey.id);
+    const surveyMetrics = await loadSurveyMetrics(surveyIds);
+    const surveyDetails: SurveyDetail[] = (surveys || []).map(survey => {
+      const metric = surveyMetrics.get(survey.id);
+      const ratingScores = metric?.ratingScores || [];
+      return {
+        id: survey.id,
+        title: survey.title,
+        responseCount: metric?.responseCount || 0,
+        avgSatisfaction: ratingScores.length
+          ? ratingScores.reduce((sum, value) => sum + value, 0) / ratingScores.length
+          : 0,
+      };
+    });
+    const surveyAverages = surveyDetails
+      .map(survey => survey.avgSatisfaction)
+      .filter(average => average > 0);
+    const averageSatisfaction = surveyAverages.length
+      ? surveyAverages.reduce((sum, average) => sum + average, 0) / surveyAverages.length
       : 0;
+    const totalResponses = [...surveyMetrics.values()].reduce((sum, metric) => sum + metric.responseCount, 0);
+    const textCommentsCount = [...surveyMetrics.values()].reduce((sum, metric) => sum + metric.textCommentsCount, 0);
 
-    // Get text comments count
-    let textCommentsCount = 0;
-    if (surveyIds.length > 0) {
-      const { data: textAnswers } = await supabase
-        .from('answers')
-        .select('value, question_id, questions!inner(type, survey_id, is_archived)')
-        .eq('questions.is_archived', false)
-        .not('value', 'is', null);
-
-      if (textAnswers) {
-        textCommentsCount = textAnswers.filter((a: any) => 
-          a.questions?.type === 'text' && 
-          surveyIds.includes(a.questions?.survey_id) &&
-          a.value && a.value.trim().length > 0
-        ).length;
-      }
-    }
-
-    // Get complaints for this program with details
-    const { data: complaints } = await supabase
+    const { data: complaints, error: complaintsError } = await supabase
       .from('complaints')
       .select('id, subject, status, created_at, complainant_type')
       .eq('program_id', program.id)
       .order('created_at', { ascending: false });
+    if (complaintsError) throw complaintsError;
 
     const complaintStats = {
       pending: complaints?.filter(c => c.status === 'pending').length || 0,
@@ -238,65 +216,43 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
       complainantType: c.complainant_type,
     }));
 
-    // Get course satisfaction
-    const { data: courses } = await supabase
+    const { data: courses, error: coursesError } = await supabase
       .from('courses')
       .select('id, name, name_en')
       .eq('program_id', program.id);
+    if (coursesError) throw coursesError;
 
     const courseSatisfaction: Array<{ id: string; name: string; averageSatisfaction: number }> = [];
     
     if (courses && courses.length > 0 && surveyIds.length > 0) {
-      const { data: surveyCourses } = await supabase
+      const { data: surveyCourses, error: surveyCoursesError } = await supabase
         .from('survey_courses')
         .select('course_id, survey_id')
         .in('survey_id', surveyIds);
+      if (surveyCoursesError) throw surveyCoursesError;
 
       for (const course of courses) {
         const courseSurveyIds = surveyCourses
           ?.filter(sc => sc.course_id === course.id)
           .map(sc => sc.survey_id) || [];
 
-        if (courseSurveyIds.length > 0) {
-          const { data: courseResponses } = await supabase
-            .from('responses')
-            .select('id')
-            .in('survey_id', courseSurveyIds);
-
-          const responseIds = courseResponses?.map(r => r.id) || [];
-
-          if (responseIds.length > 0) {
-            const { data: courseAnswers } = await supabase
-              .from('answers')
-              .select('numeric_value, questions!inner(type, is_archived)')
-              .in('response_id', responseIds)
-              .not('numeric_value', 'is', null)
-              .eq('questions.is_archived', false)
-              .in('questions.type', ['likert', 'rating']);
-
-            const validCourseAnswers = (courseAnswers || []).filter((a: any) => 
-              a.numeric_value != null && a.numeric_value >= 1 && a.numeric_value <= 5
-            );
-            if (validCourseAnswers.length > 0) {
-              const sum = validCourseAnswers.reduce((acc: number, curr: any) => acc + curr.numeric_value, 0);
-              const avg = sum / validCourseAnswers.length;
-              courseSatisfaction.push({
-                id: course.id,
-                name: language === 'ar' ? course.name : (course.name_en || course.name),
-                averageSatisfaction: avg,
-              });
-            }
-          }
+        const courseScores = courseSurveyIds.flatMap(surveyId => surveyMetrics.get(surveyId)?.ratingScores || []);
+        if (courseScores.length > 0) {
+          courseSatisfaction.push({
+            id: course.id,
+            name: language === 'ar' ? course.name : (course.name_en || course.name),
+            averageSatisfaction: courseScores.reduce((sum, value) => sum + value, 0) / courseScores.length,
+          });
         }
       }
     }
 
-    // Get recommendations from recommendations table
-    const { data: recsData } = await supabase
+    const { data: recsData, error: recommendationsError } = await supabase
       .from('recommendations')
       .select('*')
       .eq('program_id', program.id)
       .order('created_at', { ascending: false });
+    if (recommendationsError) throw recommendationsError;
 
     const recommendations: RecommendationDetail[] = (recsData || []).map(r => ({
       id: r.id,
@@ -327,70 +283,37 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
   };
 
   const loadCollegeLevelStats = async (): Promise<ProgramStats> => {
-    // Get surveys with no program (college-level)
-    const { data: surveys } = await supabase
+    const { data: surveys, error: surveysError } = await supabase
       .from('surveys')
       .select('id, title')
       .is('program_id', null);
+    if (surveysError) throw surveysError;
 
-    const surveyIds = surveys?.map(s => s.id) || [];
-    
-    let totalResponses = 0;
-    if (surveyIds.length > 0) {
-      const { count } = await supabase
-        .from('responses')
-        .select('*', { count: 'exact', head: true })
-        .in('survey_id', surveyIds);
-      totalResponses = count || 0;
-    }
-
-    const surveyDetails: SurveyDetail[] = [];
-    const surveyAverages: number[] = [];
-
-    if (surveys && surveys.length > 0) {
-      for (const survey of surveys) {
-        const { data: surveyResponses } = await supabase
-          .from('responses')
-          .select('id')
-          .eq('survey_id', survey.id);
-
-        const responseCount = surveyResponses?.length || 0;
-        const responseIds = surveyResponses?.map(r => r.id) || [];
-
-        let avgSatisfaction = 0;
-        if (responseIds.length > 0) {
-          const { data: surveyAnswers } = await supabase
-            .from('answers')
-            .select('numeric_value, questions!inner(type, is_archived)')
-            .in('response_id', responseIds)
-            .not('numeric_value', 'is', null)
-            .eq('questions.is_archived', false)
-            .in('questions.type', ['likert', 'rating']);
-
-          const validAnswers = (surveyAnswers || []).filter((a: any) => 
-            a.numeric_value != null && a.numeric_value >= 1 && a.numeric_value <= 5
-          );
-          if (validAnswers.length > 0) {
-            const sum = validAnswers.reduce((acc: number, curr: any) => acc + curr.numeric_value, 0);
-            avgSatisfaction = sum / validAnswers.length;
-            surveyAverages.push(avgSatisfaction);
-          }
-        }
-
-        surveyDetails.push({ id: survey.id, title: survey.title, responseCount, avgSatisfaction });
-      }
-    }
-
-    const averageSatisfaction = surveyAverages.length > 0
-      ? surveyAverages.reduce((a, b) => a + b, 0) / surveyAverages.length
+    const surveyIds = (surveys || []).map(survey => survey.id);
+    const surveyMetrics = await loadSurveyMetrics(surveyIds);
+    const surveyDetails: SurveyDetail[] = (surveys || []).map(survey => {
+      const metric = surveyMetrics.get(survey.id);
+      const scores = metric?.ratingScores || [];
+      return {
+        id: survey.id,
+        title: survey.title,
+        responseCount: metric?.responseCount || 0,
+        avgSatisfaction: scores.length ? scores.reduce((sum, value) => sum + value, 0) / scores.length : 0,
+      };
+    });
+    const surveyAverages = surveyDetails.map(survey => survey.avgSatisfaction).filter(average => average > 0);
+    const averageSatisfaction = surveyAverages.length
+      ? surveyAverages.reduce((sum, average) => sum + average, 0) / surveyAverages.length
       : 0;
+    const totalResponses = [...surveyMetrics.values()].reduce((sum, metric) => sum + metric.responseCount, 0);
+    const textCommentsCount = [...surveyMetrics.values()].reduce((sum, metric) => sum + metric.textCommentsCount, 0);
 
-    // Complaints with no program
-    const { data: complaints } = await supabase
+    const { data: complaints, error: complaintsError } = await supabase
       .from('complaints')
       .select('id, subject, status, created_at, complainant_type')
       .is('program_id', null)
       .order('created_at', { ascending: false });
+    if (complaintsError) throw complaintsError;
 
     const complaintStats = {
       pending: complaints?.filter(c => c.status === 'pending').length || 0,
@@ -403,12 +326,12 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
       createdAt: c.created_at || '', complainantType: c.complainant_type,
     }));
 
-    // Recommendations with no program
-    const { data: recsData } = await supabase
+    const { data: recsData, error: recommendationsError } = await supabase
       .from('recommendations')
       .select('*')
       .is('program_id', null)
       .order('created_at', { ascending: false });
+    if (recommendationsError) throw recommendationsError;
 
     const recommendations: RecommendationDetail[] = (recsData || []).map(r => ({
       id: r.id, title: r.title, description: r.description,
@@ -424,7 +347,7 @@ const RoleBasedDashboard = ({ userRole, userProgramIds }: RoleBasedDashboardProp
       totalResponses,
       averageSatisfaction,
       totalSurveys: surveyIds.length,
-      textCommentsCount: 0,
+      textCommentsCount,
       complaintStats,
       courseSatisfaction: [],
       surveyDetails,

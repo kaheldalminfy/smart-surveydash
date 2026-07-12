@@ -1,11 +1,15 @@
-// Snapshot a program's period (program_id + academic_year + semester) into archives
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+// Snapshot a program period into archives without PostgREST row truncation.
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.98.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+const PAGE_SIZE = 500;
+const MAX_ROWS = 100_000;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 interface Payload {
   program_id: string | null;
@@ -18,147 +22,212 @@ interface Payload {
   title?: string | null;
 }
 
+type Row = Record<string, unknown>;
+
+const fetchAllRows = async (
+  label: string,
+  buildQuery: () => any,
+): Promise<Row[]> => {
+  const rows: Row[] = [];
+
+  for (let from = 0; from < MAX_ROWS; from += PAGE_SIZE) {
+    const { data, error } = await buildQuery()
+      .order("id", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw new Error(`Failed to load ${label}: ${error.message}`);
+    const page = (data || []) as Row[];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) return rows;
+  }
+
+  throw new Error(`${label} archive limit exceeded`);
+};
+
+const applyProgramFilter = (query: any, programId: string | null) =>
+  programId ? query.eq("program_id", programId) : query.is("program_id", null);
+
+const fetchRowsBySurveyIds = async (
+  label: string,
+  surveyIds: string[],
+  buildQuery: (ids: string[]) => any,
+): Promise<Row[]> => {
+  const rows: Row[] = [];
+  for (let offset = 0; offset < surveyIds.length; offset += 100) {
+    rows.push(...await fetchAllRows(label, () => buildQuery(surveyIds.slice(offset, offset + 100))));
+  }
+  return rows;
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return json({ error: "Unauthorized" }, 401);
+    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!supabaseUrl || !serviceKey || !anonKey) throw new Error("Supabase environment is not configured");
 
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData?.user) return json({ error: "Unauthorized" }, 401);
+    const { data: userData, error: userError } = await userClient.auth.getUser();
+    if (userError || !userData?.user) return json({ error: "Unauthorized" }, 401);
     const userId = userData.user.id;
 
     const body = (await req.json()) as Payload;
-    if (!body.academic_year || !body.semester) {
-      return json({ error: "academic_year and semester are required" }, 400);
+    const programId = body.program_id ?? null;
+    const academicYear = String(body.academic_year || "").trim();
+    const semester = String(body.semester || "").trim();
+    const closingNotes = body.closing_notes == null ? null : String(body.closing_notes).trim();
+    const requestedTitle = body.title == null ? null : String(body.title).trim();
+
+    if (!academicYear || !semester || academicYear.length > 100 || semester.length > 100) {
+      return json({ error: "A valid academic_year and semester are required" }, 400);
+    }
+    if (programId !== null && !UUID_PATTERN.test(programId)) {
+      return json({ error: "Invalid program_id" }, 400);
+    }
+    if ((closingNotes?.length || 0) > 10_000 || (requestedTitle?.length || 0) > 500) {
+      return json({ error: "Archive text is too long" }, 400);
     }
 
-    const admin = createClient(supabaseUrl, serviceKey);
+    const admin = createClient(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
 
-    // Authz: admin OR coordinator for that program
-    const { data: roles } = await admin
+    const { data: roles, error: rolesError } = await admin
       .from("user_roles")
       .select("role, program_id")
       .eq("user_id", userId);
-    const isAdmin = roles?.some((r) => r.role === "admin");
-    const isCoordinator = roles?.some(
-      (r) => r.role === "coordinator" && (r.program_id === body.program_id || r.program_id === null),
+    if (rolesError) throw rolesError;
+
+    const isCollegeManager = roles?.some((role) => role.role === "admin" || role.role === "dean");
+    const hasProgramRole = roles?.some((role) =>
+      (role.role === "coordinator" || role.role === "program_manager")
+      && (role.program_id === programId || role.program_id === null)
     );
-    if (!isAdmin && !isCoordinator) return json({ error: "Forbidden" }, 403);
+    if (!isCollegeManager && !hasProgramRole) return json({ error: "Forbidden" }, 403);
 
-    // Fetch all related data
-    const programFilter = body.program_id;
+    const programResult = programId
+      ? await admin.from("programs").select("*").eq("id", programId).maybeSingle()
+      : { data: null, error: null };
+    if (programResult.error) throw programResult.error;
+    if (programId && !programResult.data) return json({ error: "Program not found" }, 404);
 
-    const [surveysRes, complaintsRes, reportsRes, recommendationsRes, indicatorRespRes, programRes] =
-      await Promise.all([
-        admin
-          .from("surveys")
-          .select("*, questions(*)")
-          .eq("academic_year", body.academic_year)
-          .eq("semester", body.semester)
-          .eq("program_id", programFilter as any),
-        admin
-          .from("complaints")
-          .select("*")
-          .eq("academic_year", body.academic_year)
-          .eq("semester", body.semester)
-          .eq("program_id", programFilter as any),
-        admin.from("reports").select("*"),
-        admin
-          .from("recommendations")
-          .select("*")
-          .eq("academic_year", body.academic_year)
-          .eq("semester", body.semester)
-          .eq("program_id", programFilter as any),
-        admin
-          .from("indicator_responses")
-          .select("*")
-          .eq("academic_year", body.academic_year)
-          .eq("semester", body.semester)
-          .eq("program_id", programFilter as any),
-        programFilter
-          ? admin.from("programs").select("*").eq("id", programFilter).maybeSingle()
-          : Promise.resolve({ data: null } as any),
-      ]);
+    const surveys = await fetchAllRows("surveys", () => applyProgramFilter(
+      admin
+        .from("surveys")
+        .select("*, questions(*)")
+        .eq("academic_year", academicYear)
+        .eq("semester", semester),
+      programId,
+    ));
+    const surveyIds = surveys.map((survey) => String(survey.id));
 
-    const surveys = surveysRes.data ?? [];
-    const surveyIds = surveys.map((s: any) => s.id);
-
-    const [responsesRes] = await Promise.all([
-      surveyIds.length
-        ? admin.from("responses").select("*, answers(*)").in("survey_id", surveyIds)
-        : Promise.resolve({ data: [] } as any),
+    const [complaints, recommendations, indicatorResponses] = await Promise.all([
+      fetchAllRows("complaints", () => applyProgramFilter(
+        admin.from("complaints").select("*").eq("academic_year", academicYear).eq("semester", semester),
+        programId,
+      )),
+      fetchAllRows("recommendations", () => applyProgramFilter(
+        admin.from("recommendations").select("*").eq("academic_year", academicYear).eq("semester", semester),
+        programId,
+      )),
+      fetchAllRows("indicator responses", () => applyProgramFilter(
+        admin.from("indicator_responses").select("*").eq("academic_year", academicYear).eq("semester", semester),
+        programId,
+      )),
     ]);
-    const responses = responsesRes.data ?? [];
 
-    const filteredReports = (reportsRes.data ?? []).filter((r: any) => surveyIds.includes(r.survey_id));
+    let responses: Row[] = [];
+    let reports: Row[] = [];
+    if (surveyIds.length > 0) {
+      try {
+        responses = await fetchRowsBySurveyIds("responses", surveyIds, (ids) => admin
+          .from("responses")
+          .select("*, answers(*)")
+          .in("survey_id", ids)
+          .eq("is_complete", true));
+      } catch (error) {
+        const message = error instanceof Error ? error.message.toLowerCase() : "";
+        if (!message.includes("is_complete")) throw error;
+        responses = (await fetchRowsBySurveyIds("responses", surveyIds, (ids) => admin
+          .from("responses")
+          .select("*, answers(*)")
+          .in("survey_id", ids)))
+          .filter((response) => Array.isArray(response.answers) && response.answers.length > 0);
+      }
 
-    // Compute KPIs
-    const totalResponses = responses.length;
-    const totalComplaints = (complaintsRes.data ?? []).length;
-    const resolvedComplaints = (complaintsRes.data ?? []).filter((c: any) => c.status === "resolved").length;
+      reports = await fetchRowsBySurveyIds("reports", surveyIds, (ids) => admin
+        .from("reports")
+        .select("*")
+        .in("survey_id", ids));
+    }
+
+    const totalComplaints = complaints.length;
+    const resolvedComplaints = complaints.filter((complaint) =>
+      complaint.status === "resolved" || complaint.status === "closed"
+    ).length;
 
     let likertSum = 0;
     let likertCount = 0;
-    for (const r of responses as any[]) {
-      for (const a of r.answers ?? []) {
-        if (typeof a.numeric_value === "number" && a.numeric_value >= 1 && a.numeric_value <= 5) {
-          likertSum += a.numeric_value;
+    for (const response of responses) {
+      const answers = Array.isArray(response.answers) ? response.answers as Row[] : [];
+      for (const answer of answers) {
+        const value = answer.numeric_value;
+        if (typeof value === "number" && value >= 1 && value <= 5) {
+          likertSum += value;
           likertCount += 1;
         }
       }
     }
-    const avgLikert = likertCount ? likertSum / likertCount : null;
 
-    const indicatorResps = indicatorRespRes.data ?? [];
-    const avgCompliance = indicatorResps.length
-      ? indicatorResps.reduce((s: number, x: any) => s + (x.compliance_percentage ?? 0), 0) / indicatorResps.length
-      : null;
+    const complianceValues = indicatorResponses
+      .map((row) => row.compliance_percentage)
+      .filter((value): value is number => typeof value === "number");
 
     const kpis = {
       surveys_count: surveys.length,
-      responses_count: totalResponses,
+      responses_count: responses.length,
       complaints_count: totalComplaints,
       complaints_resolved: resolvedComplaints,
       complaints_resolution_rate: totalComplaints ? resolvedComplaints / totalComplaints : null,
-      reports_count: filteredReports.length,
-      recommendations_count: (recommendationsRes.data ?? []).length,
-      avg_likert: avgLikert,
-      avg_compliance_percentage: avgCompliance,
+      reports_count: reports.length,
+      recommendations_count: recommendations.length,
+      avg_likert: likertCount ? likertSum / likertCount : null,
+      avg_compliance_percentage: complianceValues.length
+        ? complianceValues.reduce((sum, value) => sum + value, 0) / complianceValues.length
+        : null,
     };
 
     const snapshot = {
-      program: programRes?.data ?? null,
+      program: programResult.data,
       surveys,
       responses,
-      complaints: complaintsRes.data ?? [],
-      reports: filteredReports,
-      recommendations: recommendationsRes.data ?? [],
-      indicator_responses: indicatorResps,
+      complaints,
+      reports,
+      recommendations,
+      indicator_responses: indicatorResponses,
       generated_at: new Date().toISOString(),
       generated_by: userId,
     };
 
-    const programLabel = programRes?.data?.name ?? "College Level";
-    const title = body.title?.trim() || `${programLabel} — ${body.academic_year} / ${body.semester}`;
-
-    const { data: archive, error: insertErr } = await admin
+    const programLabel = programResult.data?.name || "College Level";
+    const title = requestedTitle || `${programLabel} - ${academicYear} / ${semester}`;
+    const { data: archive, error: insertError } = await admin
       .from("archives")
       .insert({
-        program_id: body.program_id,
-        academic_year: body.academic_year,
-        semester: body.semester,
-        period_start_date: body.period_start_date ?? null,
-        period_end_date: body.period_end_date ?? null,
-        closing_notes: body.closing_notes ?? null,
+        program_id: programId,
+        academic_year: academicYear,
+        semester,
+        period_start_date: body.period_start_date || null,
+        period_end_date: body.period_end_date || null,
+        closing_notes: closingNotes,
         title,
         data_type: "period_snapshot",
         data: snapshot,
@@ -169,19 +238,23 @@ Deno.serve(async (req) => {
       })
       .select()
       .single();
+    if (insertError || !archive) throw new Error(insertError?.message || "Archive creation failed");
 
-    if (insertErr) return json({ error: insertErr.message }, 500);
-
-    await admin.from("archive_audit_log").insert({
-      archive_id: archive!.id,
+    const { error: auditError } = await admin.from("archive_audit_log").insert({
+      archive_id: archive.id,
       action: body.freeze ? "frozen" : "created",
       performed_by: userId,
       metadata: { kpis },
     });
+    if (auditError) {
+      console.error("Archive audit insert failed", auditError.message);
+    }
 
-    return json({ archive, kpis });
-  } catch (e) {
-    return json({ error: (e as Error).message }, 500);
+    return json({ archive, kpis, audit_logged: !auditError });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("create-period-archive", message);
+    return json({ error: message }, 500);
   }
 });
 

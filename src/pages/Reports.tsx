@@ -18,6 +18,19 @@ import { QuestionAnalysisSection } from "@/components/reports/QuestionAnalysisSe
 import { ReportContentEditorCard } from "@/components/reports/ReportContentEditorCard";
 import { ReportDeleteDialog } from "@/components/reports/ReportDeleteDialog";
 import { getReportCopy, getReportTypeLabel, inferSurveyReportType } from "@/utils/reportType";
+import {
+  fetchAllCompleteSurveyResponses,
+  fetchAllSurveyQuestions,
+} from "@/lib/paginatedSurveyData";
+import type { Database } from "@/integrations/supabase/types";
+
+type ReportStatus = Database["public"]["Enums"]["report_status"];
+
+const isMissingReportMetadataRpcError = (error: { code?: string; message?: string; details?: string }) => {
+  const message = `${error.message || ""} ${error.details || ""}`.toLowerCase();
+  return error.code === "PGRST202"
+    || (message.includes("save_report_metadata") && message.includes("function"));
+};
 
 const Reports = () => {
   const { id } = useParams();
@@ -31,7 +44,7 @@ const Reports = () => {
   const [loading, setLoading] = useState(true);
   const [semester, setSemester] = useState("");
   const [academicYear, setAcademicYear] = useState("");
-  const [reportStatus, setReportStatus] = useState("responding");
+  const [reportStatus, setReportStatus] = useState<ReportStatus>("responding");
   const [targetEnrollment, setTargetEnrollment] = useState("");
   const [collegeLogo, setCollegeLogo] = useState("");
   const [collegeName, setCollegeName] = useState("كلية العلوم الإنسانية والاجتماعية");
@@ -138,30 +151,34 @@ const Reports = () => {
   };
 
   const loadDetailedAnswers = async () => {
+    if (!id) return;
+
     try {
-      const { data: questions, error: qError } = await supabase
-        .from("questions")
-        .select("*")
-        .eq("survey_id", id)
-        .eq("is_archived", false)
-        .neq("type", "section")
-        .order("order_index");
+      const [questions, responses] = await Promise.all([
+        fetchAllSurveyQuestions(id),
+        fetchAllCompleteSurveyResponses(id),
+      ]);
 
-      if (qError) throw qError;
+      const answeredQuestionIds = new Set(
+        responses.flatMap(response => response.answers.map(answer => answer.question_id)),
+      );
+      const historicalLabel = language === "ar" ? "نسخة سابقة" : "previous version";
+      const reportQuestions = questions
+        .filter(question => !question.is_archived || answeredQuestionIds.has(question.id))
+        .map(question => question.is_archived
+          ? { ...question, text: `${question.text} (${historicalLabel})` }
+          : question);
 
-      const { data: responses, error: rError } = await supabase
-        .from("responses")
-        .select("*, answers(*)")
-        .eq("survey_id", id);
-
-      if (rError) throw rError;
-
-      setAllQuestions(questions || []);
-      setAllResponses(responses || []);
-
-      processDataWithFilter(questions || [], responses || [], "", []);
+      setAllQuestions(reportQuestions);
+      setAllResponses(responses);
+      processDataWithFilter(reportQuestions, responses, "", []);
     } catch (error) {
       console.error("Error loading detailed answers:", error);
+      toast({
+        title: t("reports.toastError"),
+        description: language === "ar" ? "تعذر تحميل جميع إجابات التقرير." : "Could not load all report answers.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -355,40 +372,58 @@ const Reports = () => {
   };
 
   const getTargetEnrollmentNumber = () => {
-    const parsed = parseInt(targetEnrollment, 10);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    const parsed = Number(targetEnrollment.trim());
+    return Number.isInteger(parsed) && parsed >= 1 && parsed <= 1_000_000 ? parsed : 0;
   };
 
   const saveReportMetadata = async () => {
-    const { error } = await supabase
-      .from("reports")
-      .update({
-        semester,
-        academic_year: academicYear,
-        status: reportStatus,
-      })
-      .eq("id", report.id);
+    const targetEnrollmentValue = targetEnrollment.trim() ? getTargetEnrollmentNumber() : null;
+    if (targetEnrollment.trim() && !targetEnrollmentValue) {
+      toast({
+        title: t("reports.toastError"),
+        description: language === "ar" ? "أدخل عدداً صحيحاً أكبر من صفر للمشاركين." : "Enter a participant count greater than zero.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    if (error) {
+    const { error: rpcError } = await supabase.rpc("save_report_metadata", {
+      p_report_id: report.id,
+      p_semester: semester,
+      p_academic_year: academicYear,
+      p_status: reportStatus,
+      p_target_enrollment: targetEnrollmentValue,
+    });
+
+    if (rpcError && !isMissingReportMetadataRpcError(rpcError)) {
       toast({ title: t("reports.toastError"), description: t("reports.toastSaveMetaErr"), variant: "destructive" });
       return;
     }
 
-    const { error: surveyError } = await supabase
-      .from("surveys")
-      .update({
-        target_enrollment: targetEnrollment.trim() ? getTargetEnrollmentNumber() || null : null,
-      })
-      .eq("id", report.survey_id);
+    if (rpcError) {
+      // Compatibility path until the atomic metadata migration is deployed.
+      const { error: reportError } = await supabase
+        .from("reports")
+        .update({ semester, academic_year: academicYear, status: reportStatus })
+        .eq("id", report.id);
+      if (reportError) {
+        toast({ title: t("reports.toastError"), description: t("reports.toastSaveMetaErr"), variant: "destructive" });
+        return;
+      }
 
-    if (surveyError) {
-      toast({ title: t("reports.toastError"), description: t("reports.toastSaveMetaErr"), variant: "destructive" });
-      return;
+      const { error: surveyError } = await supabase
+        .from("surveys")
+        .update({ target_enrollment: targetEnrollmentValue })
+        .eq("id", report.survey_id);
+      if (surveyError) {
+        toast({ title: t("reports.toastError"), description: t("reports.toastSaveMetaErr"), variant: "destructive" });
+        return;
+      }
     }
 
     setSurvey(prev => ({
       ...prev,
-      target_enrollment: getTargetEnrollmentNumber() || null,
+      target_enrollment: targetEnrollmentValue,
     }));
 
     toast({ title: t("reports.toastSaveOk"), description: t("reports.toastSaveMeta") });
@@ -680,7 +715,12 @@ const Reports = () => {
     try {
       const courseName = getSelectedCourseName();
       const { data, error } = await supabase.functions.invoke("analyze-survey", {
-        body: { surveyId: id, courseName: courseName || undefined },
+        body: {
+          surveyId: id,
+          courseName: courseName || undefined,
+          filterQuestionId: filterQuestion || undefined,
+          filterValues: filterValues.length > 0 ? filterValues : undefined,
+        },
       });
 
       if (error) throw error;
@@ -746,7 +786,8 @@ const Reports = () => {
     }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    setIsExporting(true);
     const currentReportType = getCurrentReportType();
     const selectedReportTitle = reportTitle.trim() || getReportCopy(currentReportType, language).reportTitle;
     const likertRatingQuestions = detailedAnswers.filter(q => q.type === 'likert' || q.type === 'rating');
@@ -787,17 +828,27 @@ const Reports = () => {
         responses: q.textResponses,
       }));
 
-    exportToExcel({
-      ...report,
-      summary: editedSummary,
-      recommendations_text: editedRecommendations,
-      statistics: {
-        ...((report?.statistics || {}) as Record<string, any>),
-        report_title: selectedReportTitle,
-        report_type: currentReportType,
-      },
-    }, survey, stats, textResponses);
-    toast({ title: t("reports.toastExportOk"), description: t("reports.toastExportExcelOk") });
+    try {
+      await exportToExcel({
+        ...report,
+        summary: editedSummary,
+        recommendations_text: editedRecommendations,
+        statistics: {
+          ...((report?.statistics || {}) as Record<string, any>),
+          report_title: selectedReportTitle,
+          report_type: currentReportType,
+        },
+      }, survey, stats, textResponses, {
+        responses: allResponses,
+        questions: allQuestions,
+      });
+      toast({ title: t("reports.toastExportOk"), description: t("reports.toastExportExcelOk") });
+    } catch (error) {
+      console.error("Excel export error:", error);
+      toast({ title: t("reports.toastError"), description: t("reports.toastExportErr"), variant: "destructive" });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   if (loading) {
@@ -873,7 +924,7 @@ const Reports = () => {
           reportType={currentReportType}
           onSemesterChange={setSemester}
           onAcademicYearChange={setAcademicYear}
-          onReportStatusChange={setReportStatus}
+          onReportStatusChange={(value) => setReportStatus(value as ReportStatus)}
           onTargetEnrollmentChange={setTargetEnrollment}
           onSave={saveReportMetadata}
         />

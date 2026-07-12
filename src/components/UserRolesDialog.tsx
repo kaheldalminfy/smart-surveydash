@@ -24,6 +24,12 @@ interface UserRolesDialogProps {
   onRolesUpdated: () => void;
 }
 
+const isMissingRoleRpcError = (error: { code?: string; message?: string; details?: string }) => {
+  const message = `${error.message || ""} ${error.details || ""}`.toLowerCase();
+  return error.code === "PGRST202"
+    || (message.includes("set_user_roles") && message.includes("function"));
+};
+
 export default function UserRolesDialog({ open, onOpenChange, userId, userName, currentRoles, programs, onRolesUpdated }: UserRolesDialogProps) {
   const { toast } = useToast();
   const { t } = useLanguage();
@@ -51,17 +57,32 @@ export default function UserRolesDialog({ open, onOpenChange, userId, userName, 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const { error: deleteError } = await supabase.from("user_roles").delete().eq("user_id", userId);
-      if (deleteError) throw deleteError;
-      if (roles.length > 0) {
-        const uniqueRoles = roles.reduce((acc: UserRole[], role) => {
-          if (!acc.some(r => r.role === role.role && r.program_id === role.program_id)) acc.push(role);
-          return acc;
-        }, []);
-        const { error: insertError } = await supabase.from("user_roles").insert(
-          uniqueRoles.map(role => ({ user_id: userId, role: role.role, program_id: role.program_id }))
-        );
-        if (insertError) throw insertError;
+      const uniqueRoles = roles.reduce((acc: UserRole[], role) => {
+        if (!acc.some(item => item.role === role.role && item.program_id === role.program_id)) acc.push(role);
+        return acc;
+      }, []);
+      if (uniqueRoles.some(role => needsProgram(role.role) && !role.program_id)) {
+        toast({ title: t('common.error'), description: t('users.selectProgram'), variant: "destructive" });
+        return;
+      }
+
+      const { error: rpcError } = await supabase.rpc("set_user_roles", {
+        p_user_id: userId,
+        p_roles: uniqueRoles.map(role => ({ role: role.role, program_id: role.program_id })),
+      });
+
+      if (rpcError && !isMissingRoleRpcError(rpcError)) throw rpcError;
+
+      if (rpcError) {
+        // Compatibility path before the atomic role migration is deployed.
+        const { error: deleteError } = await supabase.from("user_roles").delete().eq("user_id", userId);
+        if (deleteError) throw deleteError;
+        if (uniqueRoles.length > 0) {
+          const { error: insertError } = await supabase.from("user_roles").insert(
+            uniqueRoles.map(role => ({ user_id: userId, role: role.role, program_id: role.program_id }))
+          );
+          if (insertError) throw insertError;
+        }
       }
       toast({ title: t('common.saved'), description: t('roles.saved') });
       onRolesUpdated();

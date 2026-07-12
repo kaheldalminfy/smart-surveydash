@@ -46,15 +46,24 @@ export default function ArchiveCreateWizard({ open, onOpenChange, onCreated }: P
 
   const fetchPreview = async () => {
     const pid = programId === "__college__" ? null : programId;
-    const [s, c, r] = await Promise.all([
-      supabase.from("surveys").select("id", { count: "exact", head: true })
-        .eq("academic_year", academicYear).eq("semester", semester).eq("program_id", pid as any),
-      supabase.from("complaints").select("id", { count: "exact", head: true })
-        .eq("academic_year", academicYear).eq("semester", semester).eq("program_id", pid as any),
-      supabase.from("recommendations").select("id", { count: "exact", head: true })
-        .eq("academic_year", academicYear).eq("semester", semester).eq("program_id", pid as any),
-    ]);
-    setPreview({ surveys: s.count ?? 0, complaints: c.count ?? 0, recommendations: r.count ?? 0 });
+    const filterProgram = (query: any) => pid ? query.eq("program_id", pid) : query.is("program_id", null);
+
+    try {
+      const [s, c, r] = await Promise.all([
+        filterProgram(supabase.from("surveys").select("id", { count: "exact", head: true })
+          .eq("academic_year", academicYear).eq("semester", semester)),
+        filterProgram(supabase.from("complaints").select("id", { count: "exact", head: true })
+          .eq("academic_year", academicYear).eq("semester", semester)),
+        filterProgram(supabase.from("recommendations").select("id", { count: "exact", head: true })
+          .eq("academic_year", academicYear).eq("semester", semester)),
+      ]);
+      const firstError = s.error || c.error || r.error;
+      if (firstError) throw firstError;
+      setPreview({ surveys: s.count ?? 0, complaints: c.count ?? 0, recommendations: r.count ?? 0 });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : (ar ? "تعذر حساب محتوى الفترة" : "Could not calculate period content");
+      toast({ title: ar ? "خطأ" : "Error", description: message, variant: "destructive" });
+    }
   };
 
   const submit = async () => {
