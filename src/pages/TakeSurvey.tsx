@@ -459,8 +459,14 @@ const TakeSurvey = () => {
           <CardHeader className="pb-4">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                <CardTitle className="text-3xl mb-2">{survey.title}</CardTitle>
-                {survey.description && <p className="text-muted-foreground text-base">{survey.description}</p>}
+                <CardTitle className="text-3xl mb-2">{tr(survey.title)}</CardTitle>
+                {survey.description && <p className="text-muted-foreground text-base">{tr(survey.description)}</p>}
+                {isTranslating && (
+                  <p className="text-xs text-muted-foreground mt-2 italic">
+                    {language === 'ar' ? 'جارٍ الترجمة…' : 'Translating…'}
+                  </p>
+                )}
+
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <LanguageToggle />
