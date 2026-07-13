@@ -367,7 +367,7 @@ const TakeSurvey = () => {
                 <div key={optionId} className={`flex items-center space-x-2 space-x-reverse p-4 border-2 rounded-lg transition-all cursor-pointer ${isSelected ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-accent/30'}`}
                   onClick={() => handleResponseChange(question.id, option)}>
                   <RadioGroupItem value={option} id={optionId} checked={isSelected} />
-                  <Label htmlFor={optionId} className="flex-1 cursor-pointer font-medium text-base">{option}</Label>
+                  <Label htmlFor={optionId} className="flex-1 cursor-pointer font-medium text-base">{tr(option)}</Label>
                   {isSelected && <CheckCircle2 className="h-5 w-5 text-primary" />}
                 </div>
               );
