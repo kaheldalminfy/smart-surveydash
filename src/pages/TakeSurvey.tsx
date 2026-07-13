@@ -511,12 +511,13 @@ const TakeSurvey = () => {
           <CardContent className="space-y-6 py-8">
             <div className="min-h-[350px]">
               <h3 className={`font-bold mb-6 text-foreground leading-relaxed ${currentQuestion?.type === 'section' ? 'text-2xl text-primary' : 'text-xl'}`}>
-                {currentQuestion?.text}
+                {tr(currentQuestion?.text)}
               </h3>
               {currentQuestion?.help_text && (
                 <div className="flex items-start gap-3 mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <HelpCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <p className="text-sm text-blue-800 leading-relaxed">{currentQuestion.help_text}</p>
+                  <p className="text-sm text-blue-800 leading-relaxed">{tr(currentQuestion.help_text)}</p>
+
                 </div>
               )}
               {currentQuestion && currentQuestion.type !== 'section' && renderQuestionInput(currentQuestion)}
