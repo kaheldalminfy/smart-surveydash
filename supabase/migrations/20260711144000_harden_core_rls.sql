@@ -448,5 +448,11 @@ BEGIN
 END;
 $$;
 
-DROP POLICY IF EXISTS "System can create notifications" ON public.notifications;
-REVOKE INSERT ON public.notifications FROM anon, authenticated;
+DO $$
+BEGIN
+  IF to_regclass('public.notifications') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS "System can create notifications" ON public.notifications';
+    EXECUTE 'REVOKE INSERT ON public.notifications FROM anon, authenticated';
+  END IF;
+END;
+$$;
