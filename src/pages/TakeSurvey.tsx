@@ -65,7 +65,24 @@ const TakeSurvey = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [translations, setTranslations] = useState<Record<'ar' | 'en', Record<string, string>>>({ ar: {}, en: {} });
+  const [isTranslating, setIsTranslating] = useState(false);
   const submissionToken = useRef(crypto.randomUUID());
+
+  const hasArabic = (s: string) => /[\u0600-\u06FF]/.test(s || '');
+  const hasLatin = (s: string) => /[A-Za-z]/.test(s || '');
+  const detectLang = (s: string): 'ar' | 'en' | null => {
+    if (hasArabic(s)) return 'ar';
+    if (hasLatin(s)) return 'en';
+    return null;
+  };
+  const tr = (text: string | undefined | null): string => {
+    if (!text) return '';
+    const src = detectLang(text);
+    if (!src || src === language) return text;
+    return translations[language]?.[text] ?? text;
+  };
+
 
   useEffect(() => { if (id) loadSurvey(); }, [id]);
 
