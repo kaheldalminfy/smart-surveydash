@@ -86,6 +86,54 @@ const TakeSurvey = () => {
 
   useEffect(() => { if (id) loadSurvey(); }, [id]);
 
+  // Auto-translate survey content when language differs from source
+  useEffect(() => {
+    if (!survey || questions.length === 0) return;
+    const collected: string[] = [];
+    const push = (s?: string | null) => {
+      if (!s) return;
+      const src = detectLang(s);
+      if (!src || src === language) return;
+      if (translations[language]?.[s]) return;
+      if (!collected.includes(s)) collected.push(s);
+    };
+    push(survey.title);
+    push(survey.description);
+    questions.forEach(q => {
+      push(q.text);
+      push(q.help_text);
+      const opts = Array.isArray(q.options) ? q.options : q.options?.choices;
+      if (Array.isArray(opts)) opts.forEach(o => push(String(o)));
+    });
+    if (collected.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      setIsTranslating(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('translate-survey', {
+          body: { texts: collected, targetLang: language },
+        });
+        if (cancelled) return;
+        if (error) throw error;
+        const arr: string[] = data?.translations ?? [];
+        setTranslations(prev => {
+          const next = { ...prev, [language]: { ...prev[language] } };
+          collected.forEach((orig, i) => {
+            if (arr[i]) next[language][orig] = arr[i];
+          });
+          return next;
+        });
+      } catch (e) {
+        console.warn('Translation failed', e);
+      } finally {
+        if (!cancelled) setIsTranslating(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [language, survey, questions]);
+
+
   const loadSurvey = async () => {
     setIsLoading(true);
     try {
