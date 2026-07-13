@@ -65,9 +65,74 @@ const TakeSurvey = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [translations, setTranslations] = useState<Record<'ar' | 'en', Record<string, string>>>({ ar: {}, en: {} });
+  const [isTranslating, setIsTranslating] = useState(false);
   const submissionToken = useRef(crypto.randomUUID());
 
+  const hasArabic = (s: string) => /[\u0600-\u06FF]/.test(s || '');
+  const hasLatin = (s: string) => /[A-Za-z]/.test(s || '');
+  const detectLang = (s: string): 'ar' | 'en' | null => {
+    if (hasArabic(s)) return 'ar';
+    if (hasLatin(s)) return 'en';
+    return null;
+  };
+  const tr = (text: string | undefined | null): string => {
+    if (!text) return '';
+    const src = detectLang(text);
+    if (!src || src === language) return text;
+    return translations[language]?.[text] ?? text;
+  };
+
+
   useEffect(() => { if (id) loadSurvey(); }, [id]);
+
+  // Auto-translate survey content when language differs from source
+  useEffect(() => {
+    if (!survey || questions.length === 0) return;
+    const collected: string[] = [];
+    const push = (s?: string | null) => {
+      if (!s) return;
+      const src = detectLang(s);
+      if (!src || src === language) return;
+      if (translations[language]?.[s]) return;
+      if (!collected.includes(s)) collected.push(s);
+    };
+    push(survey.title);
+    push(survey.description);
+    questions.forEach(q => {
+      push(q.text);
+      push(q.help_text);
+      const opts = Array.isArray(q.options) ? q.options : q.options?.choices;
+      if (Array.isArray(opts)) opts.forEach(o => push(String(o)));
+    });
+    if (collected.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      setIsTranslating(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('translate-survey', {
+          body: { texts: collected, targetLang: language },
+        });
+        if (cancelled) return;
+        if (error) throw error;
+        const arr: string[] = data?.translations ?? [];
+        setTranslations(prev => {
+          const next = { ...prev, [language]: { ...prev[language] } };
+          collected.forEach((orig, i) => {
+            if (arr[i]) next[language][orig] = arr[i];
+          });
+          return next;
+        });
+      } catch (e) {
+        console.warn('Translation failed', e);
+      } finally {
+        if (!cancelled) setIsTranslating(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [language, survey, questions]);
+
 
   const loadSurvey = async () => {
     setIsLoading(true);
@@ -258,12 +323,13 @@ const TakeSurvey = () => {
   };
 
   const likertOptions = [
-    { label: t('takeSurvey.stronglyDisagree'), value: "1" },
-    { label: t('takeSurvey.disagree'), value: "2" },
-    { label: t('takeSurvey.neutral'), value: "3" },
-    { label: t('takeSurvey.agree'), value: "4" },
-    { label: t('takeSurvey.stronglyAgree'), value: "5" }
+    { label: `1 - ${t('takeSurvey.stronglyDisagree')}`, value: "1" },
+    { label: `2 - ${t('takeSurvey.disagree')}`, value: "2" },
+    { label: `3 - ${t('takeSurvey.neutral')}`, value: "3" },
+    { label: `4 - ${t('takeSurvey.agree')}`, value: "4" },
+    { label: `5 - ${t('takeSurvey.stronglyAgree')}`, value: "5" }
   ];
+
 
   const renderQuestionInput = (question: Question) => {
     const uniqueKey = `${question.id}-${question.order_index}`;
@@ -301,7 +367,7 @@ const TakeSurvey = () => {
                 <div key={optionId} className={`flex items-center space-x-2 space-x-reverse p-4 border-2 rounded-lg transition-all cursor-pointer ${isSelected ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-accent/30'}`}
                   onClick={() => handleResponseChange(question.id, option)}>
                   <RadioGroupItem value={option} id={optionId} checked={isSelected} />
-                  <Label htmlFor={optionId} className="flex-1 cursor-pointer font-medium text-base">{option}</Label>
+                  <Label htmlFor={optionId} className="flex-1 cursor-pointer font-medium text-base">{tr(option)}</Label>
                   {isSelected && <CheckCircle2 className="h-5 w-5 text-primary" />}
                 </div>
               );
@@ -393,8 +459,14 @@ const TakeSurvey = () => {
           <CardHeader className="pb-4">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                <CardTitle className="text-3xl mb-2">{survey.title}</CardTitle>
-                {survey.description && <p className="text-muted-foreground text-base">{survey.description}</p>}
+                <CardTitle className="text-3xl mb-2">{tr(survey.title)}</CardTitle>
+                {survey.description && <p className="text-muted-foreground text-base">{tr(survey.description)}</p>}
+                {isTranslating && (
+                  <p className="text-xs text-muted-foreground mt-2 italic">
+                    {language === 'ar' ? 'جارٍ الترجمة…' : 'Translating…'}
+                  </p>
+                )}
+
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <LanguageToggle />
@@ -439,12 +511,13 @@ const TakeSurvey = () => {
           <CardContent className="space-y-6 py-8">
             <div className="min-h-[350px]">
               <h3 className={`font-bold mb-6 text-foreground leading-relaxed ${currentQuestion?.type === 'section' ? 'text-2xl text-primary' : 'text-xl'}`}>
-                {currentQuestion?.text}
+                {tr(currentQuestion?.text)}
               </h3>
               {currentQuestion?.help_text && (
                 <div className="flex items-start gap-3 mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <HelpCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <p className="text-sm text-blue-800 leading-relaxed">{currentQuestion.help_text}</p>
+                  <p className="text-sm text-blue-800 leading-relaxed">{tr(currentQuestion.help_text)}</p>
+
                 </div>
               )}
               {currentQuestion && currentQuestion.type !== 'section' && renderQuestionInput(currentQuestion)}
