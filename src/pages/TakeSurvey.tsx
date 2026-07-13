@@ -258,12 +258,13 @@ const TakeSurvey = () => {
   };
 
   const likertOptions = [
-    { label: t('takeSurvey.stronglyDisagree'), value: "1" },
-    { label: t('takeSurvey.disagree'), value: "2" },
-    { label: t('takeSurvey.neutral'), value: "3" },
-    { label: t('takeSurvey.agree'), value: "4" },
-    { label: t('takeSurvey.stronglyAgree'), value: "5" }
+    { label: `1 - ${t('takeSurvey.stronglyDisagree')}`, value: "1" },
+    { label: `2 - ${t('takeSurvey.disagree')}`, value: "2" },
+    { label: `3 - ${t('takeSurvey.neutral')}`, value: "3" },
+    { label: `4 - ${t('takeSurvey.agree')}`, value: "4" },
+    { label: `5 - ${t('takeSurvey.stronglyAgree')}`, value: "5" }
   ];
+
 
   const renderQuestionInput = (question: Question) => {
     const uniqueKey = `${question.id}-${question.order_index}`;
