@@ -374,6 +374,7 @@ export type Database = {
           student_id: string | null
           student_name: string | null
           subject: string
+          submission_token: string | null
           type: Database["public"]["Enums"]["complaint_type"]
           updated_at: string | null
         }
@@ -398,6 +399,7 @@ export type Database = {
           student_id?: string | null
           student_name?: string | null
           subject: string
+          submission_token?: string | null
           type: Database["public"]["Enums"]["complaint_type"]
           updated_at?: string | null
         }
@@ -422,6 +424,7 @@ export type Database = {
           student_id?: string | null
           student_name?: string | null
           subject?: string
+          submission_token?: string | null
           type?: Database["public"]["Enums"]["complaint_type"]
           updated_at?: string | null
         }
@@ -942,19 +945,25 @@ export type Database = {
       responses: {
         Row: {
           id: string
+          is_complete: boolean
           respondent_id: string | null
+          submission_token: string | null
           submitted_at: string | null
           survey_id: string
         }
         Insert: {
           id?: string
+          is_complete?: boolean
           respondent_id?: string | null
+          submission_token?: string | null
           submitted_at?: string | null
           survey_id: string
         }
         Update: {
           id?: string
+          is_complete?: boolean
           respondent_id?: string | null
+          submission_token?: string | null
           submitted_at?: string | null
           survey_id?: string
         }
@@ -1190,6 +1199,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_manage_complaint_attachment: {
+        Args: { p_object_name: string }
+        Returns: boolean
+      }
+      can_upload_complaint_attachment: {
+        Args: { p_object_name: string }
+        Returns: boolean
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -1198,6 +1215,14 @@ export type Database = {
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
+      }
+      finalize_public_complaint_attachments: {
+        Args: {
+          p_complaint_id: string
+          p_submission_token: string
+          p_successful_paths: Json
+        }
+        Returns: undefined
       }
       has_role: {
         Args: {
@@ -1230,6 +1255,52 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      record_archive_export: {
+        Args: { p_archive_id: string; p_format?: string }
+        Returns: number
+      }
+      save_report_metadata: {
+        Args: {
+          p_academic_year: string
+          p_report_id: string
+          p_semester: string
+          p_status: Database["public"]["Enums"]["report_status"]
+          p_target_enrollment: number
+        }
+        Returns: undefined
+      }
+      set_user_roles: {
+        Args: { p_roles: Json; p_user_id: string }
+        Returns: undefined
+      }
+      submit_public_complaint: {
+        Args: {
+          p_attachments?: Json
+          p_complainant_academic_id: string
+          p_complainant_type: string
+          p_complaint_category: string
+          p_complaint_id: string
+          p_description: string
+          p_program_id: string
+          p_student_email: string
+          p_student_name: string
+          p_subject: string
+          p_submission_token: string
+        }
+        Returns: string
+      }
+      submit_survey_response: {
+        Args: {
+          p_answers: Json
+          p_submission_token?: string
+          p_survey_id: string
+        }
+        Returns: string
+      }
+      sync_survey_questions: {
+        Args: { p_questions: Json; p_survey_id: string }
+        Returns: Json
       }
     }
     Enums: {
