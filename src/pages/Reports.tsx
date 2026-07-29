@@ -182,6 +182,19 @@ const Reports = () => {
     }
   };
 
+  const handlePurged = async () => {
+    if (!id) return;
+    try {
+      const responses = await fetchAllCompleteSurveyResponses(id);
+      setAllResponses(responses);
+      processDataWithFilter(allQuestions, responses, filterQuestion, filterValues);
+    } catch (error) {
+      console.error("Error refreshing responses after purge:", error);
+    }
+  };
+
+
+
   const processDataWithFilter = (
     questions: any[],
     responses: any[],
@@ -954,6 +967,9 @@ const Reports = () => {
           onManualEnrollmentChange={setManualEnrollment}
           getFilterOptions={getFilterOptions}
           reportType={currentReportType}
+          surveyId={id}
+          onPurged={handlePurged}
+
         />
 
         <QuestionsSummaryChart likertRatingQuestions={likertRatingQuestions} />
