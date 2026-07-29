@@ -151,7 +151,32 @@ export const ReportFilterCard = ({
                 })()}
               </div>
             </div>
+
+            {(() => {
+              const manualNum = parseInt(manualEnrollment);
+              if (!manualEnrollment || isNaN(manualNum) || manualNum <= 0) return null;
+              if (filteredResponsesCount <= manualNum) return null;
+              return (
+                <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                  <p className="text-sm text-muted-foreground">
+                    {language === 'ar'
+                      ? `يوجد ${filteredResponsesCount - manualNum} استجابة زائدة عن العدد الفعلي للطلاب في هذا المقرر.`
+                      : `There are ${filteredResponsesCount - manualNum} responses above the actual number of students for this course.`}
+                  </p>
+                  <PurgeExcessResponsesButton
+                    surveyId={surveyId}
+                    questionId={filterQuestion}
+                    filterValues={filterValues}
+                    courseName={filterValues[0] || ''}
+                    currentCount={filteredResponsesCount}
+                    actualStudents={manualNum}
+                    onPurged={onPurged}
+                  />
+                </div>
+              );
+            })()}
           </CardContent>
+
         </Card>
       )}
     </>
