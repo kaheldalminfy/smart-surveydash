@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Filter, Target, Users } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { getReportCopy, SurveyReportType } from "@/utils/reportType";
+import { PurgeExcessResponsesButton } from "@/components/reports/PurgeExcessResponsesButton";
 
 interface ReportFilterCardProps {
   allQuestions: any[];
@@ -22,16 +23,20 @@ interface ReportFilterCardProps {
   onManualEnrollmentChange: (v: string) => void;
   getFilterOptions: () => string[];
   reportType?: SurveyReportType;
+  surveyId?: string;
+  onPurged?: () => void;
 }
 
 export const ReportFilterCard = ({
   allQuestions, hasAnswersData, filterQuestion, filterValues, filteredResponsesCount,
   manualEnrollment, onFilterQuestionChange, onFilterValueChange, onClearFilter,
   onManualEnrollmentChange, getFilterOptions, reportType = "course_evaluation",
+  surveyId, onPurged,
 }: ReportFilterCardProps) => {
   const { t, language } = useLanguage();
   const copy = getReportCopy(reportType, language);
   if (allQuestions.length === 0 || !hasAnswersData) return null;
+
 
   return (
     <>
