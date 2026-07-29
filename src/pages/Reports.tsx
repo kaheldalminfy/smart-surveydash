@@ -954,6 +954,9 @@ const Reports = () => {
           onManualEnrollmentChange={setManualEnrollment}
           getFilterOptions={getFilterOptions}
           reportType={currentReportType}
+          surveyId={id}
+          onPurged={handlePurged}
+
         />
 
         <QuestionsSummaryChart likertRatingQuestions={likertRatingQuestions} />
