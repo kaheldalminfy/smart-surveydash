@@ -942,6 +942,57 @@ export type Database = {
           },
         ]
       }
+      response_purge_log: {
+        Row: {
+          actual_students: number
+          course_name: string
+          deleted_count: number
+          deleted_response_ids: Json
+          id: string
+          performed_at: string
+          performed_by: string | null
+          performed_by_email: string | null
+          performed_by_name: string | null
+          program_id: string | null
+          question_id: string | null
+          responses_after: number
+          responses_before: number
+          survey_id: string | null
+        }
+        Insert: {
+          actual_students: number
+          course_name: string
+          deleted_count: number
+          deleted_response_ids?: Json
+          id?: string
+          performed_at?: string
+          performed_by?: string | null
+          performed_by_email?: string | null
+          performed_by_name?: string | null
+          program_id?: string | null
+          question_id?: string | null
+          responses_after: number
+          responses_before: number
+          survey_id?: string | null
+        }
+        Update: {
+          actual_students?: number
+          course_name?: string
+          deleted_count?: number
+          deleted_response_ids?: Json
+          id?: string
+          performed_at?: string
+          performed_by?: string | null
+          performed_by_email?: string | null
+          performed_by_name?: string | null
+          program_id?: string | null
+          question_id?: string | null
+          responses_after?: number
+          responses_before?: number
+          survey_id?: string | null
+        }
+        Relationships: []
+      }
       responses: {
         Row: {
           id: string
@@ -1247,6 +1298,16 @@ export type Database = {
           source_queue: string
         }
         Returns: number
+      }
+      purge_excess_responses: {
+        Args: {
+          p_actual_students: number
+          p_course_name: string
+          p_filter_values: string[]
+          p_question_id: string
+          p_survey_id: string
+        }
+        Returns: Json
       }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
