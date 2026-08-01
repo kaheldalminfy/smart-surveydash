@@ -559,14 +559,17 @@ const buildPDFDocument = async (
   }
 
   // ============ SUMMARY CHART (programmatic horizontal bar chart) ============
-  const summaryLikertStats = (stats.questionStats || []).filter((q: any) =>
+  const allQuestionStats: any[] = stats.questionStats || [];
+  const qNum = (q: any) => allQuestionStats.indexOf(q) + 1;
+
+  const summaryLikertStats = allQuestionStats.filter((q: any) =>
     (q.type === 'likert' || q.type === 'rating') && typeof q.mean === 'number' && q.mean > 0
   );
 
   if (summaryLikertStats.length > 0) {
-    doc.addPage();
-    yPos = 15;
+    yPos = checkNewPage(doc, yPos, 70, pageHeight);
     yPos = drawSectionHeader(doc, yPos, 'ملخص متوسطات الأسئلة', COLORS.blue, pageWidth, margin, fontLoaded);
+
 
     const chartLeft = margin + 25;
     const chartRight = pageWidth - margin - 10;
