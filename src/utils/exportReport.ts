@@ -718,18 +718,14 @@ const buildPDFDocument = async (
   );
 
   if (mcqStats.length > 0) {
-    doc.addPage();
-    yPos = 15;
+    yPos = checkNewPage(doc, yPos, 60, pageHeight);
     yPos = drawSectionHeader(doc, yPos, 'توزيع إجابات أسئلة الاختيار', COLORS.purple, pageWidth, margin, fontLoaded);
 
     for (let idx = 0; idx < mcqStats.length; idx++) {
       const q = mcqStats[idx];
       yPos = checkNewPage(doc, yPos, 45, pageHeight);
-      if (fontLoaded) doc.setFont('Amiri', 'normal');
-      doc.setTextColor(...COLORS.darkBlue);
-      doc.setFontSize(9);
-      doc.text(`س${idx + 1}: ${(q.question || '').substring(0, 85)}`, pageWidth - margin - 4, yPos, { align: 'right' });
-      yPos += 5;
+      yPos = drawQuestionTitle(doc, yPos, `س${qNum(q)}`, q.question || '', pageWidth, margin, fontLoaded, COLORS.darkBlue);
+
 
       const total = q.mcqDistribution.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
       const body = q.mcqDistribution.map((item: any) => [
