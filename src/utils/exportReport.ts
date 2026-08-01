@@ -684,27 +684,21 @@ const buildPDFDocument = async (
   }
 
   // ============ PER-QUESTION BAR CHARTS (drawn) ============
-  const likertStats = (stats.questionStats || []).filter((q: any) => 
+  const likertStats = allQuestionStats.filter((q: any) =>
     (q.type === 'likert' || q.type === 'rating') && q.distribution && q.distribution.length > 0
   );
 
   if (likertStats.length > 0) {
-    doc.addPage();
-    yPos = 15;
+    yPos = checkNewPage(doc, yPos, 70, pageHeight);
     yPos = drawSectionHeader(doc, yPos, 'تحليل تفصيلي لكل سؤال', COLORS.darkBlue, pageWidth, margin, fontLoaded);
 
     for (let idx = 0; idx < likertStats.length; idx++) {
       const q = likertStats[idx];
-      yPos = checkNewPage(doc, yPos, 60, pageHeight);
+      yPos = checkNewPage(doc, yPos, 65, pageHeight);
 
-      // Question header
-      doc.setFillColor(...COLORS.lightGray);
-      doc.roundedRect(margin, yPos, pageWidth - margin * 2, 10, 2, 2, 'F');
-      doc.setTextColor(...COLORS.darkBlue);
-      doc.setFontSize(9);
-      if (fontLoaded) doc.setFont('Amiri', 'normal');
-      doc.text(`س${idx + 1}: ${(q.question || '').substring(0, 70)}`, pageWidth - margin - 4, yPos + 7, { align: 'right' });
-      yPos += 14;
+      // Question header (full text, wrapped)
+      yPos = drawQuestionTitle(doc, yPos, `س${qNum(q)}`, q.question || '', pageWidth, margin, fontLoaded, COLORS.darkBlue);
+
 
       // Draw bar chart
       yPos = drawBarChart(doc, yPos, q.distribution, q.mean || 0, q.stdDev || 0, pageWidth, margin, fontLoaded);
