@@ -1,8 +1,9 @@
+import { Fragment } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, ListTree } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { getMeanLevel, MCQ_COLORS } from "./reportConstants";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -21,13 +22,30 @@ export const QuestionAnalysisSection = ({ detailedAnswers, totalResponses }: Que
         {t('reports.questionAnalysis')}
       </h2>
 
-      {detailedAnswers.map((question, index) => (
-        <Card key={question.id}>
+      {detailedAnswers.map((question, index) => {
+        const previousQuestion = detailedAnswers[index - 1];
+        const startsSection = Boolean(
+          question.sectionId && question.sectionId !== previousQuestion?.sectionId,
+        );
+        const questionNumber = question.questionNumber ?? index + 1;
+
+        return (
+        <Fragment key={question.id}>
+          {startsSection && (
+            <div className="flex items-start gap-3 border-s-4 border-primary bg-primary/5 px-4 py-3">
+              <ListTree className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+              <h3 className="text-base font-semibold leading-6 break-words">
+                {question.sectionTitle}
+              </h3>
+            </div>
+          )}
+
+        <Card>
           <CardHeader className="bg-muted/30 border-b">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="default">{t('reports.question')} {index + 1}</Badge>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <Badge variant="default">{t('reports.question')} {questionNumber}</Badge>
                   <Badge variant="outline">
                     {question.type === 'likert' ? t('reports.likertScale') :
                      question.type === 'rating' ? t('reports.ratingLabel') :
@@ -35,11 +53,13 @@ export const QuestionAnalysisSection = ({ detailedAnswers, totalResponses }: Que
                   </Badge>
                   <Badge variant="secondary">{question.responseCount} {t('reports.response')}</Badge>
                 </div>
-                <CardTitle className="text-lg">{question.text}</CardTitle>
+                <CardTitle className="text-base leading-7 whitespace-normal break-words sm:text-lg">
+                  {question.text}
+                </CardTitle>
               </div>
 
               {(question.type === 'likert' || question.type === 'rating') && parseFloat(question.mean) > 0 && (
-                <div className="text-center">
+                <div className="self-start text-center sm:shrink-0">
                   <div className={`px-4 py-2 rounded-lg ${getMeanLevel(parseFloat(question.mean)).color} text-white`}>
                     <p className="text-2xl font-bold">{question.mean}</p>
                     <p className="text-xs">{getMeanLevel(parseFloat(question.mean)).label}</p>
@@ -118,7 +138,7 @@ export const QuestionAnalysisSection = ({ detailedAnswers, totalResponses }: Que
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4 pt-4 border-t">
+                <div className="grid grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-3 sm:gap-4">
                   <div className="text-center p-3 bg-muted/30 rounded-lg">
                     <p className="text-sm text-muted-foreground">{t('reports.mean')}</p>
                     <p className="text-xl font-bold text-primary">{question.mean}</p>
@@ -165,8 +185,8 @@ export const QuestionAnalysisSection = ({ detailedAnswers, totalResponses }: Que
                       return (
                         <div key={i}>
                           <div className="flex justify-between text-sm mb-1">
-                            <span>{item.name}</span>
-                            <span className="font-medium">{item.value} ({percentage.toFixed(1)}%)</span>
+                            <span className="min-w-0 break-words">{item.name}</span>
+                            <span className="shrink-0 font-medium">{item.value} ({percentage.toFixed(1)}%)</span>
                           </div>
                           <Progress value={percentage} className="h-2" />
                         </div>
@@ -186,7 +206,7 @@ export const QuestionAnalysisSection = ({ detailedAnswers, totalResponses }: Que
                       <div key={i} className="p-4 bg-muted/30 rounded-lg border-r-4 border-primary">
                         <div className="flex items-start gap-3">
                           <Badge variant="outline" className="shrink-0">{i + 1}</Badge>
-                          <p className="text-sm leading-relaxed">{response}</p>
+                          <p className="min-w-0 whitespace-pre-wrap break-words text-sm leading-relaxed">{response}</p>
                         </div>
                       </div>
                     ))}
@@ -198,7 +218,9 @@ export const QuestionAnalysisSection = ({ detailedAnswers, totalResponses }: Que
             )}
           </CardContent>
         </Card>
-      ))}
+        </Fragment>
+        );
+      })}
     </div>
   );
 };

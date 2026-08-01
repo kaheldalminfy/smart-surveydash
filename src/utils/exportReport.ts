@@ -17,6 +17,7 @@ interface ChartImage {
 interface TextResponse {
   question: string;
   responses: string[];
+  sectionTitle?: string | null;
 }
 
 interface RawExcelAnswer {
@@ -35,6 +36,7 @@ interface RawExcelQuestion {
   id: string;
   text: string;
   order_index: number;
+  sectionTitle?: string | null;
 }
 
 interface RawExcelData {
@@ -44,6 +46,8 @@ interface RawExcelData {
 
 interface QuestionStat {
   question: string;
+  questionNumber?: number;
+  sectionTitle?: string | null;
   type: string;
   mean?: number;
   stdDev?: number;
@@ -139,6 +143,31 @@ const drawQuestionTitle = (
   doc.setTextColor(...textColor);
   doc.text(lines, pageWidth - margin - 4, y + 5.5, { align: 'right' });
   return y + boxHeight + 4;
+};
+
+const drawQuestionSection = (
+  doc: jsPDF,
+  y: number,
+  title: string | null | undefined,
+  pageWidth: number,
+  margin: number,
+  fontLoaded: boolean,
+) => {
+  if (!title) return y;
+
+  if (fontLoaded) doc.setFont('Amiri', 'normal');
+  doc.setFontSize(9);
+  const lines = doc.splitTextToSize(title, pageWidth - margin * 2 - 12);
+  const boxHeight = Math.max(9, lines.length * 4.5 + 4);
+  doc.setFillColor(232, 242, 252);
+  doc.roundedRect(margin, y, pageWidth - margin * 2, boxHeight, 1.5, 1.5, 'F');
+  doc.setFillColor(...COLORS.blue);
+  doc.setDrawColor(...COLORS.blue);
+  doc.setLineWidth(0.8);
+  doc.rect(pageWidth - margin - 2, y, 2, boxHeight, 'F');
+  doc.setTextColor(...COLORS.darkBlue);
+  doc.text(lines, pageWidth - margin - 6, y + 5.5, { align: 'right' });
+  return y + boxHeight + 3;
 };
 
 
@@ -560,7 +589,7 @@ const buildPDFDocument = async (
 
   // ============ SUMMARY CHART (programmatic horizontal bar chart) ============
   const allQuestionStats: any[] = stats.questionStats || [];
-  const qNum = (q: any) => allQuestionStats.indexOf(q) + 1;
+  const qNum = (q: any) => q.questionNumber || allQuestionStats.indexOf(q) + 1;
 
   const summaryLikertStats = allQuestionStats.filter((q: any) =>
     (q.type === 'likert' || q.type === 'rating') && typeof q.mean === 'number' && q.mean > 0
@@ -604,7 +633,7 @@ const buildPDFDocument = async (
       if (fontLoaded) doc.setFont('Amiri', 'normal');
       doc.setTextColor(...COLORS.text);
       doc.setFontSize(7);
-      doc.text(`س${idx + 1}`, margin + 18, yPos + barHeight - 2, { align: 'right' });
+      doc.text(`س${qNum(q)}`, margin + 18, yPos + barHeight - 2, { align: 'right' });
 
       // Draw bar
       doc.setFillColor(...level.color);
@@ -667,11 +696,20 @@ const buildPDFDocument = async (
     doc.setFontSize(7);
     doc.text('مفتاح الأسئلة:', pageWidth - margin - 4, yPos, { align: 'right' });
     yPos += 4;
+    let previousKeySection: string | null = null;
     for (let idx = 0; idx < summaryLikertStats.length; idx++) {
+      const question = summaryLikertStats[idx];
+      const sectionTitle = question.sectionTitle || null;
+      if (sectionTitle && sectionTitle !== previousKeySection) {
+        yPos = checkNewPage(doc, yPos, 16, pageHeight);
+        yPos = drawQuestionSection(doc, yPos, sectionTitle, pageWidth, margin, fontLoaded);
+      }
+      previousKeySection = sectionTitle;
+
       if (fontLoaded) doc.setFont('Amiri', 'normal');
       doc.setFontSize(7);
       const keyLines = doc.splitTextToSize(
-        `س${qNum(summaryLikertStats[idx])}: ${summaryLikertStats[idx].question || ''}`,
+        `س${qNum(question)}: ${question.question || ''}`,
         pageWidth - margin * 2 - 8
       );
       yPos = checkNewPage(doc, yPos, keyLines.length * 4 + 2, pageHeight);
@@ -692,9 +730,16 @@ const buildPDFDocument = async (
     yPos = checkNewPage(doc, yPos, 70, pageHeight);
     yPos = drawSectionHeader(doc, yPos, 'تحليل تفصيلي لكل سؤال', COLORS.darkBlue, pageWidth, margin, fontLoaded);
 
+    let previousLikertSection: string | null = null;
     for (let idx = 0; idx < likertStats.length; idx++) {
       const q = likertStats[idx];
       yPos = checkNewPage(doc, yPos, 65, pageHeight);
+
+      const sectionTitle = q.sectionTitle || null;
+      if (sectionTitle && sectionTitle !== previousLikertSection) {
+        yPos = drawQuestionSection(doc, yPos, sectionTitle, pageWidth, margin, fontLoaded);
+      }
+      previousLikertSection = sectionTitle;
 
       // Question header (full text, wrapped)
       yPos = drawQuestionTitle(doc, yPos, `س${qNum(q)}`, q.question || '', pageWidth, margin, fontLoaded, COLORS.darkBlue);
@@ -715,9 +760,17 @@ const buildPDFDocument = async (
     yPos = checkNewPage(doc, yPos, 60, pageHeight);
     yPos = drawSectionHeader(doc, yPos, 'توزيع إجابات أسئلة الاختيار', COLORS.purple, pageWidth, margin, fontLoaded);
 
+    let previousMcqSection: string | null = null;
     for (let idx = 0; idx < mcqStats.length; idx++) {
       const q = mcqStats[idx];
       yPos = checkNewPage(doc, yPos, 45, pageHeight);
+
+      const sectionTitle = q.sectionTitle || null;
+      if (sectionTitle && sectionTitle !== previousMcqSection) {
+        yPos = drawQuestionSection(doc, yPos, sectionTitle, pageWidth, margin, fontLoaded);
+      }
+      previousMcqSection = sectionTitle;
+
       yPos = drawQuestionTitle(doc, yPos, `س${qNum(q)}`, q.question || '', pageWidth, margin, fontLoaded, COLORS.darkBlue);
 
 
@@ -753,16 +806,35 @@ const buildPDFDocument = async (
     yPos = checkNewPage(doc, yPos, 60, pageHeight);
     yPos = drawSectionHeader(doc, yPos, 'تفاصيل نتائج الأسئلة', COLORS.blue, pageWidth, margin, fontLoaded);
 
-    const questionData = allQuestionStats.map((q: any, i: number) => {
+    const questionData: any[] = [];
+    let previousDetailsSection: string | null = null;
+
+    allQuestionStats.forEach((q: any) => {
+      const sectionTitle = q.sectionTitle || null;
+      if (sectionTitle && sectionTitle !== previousDetailsSection) {
+        questionData.push([{
+          content: sectionTitle,
+          colSpan: 6,
+          styles: {
+            fillColor: [232, 242, 252],
+            textColor: COLORS.darkBlue,
+            fontStyle: 'normal',
+            fontSize: 9,
+            halign: 'right',
+          },
+        }]);
+      }
+      previousDetailsSection = sectionTitle;
+
       const mean = q.mean ? Number(q.mean) : 0;
-      return [
+      questionData.push([
         String(q.responseCount || 0),
         q.stdDev ? Number(q.stdDev).toFixed(2) : '-',
         mean > 0 ? mean.toFixed(2) : '-',
         mean > 0 ? getMeanLevel(mean).label : '-',
         q.type === 'likert' ? 'ليكرت' : q.type === 'mcq' ? 'اختيار' : q.type === 'rating' ? 'تقييم' : 'نصي',
-        `${i + 1}. ${q.question || ''}`,
-      ];
+        `${qNum(q)}. ${q.question || ''}`,
+      ]);
     });
 
     autoTable(doc, {
@@ -781,6 +853,8 @@ const buildPDFDocument = async (
       },
       alternateRowStyles: { fillColor: COLORS.lightGray },
       margin: { left: margin, right: margin, bottom: 30 },
+      rowPageBreak: 'avoid',
+      showHead: 'everyPage',
       theme: 'striped'
     });
 
@@ -793,8 +867,16 @@ const buildPDFDocument = async (
     yPos = 15;
     yPos = drawSectionHeader(doc, yPos, 'الردود النصية المفتوحة', COLORS.amber, pageWidth, margin, fontLoaded);
 
+    let previousTextSection: string | null = null;
     for (const item of textResponses) {
       yPos = checkNewPage(doc, yPos, 25, pageHeight);
+
+      const sectionTitle = item.sectionTitle || null;
+      if (sectionTitle && sectionTitle !== previousTextSection) {
+        yPos = drawQuestionSection(doc, yPos, sectionTitle, pageWidth, margin, fontLoaded);
+      }
+      previousTextSection = sectionTitle;
+
       autoTable(doc, {
         startY: yPos,
         head: [[item.question]],
@@ -999,9 +1081,10 @@ export const exportToExcel = async (
 
   if (stats.questionStats?.length > 0) {
     const questionsData: SheetData = [
-      ['#', 'السؤال', 'النوع', 'المتوسط', 'الانحراف المعياري', 'عدد الردود', 'التقييم'],
+      ['#', 'القسم', 'السؤال', 'النوع', 'المتوسط', 'الانحراف المعياري', 'عدد الردود', 'التقييم'],
       ...stats.questionStats.map((question: QuestionStat, index: number) => [
-        index + 1,
+        question.questionNumber || index + 1,
+        question.sectionTitle || '',
         question.question,
         question.type === 'likert' ? 'ليكرت' : question.type === 'mcq' ? 'اختيار' : question.type === 'rating' ? 'تقييم' : 'نصي',
         question.mean ? Number(question.mean).toFixed(2) : '-',
@@ -1013,7 +1096,7 @@ export const exportToExcel = async (
     sheets.push({
       data: questionsData,
       sheet: 'الأسئلة',
-      columns: [{ width: 6 }, { width: 60 }, { width: 14 }, { width: 12 }, { width: 18 }, { width: 14 }, { width: 14 }],
+      columns: [{ width: 6 }, { width: 32 }, { width: 60 }, { width: 14 }, { width: 12 }, { width: 18 }, { width: 14 }, { width: 14 }],
       rightToLeft: true,
       stickyRowsCount: 1,
     });
@@ -1022,6 +1105,7 @@ export const exportToExcel = async (
   if (rawData?.responses.length && rawData.questions.length) {
     const orderedQuestions = [...rawData.questions].sort((a, b) => a.order_index - b.order_index);
     const rawAnswersData: SheetData = [
+      ['', '', ...orderedQuestions.map(question => question.sectionTitle || '')],
       ['رقم الاستجابة', 'وقت الإرسال', ...orderedQuestions.map(question => question.text)],
       ...rawData.responses.map((response, responseIndex) => {
         const answerByQuestion = new Map(response.answers.map(answer => [answer.question_id, answer]));
@@ -1044,20 +1128,24 @@ export const exportToExcel = async (
         ...orderedQuestions.map(() => ({ width: 36 })),
       ],
       rightToLeft: true,
-      stickyRowsCount: 1,
+      stickyRowsCount: 2,
     });
   }
 
   if (textResponses?.length) {
-    const textData: SheetData = [['السؤال', 'الرد']];
+    const textData: SheetData = [['القسم', 'السؤال', 'الرد']];
     textResponses.forEach(item => {
-      item.responses.forEach((response, index) => textData.push([index === 0 ? item.question : '', response]));
-      textData.push(['', '']);
+      item.responses.forEach((response, index) => textData.push([
+        index === 0 ? item.sectionTitle || '' : '',
+        index === 0 ? item.question : '',
+        response,
+      ]));
+      textData.push(['', '', '']);
     });
     sheets.push({
       data: textData,
       sheet: 'الردود النصية',
-      columns: [{ width: 50 }, { width: 80 }],
+      columns: [{ width: 32 }, { width: 50 }, { width: 80 }],
       rightToLeft: true,
       stickyRowsCount: 1,
     });

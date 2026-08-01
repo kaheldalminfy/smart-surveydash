@@ -37,18 +37,27 @@ export const mapWithConcurrency = async <T, TResult>(
   return results;
 };
 
-export const fetchAllSurveyQuestions = async (surveyId: string) => {
+interface FetchSurveyQuestionsOptions {
+  includeSections?: boolean;
+}
+
+export const fetchAllSurveyQuestions = async (
+  surveyId: string,
+  { includeSections = false }: FetchSurveyQuestionsOptions = {},
+) => {
   const rows: SurveyQuestionRow[] = [];
 
   for (let from = 0; from < MAX_ROWS; from += PAGE_SIZE) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("questions")
       .select("*")
       .eq("survey_id", surveyId)
-      .neq("type", "section")
       .order("order_index", { ascending: true })
-      .order("id", { ascending: true })
-      .range(from, from + PAGE_SIZE - 1);
+      .order("id", { ascending: true });
+
+    if (!includeSections) query = query.neq("type", "section");
+
+    const { data, error } = await query.range(from, from + PAGE_SIZE - 1);
 
     if (error) throw error;
 

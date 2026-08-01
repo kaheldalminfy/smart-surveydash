@@ -29,7 +29,8 @@ export const QuestionsSummaryChart = ({ likertRatingQuestions }: QuestionsSummar
               data={likertRatingQuestions.map((q, i) => ({
                 name: q.text.length > 40 ? q.text.substring(0, 40) + '...' : q.text,
                 fullName: q.text,
-                shortName: `${t('reports.qPrefix')}${i + 1}`,
+                sectionTitle: q.sectionTitle,
+                shortName: `${t('reports.qPrefix')}${q.questionNumber ?? i + 1}`,
                 mean: parseFloat(q.mean) || 0,
                 responses: q.responseCount,
               }))}
@@ -46,6 +47,9 @@ export const QuestionsSummaryChart = ({ likertRatingQuestions }: QuestionsSummar
                     const level = getMeanLevel(data.mean);
                     return (
                       <div className="bg-card p-3 rounded-lg border shadow-lg max-w-sm" style={{ direction: language === 'ar' ? 'rtl' : 'ltr' }}>
+                        {data.sectionTitle && (
+                          <p className="mb-1 text-xs font-medium text-muted-foreground">{data.sectionTitle}</p>
+                        )}
                         <p className="font-medium text-sm mb-2 leading-relaxed">{data.fullName}</p>
                         <p className="text-primary font-bold">{t('reports.mean')}: {data.mean.toFixed(2)}</p>
                         <p className="text-muted-foreground text-xs">{t('reports.evaluation')}: {level.label}</p>
@@ -70,9 +74,14 @@ export const QuestionsSummaryChart = ({ likertRatingQuestions }: QuestionsSummar
           <h4 className="font-medium mb-3 text-sm">{t('reports.questionGuide')}</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
             {likertRatingQuestions.map((q, i) => (
-              <div key={q.id} className="flex gap-2">
-                <Badge variant="outline" className="shrink-0">{t('reports.qPrefix')}{i + 1}</Badge>
-                <span className="text-muted-foreground truncate" title={q.text}>{q.text}</span>
+              <div key={q.id} className="flex min-w-0 items-start gap-2 border-b border-border/60 pb-2 last:border-b-0">
+                <Badge variant="outline" className="shrink-0">{t('reports.qPrefix')}{q.questionNumber ?? i + 1}</Badge>
+                <div className="min-w-0">
+                  {q.sectionTitle && (
+                    <p className="mb-0.5 text-xs font-medium text-primary">{q.sectionTitle}</p>
+                  )}
+                  <p className="whitespace-normal break-words text-muted-foreground">{q.text}</p>
+                </div>
               </div>
             ))}
           </div>

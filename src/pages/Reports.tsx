@@ -32,6 +32,43 @@ const isMissingReportMetadataRpcError = (error: { code?: string; message?: strin
     || (message.includes("save_report_metadata") && message.includes("function"));
 };
 
+const organizeReportQuestions = (
+  questions: any[],
+  answeredQuestionIds: Set<string>,
+  historicalLabel: string,
+) => {
+  let currentSection: { id: string; title: string } | null = null;
+  let questionNumber = 0;
+
+  return questions.reduce<any[]>((organized, question) => {
+    if (question.type === "section") {
+      currentSection = {
+        id: question.id,
+        title: question.is_archived
+          ? `${question.text} (${historicalLabel})`
+          : question.text,
+      };
+      return organized;
+    }
+
+    if (question.is_archived && !answeredQuestionIds.has(question.id)) {
+      return organized;
+    }
+
+    questionNumber += 1;
+    organized.push({
+      ...question,
+      text: question.is_archived
+        ? `${question.text} (${historicalLabel})`
+        : question.text,
+      questionNumber,
+      sectionId: currentSection?.id ?? null,
+      sectionTitle: currentSection?.title ?? null,
+    });
+    return organized;
+  }, []);
+};
+
 const Reports = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -155,7 +192,7 @@ const Reports = () => {
 
     try {
       const [questions, responses] = await Promise.all([
-        fetchAllSurveyQuestions(id),
+        fetchAllSurveyQuestions(id, { includeSections: true }),
         fetchAllCompleteSurveyResponses(id),
       ]);
 
@@ -163,11 +200,11 @@ const Reports = () => {
         responses.flatMap(response => response.answers.map(answer => answer.question_id)),
       );
       const historicalLabel = language === "ar" ? "نسخة سابقة" : "previous version";
-      const reportQuestions = questions
-        .filter(question => !question.is_archived || answeredQuestionIds.has(question.id))
-        .map(question => question.is_archived
-          ? { ...question, text: `${question.text} (${historicalLabel})` }
-          : question);
+      const reportQuestions = organizeReportQuestions(
+        questions,
+        answeredQuestionIds,
+        historicalLabel,
+      );
 
       setAllQuestions(reportQuestions);
       setAllResponses(responses);
@@ -616,7 +653,11 @@ const Reports = () => {
 
     const textResponses = pdfAnswers
       .filter((q: any) => q.type === 'text' && q.textResponses.length > 0)
-      .map((q: any) => ({ question: q.text, responses: q.textResponses }));
+      .map((q: any) => ({
+        question: q.text,
+        responses: q.textResponses,
+        sectionTitle: q.sectionTitle,
+      }));
 
     const stats: any = {
       reportType: currentReportType,
@@ -628,6 +669,8 @@ const Reports = () => {
       overallStdDev,
       questionStats: pdfAnswers.map((q: any) => ({
         question: q.text,
+        questionNumber: q.questionNumber,
+        sectionTitle: q.sectionTitle,
         type: q.type,
         mean: parseFloat(q.mean) || 0,
         stdDev: parseFloat(q.stdDev) || 0,
@@ -827,6 +870,8 @@ const Reports = () => {
       overallStdDev,
       questionStats: detailedAnswers.map(q => ({
         question: q.text,
+        questionNumber: q.questionNumber,
+        sectionTitle: q.sectionTitle,
         type: q.type,
         mean: parseFloat(q.mean) || 0,
         stdDev: parseFloat(q.stdDev) || 0,
@@ -839,6 +884,7 @@ const Reports = () => {
       .map(q => ({
         question: q.text,
         responses: q.textResponses,
+        sectionTitle: q.sectionTitle,
       }));
 
     try {
