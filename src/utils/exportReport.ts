@@ -124,6 +124,25 @@ const drawSectionHeader = (
   return y + 15;
 };
 
+// Draw a full (wrapped, never truncated) question title block
+const drawQuestionTitle = (
+  doc: jsPDF, y: number, label: string, text: string,
+  pageWidth: number, margin: number, fontLoaded: boolean,
+  textColor: [number, number, number] = [0, 51, 102]
+) => {
+  if (fontLoaded) doc.setFont('Amiri', 'normal');
+  doc.setFontSize(9);
+  const lines = doc.splitTextToSize(`${label}: ${text || ''}`, pageWidth - margin * 2 - 10);
+  const boxHeight = lines.length * 5 + 5;
+  doc.setFillColor(243, 244, 246);
+  doc.roundedRect(margin, y, pageWidth - margin * 2, boxHeight, 2, 2, 'F');
+  doc.setTextColor(...textColor);
+  doc.text(lines, pageWidth - margin - 4, y + 5.5, { align: 'right' });
+  return y + boxHeight + 4;
+};
+
+
+
 // Draw KPI Card
 const drawKPICard = (
   doc: jsPDF, x: number, y: number, width: number, height: number,
