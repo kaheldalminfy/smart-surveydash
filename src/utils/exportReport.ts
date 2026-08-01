@@ -62,6 +62,23 @@ interface FilterInfo {
   filteredCount?: number;
 }
 
+// jsPDF treats tab characters inside Arabic text as positioning commands, which
+// can hide everything after an imported question number such as "1.\t...".
+export const normalizePDFText = (value: unknown): string => String(value ?? '')
+  .replace(/\r\n?/g, '\n')
+  .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+  .replace(/[^\S\n]+/g, ' ')
+  .replace(/ *\n */g, '\n')
+  .trim();
+
+const QUESTION_NUMBER_PREFIX = /^(?:س\s*)?[0-9\u0660-\u0669\u06F0-\u06F9]+\s*[.):-]\s*/u;
+
+export const normalizePDFQuestionText = (value: unknown): string => {
+  const normalized = normalizePDFText(value);
+  const withoutImportedNumber = normalized.replace(QUESTION_NUMBER_PREFIX, '').trim();
+  return withoutImportedNumber || normalized;
+};
+
 // University Colors from DOCX template
 const COLORS = {
   red: [207, 32, 46] as [number, number, number],
@@ -347,6 +364,23 @@ const buildPDFDocument = async (
 ): Promise<jsPDF> => {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', putOnlyUsedFonts: true });
 
+  stats = {
+    ...stats,
+    questionStats: (stats?.questionStats || []).map((question: any, index: number) => ({
+      ...question,
+      question: normalizePDFQuestionText(question.question),
+      questionNumber: index + 1,
+      sectionTitle: normalizePDFText(question.sectionTitle) || null,
+    })),
+  };
+
+  textResponses = textResponses?.map((item) => ({
+    ...item,
+    question: normalizePDFQuestionText(item.question),
+    sectionTitle: normalizePDFText(item.sectionTitle) || null,
+    responses: item.responses.map(normalizePDFText),
+  }));
+
   let fontLoaded = false;
   try {
     const arabicFontBase64 = await loadEmbeddedArabicFont();
@@ -589,7 +623,7 @@ const buildPDFDocument = async (
 
   // ============ SUMMARY CHART (programmatic horizontal bar chart) ============
   const allQuestionStats: any[] = stats.questionStats || [];
-  const qNum = (q: any) => q.questionNumber || allQuestionStats.indexOf(q) + 1;
+  const qNum = (q: any) => allQuestionStats.indexOf(q) + 1;
 
   const summaryLikertStats = allQuestionStats.filter((q: any) =>
     (q.type === 'likert' || q.type === 'rating') && typeof q.mean === 'number' && q.mean > 0
@@ -915,7 +949,7 @@ const buildPDFDocument = async (
   // Auto-generate executive summary if empty or placeholder
   let summaryText = '';
   if (!isEmptyText(report?.summary)) {
-    summaryText = report.summary.trim();
+    summaryText = normalizePDFText(report.summary);
   } else {
     const qs = stats.questionStats || [];
     const likertQs = qs.filter((q: any) => (q.type === 'likert' || q.type === 'rating') && typeof q.mean === 'number' && q.mean > 0);
@@ -961,7 +995,7 @@ const buildPDFDocument = async (
   yPos = drawSectionHeader(doc, yPos, 'التوصيات', COLORS.red, pageWidth, margin, fontLoaded);
 
   const recText = !isEmptyText(report?.recommendations_text)
-    ? report.recommendations_text.trim() 
+    ? normalizePDFText(report.recommendations_text)
     : generateAutoRecommendations(stats);
   doc.setFontSize(10);
   const recLines = doc.splitTextToSize(recText, pageWidth - margin * 2 - 12);
