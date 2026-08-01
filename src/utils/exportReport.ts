@@ -759,12 +759,11 @@ const buildPDFDocument = async (
   }
 
   // ============ QUESTION DETAILS TABLE ============
-  if (stats.questionStats && stats.questionStats.length > 0) {
-    doc.addPage();
-    yPos = 15;
+  if (allQuestionStats.length > 0) {
+    yPos = checkNewPage(doc, yPos, 60, pageHeight);
     yPos = drawSectionHeader(doc, yPos, 'تفاصيل نتائج الأسئلة', COLORS.blue, pageWidth, margin, fontLoaded);
 
-    const questionData = stats.questionStats.map((q: any, i: number) => {
+    const questionData = allQuestionStats.map((q: any, i: number) => {
       const mean = q.mean ? Number(q.mean) : 0;
       return [
         String(q.responseCount || 0),
@@ -772,28 +771,29 @@ const buildPDFDocument = async (
         mean > 0 ? mean.toFixed(2) : '-',
         mean > 0 ? getMeanLevel(mean).label : '-',
         q.type === 'likert' ? 'ليكرت' : q.type === 'mcq' ? 'اختيار' : q.type === 'rating' ? 'تقييم' : 'نصي',
-        `${i + 1}. ${(q.question || '').substring(0, 45)}${(q.question?.length || 0) > 45 ? '...' : ''}`,
+        `${i + 1}. ${q.question || ''}`,
       ];
     });
 
     autoTable(doc, {
       startY: yPos,
-      head: [['ردود', 'انحراف', 'متوسط', 'التقييم', 'النوع', 'السؤال']],
+      head: [['ردود', 'الانحراف', 'المتوسط', 'التقييم', 'النوع', 'السؤال']],
       body: questionData,
-      styles: { font: fontLoaded ? 'Amiri' : 'helvetica', fontStyle: 'normal', fontSize: 8, cellPadding: 2.5, overflow: 'linebreak' },
-      headStyles: { fillColor: COLORS.blue, halign: 'center', fontStyle: 'normal', textColor: [255, 255, 255] },
+      styles: { font: fontLoaded ? 'Amiri' : 'helvetica', fontStyle: 'normal', fontSize: 8, cellPadding: 2.5, overflow: 'linebreak', valign: 'middle' },
+      headStyles: { fillColor: COLORS.blue, halign: 'center', fontStyle: 'normal', textColor: [255, 255, 255], fontSize: 8 },
       columnStyles: {
-        0: { halign: 'center', cellWidth: 12 },
-        1: { halign: 'center', cellWidth: 14 },
-        2: { halign: 'center', cellWidth: 14 },
-        3: { halign: 'center', cellWidth: 18 },
-        4: { halign: 'center', cellWidth: 14 },
+        0: { halign: 'center', cellWidth: 13 },
+        1: { halign: 'center', cellWidth: 19 },
+        2: { halign: 'center', cellWidth: 19 },
+        3: { halign: 'center', cellWidth: 22 },
+        4: { halign: 'center', cellWidth: 17 },
         5: { halign: 'right', cellWidth: 'auto' },
       },
       alternateRowStyles: { fillColor: COLORS.lightGray },
-      margin: { left: margin, right: margin },
+      margin: { left: margin, right: margin, bottom: 30 },
       theme: 'striped'
     });
+
     yPos = (doc as any).lastAutoTable.finalY + 10;
   }
 
