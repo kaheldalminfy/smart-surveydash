@@ -660,20 +660,26 @@ const buildPDFDocument = async (
     }
     yPos = legendY + 12;
 
-    // Question key table
-    yPos = checkNewPage(doc, yPos, 10 + summaryLikertStats.length * 5, pageHeight);
+    // Question key table (full text, wrapped)
+    yPos = checkNewPage(doc, yPos, 14, pageHeight);
     if (fontLoaded) doc.setFont('Amiri', 'normal');
     doc.setTextColor(...COLORS.muted);
     doc.setFontSize(7);
     doc.text('مفتاح الأسئلة:', pageWidth - margin - 4, yPos, { align: 'right' });
     yPos += 4;
     for (let idx = 0; idx < summaryLikertStats.length; idx++) {
-      yPos = checkNewPage(doc, yPos, 5, pageHeight);
+      if (fontLoaded) doc.setFont('Amiri', 'normal');
+      doc.setFontSize(7);
+      const keyLines = doc.splitTextToSize(
+        `س${qNum(summaryLikertStats[idx])}: ${summaryLikertStats[idx].question || ''}`,
+        pageWidth - margin * 2 - 8
+      );
+      yPos = checkNewPage(doc, yPos, keyLines.length * 4 + 2, pageHeight);
       doc.setTextColor(...COLORS.text);
-      doc.setFontSize(6.5);
-      doc.text(`س${idx + 1}: ${(summaryLikertStats[idx].question || '').substring(0, 80)}`, pageWidth - margin - 4, yPos, { align: 'right' });
-      yPos += 4;
+      doc.text(keyLines, pageWidth - margin - 4, yPos, { align: 'right' });
+      yPos += keyLines.length * 4 + 1;
     }
+
     yPos += 6;
   }
 
