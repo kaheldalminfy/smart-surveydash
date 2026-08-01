@@ -124,6 +124,25 @@ const drawSectionHeader = (
   return y + 15;
 };
 
+// Draw a full (wrapped, never truncated) question title block
+const drawQuestionTitle = (
+  doc: jsPDF, y: number, label: string, text: string,
+  pageWidth: number, margin: number, fontLoaded: boolean,
+  textColor: [number, number, number] = [0, 51, 102]
+) => {
+  if (fontLoaded) doc.setFont('Amiri', 'normal');
+  doc.setFontSize(9);
+  const lines = doc.splitTextToSize(`${label}: ${text || ''}`, pageWidth - margin * 2 - 10);
+  const boxHeight = lines.length * 5 + 5;
+  doc.setFillColor(243, 244, 246);
+  doc.roundedRect(margin, y, pageWidth - margin * 2, boxHeight, 2, 2, 'F');
+  doc.setTextColor(...textColor);
+  doc.text(lines, pageWidth - margin - 4, y + 5.5, { align: 'right' });
+  return y + boxHeight + 4;
+};
+
+
+
 // Draw KPI Card
 const drawKPICard = (
   doc: jsPDF, x: number, y: number, width: number, height: number,
@@ -540,14 +559,17 @@ const buildPDFDocument = async (
   }
 
   // ============ SUMMARY CHART (programmatic horizontal bar chart) ============
-  const summaryLikertStats = (stats.questionStats || []).filter((q: any) =>
+  const allQuestionStats: any[] = stats.questionStats || [];
+  const qNum = (q: any) => allQuestionStats.indexOf(q) + 1;
+
+  const summaryLikertStats = allQuestionStats.filter((q: any) =>
     (q.type === 'likert' || q.type === 'rating') && typeof q.mean === 'number' && q.mean > 0
   );
 
   if (summaryLikertStats.length > 0) {
-    doc.addPage();
-    yPos = 15;
+    yPos = checkNewPage(doc, yPos, 70, pageHeight);
     yPos = drawSectionHeader(doc, yPos, 'ملخص متوسطات الأسئلة', COLORS.blue, pageWidth, margin, fontLoaded);
+
 
     const chartLeft = margin + 25;
     const chartRight = pageWidth - margin - 10;
@@ -638,45 +660,45 @@ const buildPDFDocument = async (
     }
     yPos = legendY + 12;
 
-    // Question key table
-    yPos = checkNewPage(doc, yPos, 10 + summaryLikertStats.length * 5, pageHeight);
+    // Question key table (full text, wrapped)
+    yPos = checkNewPage(doc, yPos, 14, pageHeight);
     if (fontLoaded) doc.setFont('Amiri', 'normal');
     doc.setTextColor(...COLORS.muted);
     doc.setFontSize(7);
     doc.text('مفتاح الأسئلة:', pageWidth - margin - 4, yPos, { align: 'right' });
     yPos += 4;
     for (let idx = 0; idx < summaryLikertStats.length; idx++) {
-      yPos = checkNewPage(doc, yPos, 5, pageHeight);
+      if (fontLoaded) doc.setFont('Amiri', 'normal');
+      doc.setFontSize(7);
+      const keyLines = doc.splitTextToSize(
+        `س${qNum(summaryLikertStats[idx])}: ${summaryLikertStats[idx].question || ''}`,
+        pageWidth - margin * 2 - 8
+      );
+      yPos = checkNewPage(doc, yPos, keyLines.length * 4 + 2, pageHeight);
       doc.setTextColor(...COLORS.text);
-      doc.setFontSize(6.5);
-      doc.text(`س${idx + 1}: ${(summaryLikertStats[idx].question || '').substring(0, 80)}`, pageWidth - margin - 4, yPos, { align: 'right' });
-      yPos += 4;
+      doc.text(keyLines, pageWidth - margin - 4, yPos, { align: 'right' });
+      yPos += keyLines.length * 4 + 1;
     }
+
     yPos += 6;
   }
 
   // ============ PER-QUESTION BAR CHARTS (drawn) ============
-  const likertStats = (stats.questionStats || []).filter((q: any) => 
+  const likertStats = allQuestionStats.filter((q: any) =>
     (q.type === 'likert' || q.type === 'rating') && q.distribution && q.distribution.length > 0
   );
 
   if (likertStats.length > 0) {
-    doc.addPage();
-    yPos = 15;
+    yPos = checkNewPage(doc, yPos, 70, pageHeight);
     yPos = drawSectionHeader(doc, yPos, 'تحليل تفصيلي لكل سؤال', COLORS.darkBlue, pageWidth, margin, fontLoaded);
 
     for (let idx = 0; idx < likertStats.length; idx++) {
       const q = likertStats[idx];
-      yPos = checkNewPage(doc, yPos, 60, pageHeight);
+      yPos = checkNewPage(doc, yPos, 65, pageHeight);
 
-      // Question header
-      doc.setFillColor(...COLORS.lightGray);
-      doc.roundedRect(margin, yPos, pageWidth - margin * 2, 10, 2, 2, 'F');
-      doc.setTextColor(...COLORS.darkBlue);
-      doc.setFontSize(9);
-      if (fontLoaded) doc.setFont('Amiri', 'normal');
-      doc.text(`س${idx + 1}: ${(q.question || '').substring(0, 70)}`, pageWidth - margin - 4, yPos + 7, { align: 'right' });
-      yPos += 14;
+      // Question header (full text, wrapped)
+      yPos = drawQuestionTitle(doc, yPos, `س${qNum(q)}`, q.question || '', pageWidth, margin, fontLoaded, COLORS.darkBlue);
+
 
       // Draw bar chart
       yPos = drawBarChart(doc, yPos, q.distribution, q.mean || 0, q.stdDev || 0, pageWidth, margin, fontLoaded);
@@ -690,18 +712,14 @@ const buildPDFDocument = async (
   );
 
   if (mcqStats.length > 0) {
-    doc.addPage();
-    yPos = 15;
+    yPos = checkNewPage(doc, yPos, 60, pageHeight);
     yPos = drawSectionHeader(doc, yPos, 'توزيع إجابات أسئلة الاختيار', COLORS.purple, pageWidth, margin, fontLoaded);
 
     for (let idx = 0; idx < mcqStats.length; idx++) {
       const q = mcqStats[idx];
       yPos = checkNewPage(doc, yPos, 45, pageHeight);
-      if (fontLoaded) doc.setFont('Amiri', 'normal');
-      doc.setTextColor(...COLORS.darkBlue);
-      doc.setFontSize(9);
-      doc.text(`س${idx + 1}: ${(q.question || '').substring(0, 85)}`, pageWidth - margin - 4, yPos, { align: 'right' });
-      yPos += 5;
+      yPos = drawQuestionTitle(doc, yPos, `س${qNum(q)}`, q.question || '', pageWidth, margin, fontLoaded, COLORS.darkBlue);
+
 
       const total = q.mcqDistribution.reduce((sum: number, item: any) => sum + (item.value || 0), 0);
       const body = q.mcqDistribution.map((item: any) => [
@@ -731,12 +749,11 @@ const buildPDFDocument = async (
   }
 
   // ============ QUESTION DETAILS TABLE ============
-  if (stats.questionStats && stats.questionStats.length > 0) {
-    doc.addPage();
-    yPos = 15;
+  if (allQuestionStats.length > 0) {
+    yPos = checkNewPage(doc, yPos, 60, pageHeight);
     yPos = drawSectionHeader(doc, yPos, 'تفاصيل نتائج الأسئلة', COLORS.blue, pageWidth, margin, fontLoaded);
 
-    const questionData = stats.questionStats.map((q: any, i: number) => {
+    const questionData = allQuestionStats.map((q: any, i: number) => {
       const mean = q.mean ? Number(q.mean) : 0;
       return [
         String(q.responseCount || 0),
@@ -744,28 +761,29 @@ const buildPDFDocument = async (
         mean > 0 ? mean.toFixed(2) : '-',
         mean > 0 ? getMeanLevel(mean).label : '-',
         q.type === 'likert' ? 'ليكرت' : q.type === 'mcq' ? 'اختيار' : q.type === 'rating' ? 'تقييم' : 'نصي',
-        `${i + 1}. ${(q.question || '').substring(0, 45)}${(q.question?.length || 0) > 45 ? '...' : ''}`,
+        `${i + 1}. ${q.question || ''}`,
       ];
     });
 
     autoTable(doc, {
       startY: yPos,
-      head: [['ردود', 'انحراف', 'متوسط', 'التقييم', 'النوع', 'السؤال']],
+      head: [['ردود', 'الانحراف', 'المتوسط', 'التقييم', 'النوع', 'السؤال']],
       body: questionData,
-      styles: { font: fontLoaded ? 'Amiri' : 'helvetica', fontStyle: 'normal', fontSize: 8, cellPadding: 2.5, overflow: 'linebreak' },
-      headStyles: { fillColor: COLORS.blue, halign: 'center', fontStyle: 'normal', textColor: [255, 255, 255] },
+      styles: { font: fontLoaded ? 'Amiri' : 'helvetica', fontStyle: 'normal', fontSize: 8, cellPadding: 2.5, overflow: 'linebreak', valign: 'middle' },
+      headStyles: { fillColor: COLORS.blue, halign: 'center', fontStyle: 'normal', textColor: [255, 255, 255], fontSize: 8 },
       columnStyles: {
-        0: { halign: 'center', cellWidth: 12 },
-        1: { halign: 'center', cellWidth: 14 },
-        2: { halign: 'center', cellWidth: 14 },
-        3: { halign: 'center', cellWidth: 18 },
-        4: { halign: 'center', cellWidth: 14 },
+        0: { halign: 'center', cellWidth: 13 },
+        1: { halign: 'center', cellWidth: 19 },
+        2: { halign: 'center', cellWidth: 19 },
+        3: { halign: 'center', cellWidth: 22 },
+        4: { halign: 'center', cellWidth: 17 },
         5: { halign: 'right', cellWidth: 'auto' },
       },
       alternateRowStyles: { fillColor: COLORS.lightGray },
-      margin: { left: margin, right: margin },
+      margin: { left: margin, right: margin, bottom: 30 },
       theme: 'striped'
     });
+
     yPos = (doc as any).lastAutoTable.finalY + 10;
   }
 
