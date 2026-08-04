@@ -96,7 +96,7 @@ const Reports = () => {
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [manualEnrollment, setManualEnrollment] = useState<string>("");
-  const [courseRecommendations, setCourseRecommendations] = useState<Record<string, string>>({});
+  const [courseContent, setCourseContent] = useState<Record<string, { summary: string; recommendations: string }>>({});
   const [filteredResponseCount, setFilteredResponseCount] = useState(0);
   const [coordinatorName, setCoordinatorName] = useState("");
   const [reportTitle, setReportTitle] = useState("");
