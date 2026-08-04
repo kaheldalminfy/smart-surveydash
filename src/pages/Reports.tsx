@@ -1063,6 +1063,7 @@ const Reports = () => {
           summaryText={editedSummary}
           recommendationsText={editedRecommendations}
           isSaving={isSavingReportContent}
+          selectedCourseName={getSelectedCourseName() || undefined}
           onReportTitleChange={setReportTitle}
           onSummaryChange={setEditedSummary}
           onRecommendationsChange={setEditedRecommendations}
