@@ -639,54 +639,24 @@ const Reports = () => {
       return;
     }
 
-    const { data: existing } = await supabase
-      .from("recommendations")
-      .select("id")
-      .eq("source_id", report.id)
-      .eq("source_type", "survey")
-      .maybeSingle();
+    const { error: recError, created } = await syncRecommendationRow(courseName);
 
-    if (existing) {
-      const { error: updateError } = await supabase
-        .from("recommendations")
-        .update({
-          description: editedRecommendations,
-          title: `${survey?.title || ''}${courseName ? ` - ${courseName}` : ''}`,
-          academic_year: academicYear || null,
-          semester: semester || null,
-        })
-        .eq("id", existing.id);
-
-      if (updateError) {
-        setIsSavingReportContent(false);
-        toast({ title: t("reports.toastError"), description: t("reports.toastUpdateErr"), variant: "destructive" });
-        return;
-      }
-
-      toast({ title: t("reports.toastUpdated"), description: t("reports.toastUpdatedDesc") });
-    } else {
-      const { error: insertError } = await supabase
-        .from("recommendations")
-        .insert({
-          title: `${survey?.title || ''}${courseName ? ` - ${courseName}` : ''}`,
-          description: editedRecommendations,
-          program_id: survey?.program_id || null,
-          source_type: "survey",
-          source_id: report.id,
-          academic_year: academicYear || null,
-          semester: semester || null,
-          status: "pending",
-          priority: "medium",
-        });
-
-      if (insertError) {
-        setIsSavingReportContent(false);
-        toast({ title: t("reports.toastError"), description: t("reports.toastTransferErr"), variant: "destructive" });
-        return;
-      }
-
-      toast({ title: t("reports.toastTransferred"), description: t("reports.toastTransferredDesc") });
+    if (recError) {
+      setIsSavingReportContent(false);
+      toast({
+        title: t("reports.toastError"),
+        description: created ? t("reports.toastTransferErr") : t("reports.toastUpdateErr"),
+        variant: "destructive",
+      });
+      return;
     }
+
+    toast(
+      created
+        ? { title: t("reports.toastTransferred"), description: t("reports.toastTransferredDesc") }
+        : { title: t("reports.toastUpdated"), description: t("reports.toastUpdatedDesc") }
+    );
+
 
     setReportTitle(titleForSave);
     setCourseContent(nextCourseContent as Record<string, { summary: string; recommendations: string }>);
