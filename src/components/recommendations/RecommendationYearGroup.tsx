@@ -13,6 +13,7 @@ export interface UnifiedRecommendation {
   key: string;
   kind: "manual" | "report";
   id: string | null;
+  report_id?: string | null;
   title: string;
   description: string;
   course_name: string | null;
@@ -28,7 +29,7 @@ export interface UnifiedRecommendation {
 
 interface Props {
   items: UnifiedRecommendation[];
-  onStatusChange: (id: string, status: string) => void;
+  onStatusChange: (item: UnifiedRecommendation, status: string) => void;
   onEdit: (id: string) => void;
 }
 
@@ -48,12 +49,12 @@ const RecommendationYearGroup = ({ items, onStatusChange, onEdit }: Props) => {
 
   const statusLabel = (status: string | null) => {
     const map: Record<string, string> = {
-      pending: t("recommendations.pending"),
-      in_progress: t("recommendations.inProgress"),
-      completed: t("recommendations.completed"),
+      pending: t("recommendations.statusNotDone"),
+      in_progress: t("recommendations.statusInProgress"),
+      completed: t("recommendations.statusDone"),
       postponed: t("recommendations.postponed"),
     };
-    return map[status || "pending"] || t("recommendations.pending");
+    return map[status || "pending"] || t("recommendations.statusNotDone");
   };
 
   const priorityBadge = (priority: string | null) => {
