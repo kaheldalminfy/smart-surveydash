@@ -13,6 +13,7 @@ interface ReportContentEditorCardProps {
   summaryText: string;
   recommendationsText: string;
   isSaving: boolean;
+  selectedCourseName?: string;
   onReportTitleChange: (value: string) => void;
   onSummaryChange: (value: string) => void;
   onRecommendationsChange: (value: string) => void;
@@ -26,6 +27,7 @@ export const ReportContentEditorCard = ({
   summaryText,
   recommendationsText,
   isSaving,
+  selectedCourseName,
   onReportTitleChange,
   onSummaryChange,
   onRecommendationsChange,
@@ -42,8 +44,22 @@ export const ReportContentEditorCard = ({
             <Sparkles className="h-5 w-5" />
             {language === "ar" ? "تحرير محتوى التقرير" : "Edit Report Content"}
           </CardTitle>
-          <Badge variant="secondary">{reportTypeLabel}</Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedCourseName && (
+              <Badge>
+                {language === "ar" ? `المقرر: ${selectedCourseName}` : `Course: ${selectedCourseName}`}
+              </Badge>
+            )}
+            <Badge variant="secondary">{reportTypeLabel}</Badge>
+          </div>
         </div>
+        {selectedCourseName && (
+          <p className="text-sm text-muted-foreground">
+            {language === "ar"
+              ? "الملخص التنفيذي والتوصيات أدناه خاصة بهذا المقرر ويتم حفظها له بشكل مستقل."
+              : "The executive summary and recommendations below are specific to this course and are saved separately for it."}
+          </p>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">

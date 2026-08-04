@@ -96,7 +96,7 @@ const Reports = () => {
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [manualEnrollment, setManualEnrollment] = useState<string>("");
-  const [courseRecommendations, setCourseRecommendations] = useState<Record<string, string>>({});
+  const [courseContent, setCourseContent] = useState<Record<string, { summary: string; recommendations: string }>>({});
   const [filteredResponseCount, setFilteredResponseCount] = useState(0);
   const [coordinatorName, setCoordinatorName] = useState("");
   const [reportTitle, setReportTitle] = useState("");
@@ -136,8 +136,27 @@ const Reports = () => {
         setReportStatus(reportData.status || "responding");
         setTargetEnrollment(loadedSurvey?.target_enrollment ? String(loadedSurvey.target_enrollment) : "");
         setReportTitle(defaultTitle);
-        setEditedSummary(reportData.summary || "");
-        setEditedRecommendations(reportData.recommendations_text || "");
+        const savedCourseContent = (savedStatistics.course_content || {}) as Record<string, { summary?: string; recommendations?: string }>;
+        const normalizedCourseContent: Record<string, { summary: string; recommendations: string }> = {};
+        Object.entries(savedCourseContent).forEach(([key, value]) => {
+          normalizedCourseContent[key] = {
+            summary: value?.summary || "",
+            recommendations: value?.recommendations || "",
+          };
+        });
+        setCourseContent(normalizedCourseContent);
+
+        const activeCourse = filterValues[0] || "";
+        if (activeCourse && normalizedCourseContent[activeCourse]) {
+          setEditedSummary(normalizedCourseContent[activeCourse].summary);
+          setEditedRecommendations(normalizedCourseContent[activeCourse].recommendations);
+        } else if (activeCourse) {
+          setEditedSummary("");
+          setEditedRecommendations("");
+        } else {
+          setEditedSummary(reportData.summary || "");
+          setEditedRecommendations(reportData.recommendations_text || "");
+        }
 
         const createdBy = loadedSurvey?.created_by;
         if (createdBy) {
@@ -388,6 +407,17 @@ const Reports = () => {
     return filterValues[0] || '';
   };
 
+  const applyEditorContentForCourse = (courseName: string) => {
+    if (courseName) {
+      const saved = courseContent[courseName];
+      setEditedSummary(saved?.summary || "");
+      setEditedRecommendations(saved?.recommendations || "");
+    } else {
+      setEditedSummary(report?.summary || "");
+      setEditedRecommendations(report?.recommendations_text || "");
+    }
+  };
+
   const handleFilterValueChange = (value: string) => {
     const newValues = filterValues.includes(value)
       ? filterValues.filter(v => v !== value)
@@ -396,12 +426,7 @@ const Reports = () => {
     setFilterValues(newValues);
     processDataWithFilter(allQuestions, allResponses, filterQuestion, newValues);
 
-    const courseName = newValues.length > 0 ? newValues[0] : '';
-    if (courseName && courseRecommendations[courseName]) {
-      setEditedRecommendations(courseRecommendations[courseName]);
-    } else if (report?.recommendations_text) {
-      setEditedRecommendations(report.recommendations_text);
-    }
+    applyEditorContentForCourse(newValues.length > 0 ? newValues[0] : '');
   };
 
   const handleFilterQuestionChange = (questionId: string) => {
@@ -409,6 +434,7 @@ const Reports = () => {
     setFilterValues([]);
     setManualEnrollment("");
     processDataWithFilter(allQuestions, allResponses, questionId, []);
+    applyEditorContentForCourse('');
   };
 
   const clearFilter = () => {
@@ -416,9 +442,7 @@ const Reports = () => {
     setFilterValues([]);
     setManualEnrollment("");
     processDataWithFilter(allQuestions, allResponses, "", []);
-    if (report?.recommendations_text) {
-      setEditedRecommendations(report.recommendations_text);
-    }
+    applyEditorContentForCourse('');
   };
 
   const getTargetEnrollmentNumber = () => {
@@ -492,28 +516,43 @@ const Reports = () => {
     navigate("/surveys");
   };
 
+  const buildContentUpdate = (courseName: string, titleForSave: string, currentReportType: string) => {
+    const baseStatistics = (report?.statistics || {}) as Record<string, any>;
+    const nextCourseContent = {
+      ...((baseStatistics.course_content || {}) as Record<string, any>),
+      ...(courseName
+        ? { [courseName]: { summary: editedSummary, recommendations: editedRecommendations } }
+        : {}),
+    };
+
+    const nextStatistics = {
+      ...baseStatistics,
+      report_title: titleForSave,
+      report_type: currentReportType,
+      course_content: nextCourseContent,
+    };
+
+    return {
+      nextCourseContent,
+      update: {
+        // Course-specific content is stored per course; report-level fields stay untouched.
+        ...(courseName ? {} : { summary: editedSummary, recommendations_text: editedRecommendations }),
+        statistics: nextStatistics,
+      },
+    };
+  };
+
   const handleSaveRecommendations = async () => {
     setIsSavingReportContent(true);
     const courseName = getSelectedCourseName();
-    if (courseName) {
-      setCourseRecommendations(prev => ({ ...prev, [courseName]: editedRecommendations }));
-    }
 
     const currentReportType = getCurrentReportType();
     const titleForSave = reportTitle.trim() || getReportCopy(currentReportType, language).reportTitle;
-    const nextStatistics = {
-      ...((report?.statistics || {}) as Record<string, any>),
-      report_title: titleForSave,
-      report_type: currentReportType,
-    };
+    const { update, nextCourseContent } = buildContentUpdate(courseName, titleForSave, currentReportType);
 
     const { error } = await supabase
       .from("reports")
-      .update({
-        summary: editedSummary,
-        recommendations_text: editedRecommendations,
-        statistics: nextStatistics,
-      })
+      .update(update)
       .eq("id", report.id);
 
     if (error) {
@@ -524,6 +563,7 @@ const Reports = () => {
 
     toast({ title: t("reports.toastSaveOk"), description: courseName ? t("reports.toastSaveRecsCourse").replace("{0}", courseName) : t("reports.toastSaveRecs") });
     setReportTitle(titleForSave);
+    setCourseContent(nextCourseContent as Record<string, { summary: string; recommendations: string }>);
     await loadReport();
     setIsSavingReportContent(false);
   };
@@ -536,25 +576,14 @@ const Reports = () => {
 
     setIsSavingReportContent(true);
     const courseName = getSelectedCourseName();
-    if (courseName) {
-      setCourseRecommendations(prev => ({ ...prev, [courseName]: editedRecommendations }));
-    }
 
     const currentReportType = getCurrentReportType();
     const titleForSave = reportTitle.trim() || getReportCopy(currentReportType, language).reportTitle;
-    const nextStatistics = {
-      ...((report?.statistics || {}) as Record<string, any>),
-      report_title: titleForSave,
-      report_type: currentReportType,
-    };
+    const { update, nextCourseContent } = buildContentUpdate(courseName, titleForSave, currentReportType);
 
     const { error: saveError } = await supabase
       .from("reports")
-      .update({
-        summary: editedSummary,
-        recommendations_text: editedRecommendations,
-        statistics: nextStatistics,
-      })
+      .update(update)
       .eq("id", report.id);
 
     if (saveError) {
@@ -613,6 +642,7 @@ const Reports = () => {
     }
 
     setReportTitle(titleForSave);
+    setCourseContent(nextCourseContent as Record<string, { summary: string; recommendations: string }>);
     await loadReport();
     setIsSavingReportContent(false);
   };
@@ -759,8 +789,10 @@ const Reports = () => {
         report_type: currentReportType,
       },
     };
-    if (courseName && courseRecommendations[courseName]) {
-      reportForPDF.recommendations_text = courseRecommendations[courseName];
+    if (courseName) {
+      const saved = courseContent[courseName];
+      reportForPDF.summary = editedSummary || saved?.summary || "";
+      reportForPDF.recommendations_text = editedRecommendations || saved?.recommendations || "";
     }
 
     return { stats, textResponses, pdfAnswers, reportForPDF };
@@ -1031,6 +1063,7 @@ const Reports = () => {
           summaryText={editedSummary}
           recommendationsText={editedRecommendations}
           isSaving={isSavingReportContent}
+          selectedCourseName={getSelectedCourseName() || undefined}
           onReportTitleChange={setReportTitle}
           onSummaryChange={setEditedSummary}
           onRecommendationsChange={setEditedRecommendations}
