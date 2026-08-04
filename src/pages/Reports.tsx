@@ -563,6 +563,7 @@ const Reports = () => {
 
     toast({ title: t("reports.toastSaveOk"), description: courseName ? t("reports.toastSaveRecsCourse").replace("{0}", courseName) : t("reports.toastSaveRecs") });
     setReportTitle(titleForSave);
+    setCourseContent(nextCourseContent as Record<string, { summary: string; recommendations: string }>);
     await loadReport();
     setIsSavingReportContent(false);
   };
@@ -575,25 +576,14 @@ const Reports = () => {
 
     setIsSavingReportContent(true);
     const courseName = getSelectedCourseName();
-    if (courseName) {
-      setCourseRecommendations(prev => ({ ...prev, [courseName]: editedRecommendations }));
-    }
 
     const currentReportType = getCurrentReportType();
     const titleForSave = reportTitle.trim() || getReportCopy(currentReportType, language).reportTitle;
-    const nextStatistics = {
-      ...((report?.statistics || {}) as Record<string, any>),
-      report_title: titleForSave,
-      report_type: currentReportType,
-    };
+    const { update, nextCourseContent } = buildContentUpdate(courseName, titleForSave, currentReportType);
 
     const { error: saveError } = await supabase
       .from("reports")
-      .update({
-        summary: editedSummary,
-        recommendations_text: editedRecommendations,
-        statistics: nextStatistics,
-      })
+      .update(update)
       .eq("id", report.id);
 
     if (saveError) {
