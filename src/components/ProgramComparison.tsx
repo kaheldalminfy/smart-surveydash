@@ -722,9 +722,9 @@ const ProgramComparison = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-primary" />
-                  {t('progComp.byType')}
+                  {mode === 'surveys' ? t('progComp.byQuestion') : t('progComp.byType')}
                 </CardTitle>
-                <CardDescription>{t('progComp.byTypeDesc')}</CardDescription>
+                <CardDescription>{mode === 'surveys' ? t('progComp.byQuestionDesc') : t('progComp.byTypeDesc')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={400}>
@@ -804,7 +804,7 @@ const ProgramComparison = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-right min-w-[200px]">{t('progComp.tableType')}</TableHead>
+                      <TableHead className="text-right min-w-[200px]">{mode === 'surveys' ? t('progComp.tableQuestion') : t('progComp.tableType')}</TableHead>
                       {entities.map(p => (
                         <TableHead key={p.id} className="text-center min-w-[120px]">
                           <div className="flex items-center justify-center gap-1">
