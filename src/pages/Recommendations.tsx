@@ -163,6 +163,7 @@ const Recommendations = () => {
         key: `rep-${r.report_id}-${r.course_name || "all"}`,
         kind: "report" as const,
         id: null,
+        report_id: r.report_id,
         title: r.survey_title,
         description: r.recommendations_text,
         course_name: r.course_name,
@@ -225,13 +226,38 @@ const Recommendations = () => {
     };
   }, [filtered]);
 
-  const handleStatusChange = async (id: string, status: string) => {
-    const { error } = await supabase.from("recommendations").update({ status: status as any }).eq("id", id);
+  const handleStatusChange = async (item: UnifiedRecommendation, status: string) => {
+    if (item.id) {
+      const { error } = await supabase.from("recommendations").update({ status: status as any }).eq("id", item.id);
+      if (error) {
+        toast({ title: t("common.error"), variant: "destructive" });
+        return;
+      }
+      setRecommendations((prev) =>
+        prev.map((r) => (r.id === item.id ? { ...r, status, updated_at: new Date().toISOString() } : r))
+      );
+      toast({ title: t("recommendations.statusUpdated") });
+      return;
+    }
+
+    // Untracked report recommendation: track it now so the status can persist.
+    const { error } = await supabase.from("recommendations").insert({
+      title: item.title,
+      description: item.description,
+      course_name: item.course_name,
+      program_id: item.program_id,
+      academic_year: item.academic_year,
+      semester: item.semester,
+      priority: "medium",
+      status: status as any,
+      source_type: "survey",
+      source_id: item.report_id,
+    } as any);
     if (error) {
       toast({ title: t("common.error"), variant: "destructive" });
       return;
     }
-    setRecommendations((prev) => prev.map((r) => (r.id === id ? { ...r, status, updated_at: new Date().toISOString() } : r)));
+    await loadRecommendations();
     toast({ title: t("recommendations.statusUpdated") });
   };
 

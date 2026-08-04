@@ -13,6 +13,7 @@ export interface UnifiedRecommendation {
   key: string;
   kind: "manual" | "report";
   id: string | null;
+  report_id?: string | null;
   title: string;
   description: string;
   course_name: string | null;
@@ -28,7 +29,7 @@ export interface UnifiedRecommendation {
 
 interface Props {
   items: UnifiedRecommendation[];
-  onStatusChange: (id: string, status: string) => void;
+  onStatusChange: (item: UnifiedRecommendation, status: string) => void;
   onEdit: (id: string) => void;
 }
 
@@ -48,12 +49,12 @@ const RecommendationYearGroup = ({ items, onStatusChange, onEdit }: Props) => {
 
   const statusLabel = (status: string | null) => {
     const map: Record<string, string> = {
-      pending: t("recommendations.pending"),
-      in_progress: t("recommendations.inProgress"),
-      completed: t("recommendations.completed"),
+      pending: t("recommendations.statusNotDone"),
+      in_progress: t("recommendations.statusInProgress"),
+      completed: t("recommendations.statusDone"),
       postponed: t("recommendations.postponed"),
     };
-    return map[status || "pending"] || t("recommendations.pending");
+    return map[status || "pending"] || t("recommendations.statusNotDone");
   };
 
   const priorityBadge = (priority: string | null) => {
@@ -167,24 +168,19 @@ const RecommendationYearGroup = ({ items, onStatusChange, onEdit }: Props) => {
                               </TableCell>
                               <TableCell>{priorityBadge(item.priority)}</TableCell>
                               <TableCell>
-                                {item.id ? (
-                                  <Select
-                                    value={item.status || "pending"}
-                                    onValueChange={(v) => onStatusChange(item.id as string, v)}
-                                  >
-                                    <SelectTrigger className="h-8 w-[140px]">
-                                      <SelectValue>{statusLabel(item.status)}</SelectValue>
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="pending">{t("recommendations.pending")}</SelectItem>
-                                      <SelectItem value="in_progress">{t("recommendations.inProgress")}</SelectItem>
-                                      <SelectItem value="completed">{t("recommendations.completed")}</SelectItem>
-                                      <SelectItem value="postponed">{t("recommendations.postponed")}</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                ) : (
-                                  <Badge variant="outline">{t("recommendations.notTracked")}</Badge>
-                                )}
+                                <Select
+                                  value={item.status || "pending"}
+                                  onValueChange={(v) => onStatusChange(item, v)}
+                                >
+                                  <SelectTrigger className="h-8 w-[150px]">
+                                    <SelectValue>{statusLabel(item.status)}</SelectValue>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="completed">{t("recommendations.statusDone")}</SelectItem>
+                                    <SelectItem value="in_progress">{t("recommendations.statusInProgress")}</SelectItem>
+                                    <SelectItem value="pending">{t("recommendations.statusNotDone")}</SelectItem>
+                                  </SelectContent>
+                                </Select>
                               </TableCell>
                               <TableCell className="text-center whitespace-nowrap">
                                 {item.id && (
