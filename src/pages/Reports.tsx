@@ -788,8 +788,10 @@ const Reports = () => {
         report_type: currentReportType,
       },
     };
-    if (courseName && courseRecommendations[courseName]) {
-      reportForPDF.recommendations_text = courseRecommendations[courseName];
+    if (courseName) {
+      const saved = courseContent[courseName];
+      reportForPDF.summary = editedSummary || saved?.summary || "";
+      reportForPDF.recommendations_text = editedRecommendations || saved?.recommendations || "";
     }
 
     return { stats, textResponses, pdfAnswers, reportForPDF };
