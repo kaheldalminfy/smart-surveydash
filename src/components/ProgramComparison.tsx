@@ -741,7 +741,7 @@ const ProgramComparison = () => {
                     <YAxis domain={[0, 5]} tick={{ fontSize: 12 }} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
-                    {selectedProgramsWithColors.map((p) => (
+                    {entities.map((p) => (
                       <Bar
                         key={p.id}
                         dataKey={p.name}
@@ -773,7 +773,7 @@ const ProgramComparison = () => {
                     <PolarGrid />
                     <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11 }} />
                     <PolarRadiusAxis domain={[0, 5]} tick={{ fontSize: 10 }} />
-                    {selectedProgramsWithColors.map((p) => (
+                    {entities.map((p) => (
                       <Radar
                         key={p.id}
                         name={p.name}
@@ -805,7 +805,7 @@ const ProgramComparison = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="text-right min-w-[200px]">{t('progComp.tableType')}</TableHead>
-                      {selectedProgramsWithColors.map(p => (
+                      {entities.map(p => (
                         <TableHead key={p.id} className="text-center min-w-[120px]">
                           <div className="flex items-center justify-center gap-1">
                             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
@@ -813,7 +813,7 @@ const ProgramComparison = () => {
                           </div>
                         </TableHead>
                       ))}
-                      {selectedPrograms.length === 2 && (
+                      {entities.length === 2 && (
                         <TableHead className="text-center min-w-[80px]">{t('progComp.diff')}</TableHead>
                       )}
                     </TableRow>
@@ -821,7 +821,7 @@ const ProgramComparison = () => {
                   <TableBody>
                     {comparisonResult.surveyTypes.map((st, i) => {
                       const scores = st.programData.map(pd => pd.exists ? pd.averageScore : null);
-                      const diff = selectedPrograms.length === 2 && scores[0] !== null && scores[1] !== null
+                      const diff = entities.length === 2 && scores[0] !== null && scores[1] !== null
                         ? parseFloat((scores[0]! - scores[1]!).toFixed(2))
                         : null;
                       return (
@@ -836,7 +836,7 @@ const ProgramComparison = () => {
                               )}
                             </TableCell>
                           ))}
-                          {selectedPrograms.length === 2 && (
+                          {entities.length === 2 && (
                             <TableCell className="text-center">
                               {diff !== null ? (
                                 <Badge
@@ -861,7 +861,7 @@ const ProgramComparison = () => {
                           <span style={{ color: p.color }}>{p.overallMean}</span>
                         </TableCell>
                       ))}
-                      {selectedPrograms.length === 2 && (
+                      {entities.length === 2 && (
                         <TableCell className="text-center">
                           {(() => {
                             const d = parseFloat((comparisonResult.overall[0].overallMean - comparisonResult.overall[1].overallMean).toFixed(2));
