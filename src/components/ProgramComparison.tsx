@@ -173,11 +173,15 @@ interface ComparisonResult {
 const ProgramComparison = () => {
   const { toast } = useToast();
   const { t } = useLanguage();
+  const [mode, setMode] = useState<'programs' | 'surveys'>('programs');
   const [programs, setPrograms] = useState<any[]>([]);
   const [academicYears, setAcademicYears] = useState<string[]>([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>('');
   const [selectedSemester, setSelectedSemester] = useState<string>('all');
   const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
+  const [singleProgram, setSingleProgram] = useState<string>('');
+  const [availableSurveys, setAvailableSurveys] = useState<{ id: string; title: string }[]>([]);
+  const [selectedSurveyIds, setSelectedSurveyIds] = useState<string[]>([]);
   const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -185,6 +189,29 @@ const ProgramComparison = () => {
     loadPrograms();
     loadAcademicYears();
   }, []);
+
+  useEffect(() => {
+    if (mode !== 'surveys' || !singleProgram || !selectedAcademicYear) {
+      setAvailableSurveys([]);
+      setSelectedSurveyIds([]);
+      return;
+    }
+    (async () => {
+      let query = supabase
+        .from("surveys")
+        .select("id, title")
+        .eq("program_id", singleProgram)
+        .eq("academic_year", selectedAcademicYear)
+        .order("created_at", { ascending: false });
+      if (selectedSemester && selectedSemester !== 'all') {
+        query = query.eq("semester", selectedSemester);
+      }
+      const { data } = await query;
+      setAvailableSurveys(data || []);
+      setSelectedSurveyIds([]);
+      setComparisonResult(null);
+    })();
+  }, [mode, singleProgram, selectedAcademicYear, selectedSemester]);
 
   const loadPrograms = async () => {
     const { data } = await supabase.from("programs").select("*").order("name");
@@ -210,6 +237,17 @@ const ProgramComparison = () => {
       color: PROGRAM_COLORS[i % PROGRAM_COLORS.length],
     }));
   }, [selectedPrograms, programs]);
+
+  const selectedSurveysWithColors = useMemo(() => {
+    return selectedSurveyIds.map((id, i) => ({
+      id,
+      name: availableSurveys.find(s => s.id === id)?.title || '',
+      color: PROGRAM_COLORS[i % PROGRAM_COLORS.length],
+    }));
+  }, [selectedSurveyIds, availableSurveys]);
+
+  const entities = mode === 'programs' ? selectedProgramsWithColors : selectedSurveysWithColors;
+
 
   const loadComparisonData = async () => {
     if (selectedPrograms.length < 2) {
