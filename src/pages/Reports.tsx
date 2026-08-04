@@ -136,8 +136,27 @@ const Reports = () => {
         setReportStatus(reportData.status || "responding");
         setTargetEnrollment(loadedSurvey?.target_enrollment ? String(loadedSurvey.target_enrollment) : "");
         setReportTitle(defaultTitle);
-        setEditedSummary(reportData.summary || "");
-        setEditedRecommendations(reportData.recommendations_text || "");
+        const savedCourseContent = (savedStatistics.course_content || {}) as Record<string, { summary?: string; recommendations?: string }>;
+        const normalizedCourseContent: Record<string, { summary: string; recommendations: string }> = {};
+        Object.entries(savedCourseContent).forEach(([key, value]) => {
+          normalizedCourseContent[key] = {
+            summary: value?.summary || "",
+            recommendations: value?.recommendations || "",
+          };
+        });
+        setCourseContent(normalizedCourseContent);
+
+        const activeCourse = filterValues[0] || "";
+        if (activeCourse && normalizedCourseContent[activeCourse]) {
+          setEditedSummary(normalizedCourseContent[activeCourse].summary);
+          setEditedRecommendations(normalizedCourseContent[activeCourse].recommendations);
+        } else if (activeCourse) {
+          setEditedSummary("");
+          setEditedRecommendations("");
+        } else {
+          setEditedSummary(reportData.summary || "");
+          setEditedRecommendations(reportData.recommendations_text || "");
+        }
 
         const createdBy = loadedSurvey?.created_by;
         if (createdBy) {
