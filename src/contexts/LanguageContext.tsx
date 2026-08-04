@@ -1278,6 +1278,18 @@ const translations: Record<Language, Record<string, string>> = {
     'recommendations.completedReport': 'Completed',
     'recommendations.noResponse': 'No Response',
     'recommendations.cancelled': 'Cancelled',
+    'recommendations.recordTitle': 'Recommendations Record',
+    'recommendations.searchPlaceholder': 'Search by title or course...',
+    'recommendations.sourceReport': 'From report',
+    'recommendations.sourceManual': 'Manual',
+    'recommendations.postponed': 'Postponed',
+    'recommendations.lastUpdated': 'Last updated',
+    'recommendations.noResults': 'No recommendations match the current filters',
+    'recommendations.unknownYear': 'Unspecified year',
+    'recommendations.statusUpdated': 'Status updated',
+    'recommendations.notTracked': 'Not transferred yet',
+    'recommendations.progress': 'Progress',
+    'recommendations.itemsCount': 'recommendations',
     
     // Reports
     'reports.title': 'Reports & Analytics',
