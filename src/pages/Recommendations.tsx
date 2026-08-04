@@ -77,12 +77,10 @@ const Recommendations = () => {
   };
 
   const loadReportRecommendations = async () => {
-    // Fetch reports with recommendations_text, joined with surveys
+    // Fetch reports with report-level or per-course recommendations
     const { data: reports } = await supabase
       .from("reports")
-      .select("id, recommendations_text, academic_year, semester, survey_id, status, surveys(id, title, program_id, programs(id, name))")
-      .not("recommendations_text", "is", null)
-      .neq("recommendations_text", "");
+      .select("id, recommendations_text, statistics, academic_year, semester, survey_id, status, surveys(id, title, program_id, programs(id, name))");
 
     if (!reports) return;
 
@@ -103,21 +101,50 @@ const Recommendations = () => {
       }
     }
 
-    const items: ReportRecommendation[] = (reports as any[]).map((r) => ({
-      report_id: r.id,
-      recommendations_text: r.recommendations_text,
-      academic_year: r.academic_year || r.surveys?.academic_year || null,
-      semester: r.semester || r.surveys?.semester || null,
-      survey_id: r.survey_id,
-      survey_title: r.surveys?.title || "",
-      program_id: r.surveys?.program_id || null,
-      program_name: r.surveys?.programs?.name || "",
-      courses: courseMap.get(r.survey_id) || [],
-      report_status: r.status || null,
-    }));
+    const items: ReportRecommendation[] = [];
+
+    for (const r of reports as any[]) {
+      const base = {
+        report_id: r.id,
+        academic_year: r.academic_year || r.surveys?.academic_year || null,
+        semester: r.semester || r.surveys?.semester || null,
+        survey_id: r.survey_id,
+        survey_title: r.surveys?.title || "",
+        program_id: r.surveys?.program_id || null,
+        program_name: r.surveys?.programs?.name || "",
+        report_status: r.status || null,
+      };
+
+      // Per-course recommendations saved from the report editor
+      const courseContent = (r.statistics?.course_content || {}) as Record<
+        string,
+        { summary?: string; recommendations?: string }
+      >;
+      const courseEntries = Object.entries(courseContent).filter(
+        ([, v]) => (v?.recommendations || "").trim() !== ""
+      );
+
+      for (const [courseName, value] of courseEntries) {
+        items.push({
+          ...base,
+          recommendations_text: value.recommendations || "",
+          courses: [{ name: courseName, code: "" }],
+        });
+      }
+
+      // Report-level recommendations (only when no per-course content exists)
+      if (courseEntries.length === 0 && (r.recommendations_text || "").trim() !== "") {
+        items.push({
+          ...base,
+          recommendations_text: r.recommendations_text,
+          courses: courseMap.get(r.survey_id) || [],
+        });
+      }
+    }
 
     setReportRecs(items);
   };
+
 
   // Collect all academic years from both sources for filter
   const academicYears = useMemo(() => {
