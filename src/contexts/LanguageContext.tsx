@@ -194,6 +194,18 @@ const translations: Record<Language, Record<string, string>> = {
     'recommendations.completedReport': 'مكتمل',
     'recommendations.noResponse': 'بدون رد',
     'recommendations.cancelled': 'ملغي',
+    'recommendations.recordTitle': 'سجل التوصيات',
+    'recommendations.searchPlaceholder': 'بحث بالعنوان أو المقرر...',
+    'recommendations.sourceReport': 'من تقرير',
+    'recommendations.sourceManual': 'يدوي',
+    'recommendations.postponed': 'مؤجلة',
+    'recommendations.lastUpdated': 'آخر تحديث',
+    'recommendations.noResults': 'لا توجد توصيات مطابقة للفلاتر الحالية',
+    'recommendations.unknownYear': 'سنة غير محددة',
+    'recommendations.statusUpdated': 'تم تحديث الحالة',
+    'recommendations.notTracked': 'لم تُنقل بعد',
+    'recommendations.progress': 'الإنجاز',
+    'recommendations.itemsCount': 'توصية',
     
     // Reports
     'reports.title': 'التقارير والتحليلات',
