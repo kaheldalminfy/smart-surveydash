@@ -249,11 +249,112 @@ const ProgramComparison = () => {
   const entities = mode === 'programs' ? selectedProgramsWithColors : selectedSurveysWithColors;
 
 
+  const loadSurveyComparison = async () => {
+    if (!selectedAcademicYear) {
+      toast({ title: t('progComp.notice'), description: t('progComp.needAY'), variant: "destructive" });
+      return;
+    }
+    if (!singleProgram) {
+      toast({ title: t('progComp.notice'), description: t('progComp.needProgram'), variant: "destructive" });
+      return;
+    }
+    if (selectedSurveyIds.length < 2) {
+      toast({ title: t('progComp.notice'), description: t('progComp.minSurveys'), variant: "destructive" });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const perSurvey = await mapWithConcurrency(selectedSurveysWithColors, 4, async (entity) => {
+        const [questions, responses] = await Promise.all([
+          fetchAllSurveyQuestions(entity.id),
+          fetchAllCompleteSurveyResponses(entity.id),
+        ]);
+        const ratingQuestions = questions.filter(
+          q => (q.type === 'likert' || q.type === 'rating') && !q.is_archived,
+        );
+        const ratingIds = new Set(ratingQuestions.map(q => q.id));
+        const answers = responses
+          .flatMap(r => r.answers)
+          .filter(a => ratingIds.has(a.question_id) && a.numeric_value !== null && a.numeric_value >= 1 && a.numeric_value <= 5);
+
+        const byQuestion = new Map<string, { text: string; values: number[] }>();
+        for (const q of ratingQuestions.sort((a, b) => a.order_index - b.order_index)) {
+          byQuestion.set(q.id, { text: q.text, values: [] });
+        }
+        for (const a of answers) {
+          byQuestion.get(a.question_id)?.values.push(a.numeric_value as number);
+        }
+
+        return {
+          entity,
+          responseCount: responses.length,
+          totalSurveys: 1,
+          allScores: answers.map(a => a.numeric_value as number),
+          questions: [...byQuestion.values()],
+        };
+      });
+
+      // Cluster questions across surveys by similarity
+      const rows: { label: string; values: Map<string, { avg: number; count: number }> }[] = [];
+      for (const s of perSurvey) {
+        for (const q of s.questions) {
+          if (q.values.length === 0) continue;
+          const avg = q.values.reduce((a, b) => a + b, 0) / q.values.length;
+          const existing = rows.find(r => !r.values.has(s.entity.id) && questionsMatch(r.label, q.text));
+          if (existing) {
+            existing.values.set(s.entity.id, { avg, count: q.values.length });
+            if (q.text.length < existing.label.length) existing.label = q.text;
+          } else {
+            const row = { label: q.text, values: new Map<string, { avg: number; count: number }>() };
+            row.values.set(s.entity.id, { avg, count: q.values.length });
+            rows.push(row);
+          }
+        }
+      }
+
+      const surveyTypes: SurveyTypeComparison[] = rows.map(row => ({
+        title: row.label,
+        programData: selectedSurveysWithColors.map(e => {
+          const v = row.values.get(e.id);
+          return {
+            programId: e.id,
+            programName: e.name,
+            averageScore: v ? parseFloat(v.avg.toFixed(2)) : 0,
+            responseCount: v?.count || 0,
+            exists: !!v,
+          };
+        }),
+      }));
+
+      const overall: OverallData[] = perSurvey.map(s => {
+        const mean = s.allScores.length > 0 ? s.allScores.reduce((a, b) => a + b, 0) / s.allScores.length : 0;
+        return {
+          programName: s.entity.name,
+          programId: s.entity.id,
+          color: s.entity.color,
+          overallMean: parseFloat(mean.toFixed(2)),
+          totalResponses: s.responseCount,
+          totalSurveys: 1,
+          satisfactionRate: ((mean / 5) * 100).toFixed(1),
+        };
+      });
+
+      setComparisonResult({ surveyTypes, overall });
+    } catch (error) {
+      toast({ title: t('progComp.error'), description: t('progComp.loadErr'), variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadComparisonData = async () => {
+    if (mode === 'surveys') return loadSurveyComparison();
     if (selectedPrograms.length < 2) {
       toast({ title: t('progComp.notice'), description: t('progComp.minPrograms'), variant: "destructive" });
       return;
     }
+
     if (!selectedAcademicYear) {
       toast({ title: t('progComp.notice'), description: t('progComp.needAY'), variant: "destructive" });
       return;
