@@ -642,6 +642,7 @@ const Reports = () => {
     }
 
     setReportTitle(titleForSave);
+    setCourseContent(nextCourseContent as Record<string, { summary: string; recommendations: string }>);
     await loadReport();
     setIsSavingReportContent(false);
   };
