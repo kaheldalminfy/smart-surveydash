@@ -235,6 +235,53 @@ const Recommendations = () => {
     toast({ title: t("recommendations.statusUpdated") });
   };
 
+  const buildExportLabels = (): ExportLabels => ({
+    isArabic: language === "ar",
+    documentTitle: t("recommendations.exportTitle"),
+    year: t("common.academicYear"),
+    program: t("recommendations.programLabel"),
+    semester: t("common.semester"),
+    course: t("recommendations.courseName"),
+    title: t("recommendations.titleLabel"),
+    description: t("recommendations.recommendationText"),
+    priority: t("recommendations.priority"),
+    status: t("recommendations.status"),
+    source: t("recommendations.source"),
+    notTracked: t("recommendations.notTracked"),
+    none: t("recommendations.noCourses"),
+    semesterLabel: (s) =>
+      s === "first" ? t("recommendations.firstSem")
+        : s === "second" ? t("recommendations.secondSem")
+        : s === "summer" ? t("recommendations.summerSemester")
+        : s || "-",
+    statusLabel: (s) =>
+      s === "completed" ? t("recommendations.completed")
+        : s === "in_progress" ? t("recommendations.inProgress")
+        : s === "postponed" ? t("recommendations.postponed")
+        : t("recommendations.pending"),
+    priorityLabel: (p) =>
+      p === "high" ? t("recommendations.high")
+        : p === "low" ? t("recommendations.low")
+        : p ? t("recommendations.medium") : "-",
+    sourceLabel: (k) => (k === "report" ? t("recommendations.sourceReport") : t("recommendations.sourceManual")),
+  });
+
+  const handleExport = async (format: "excel" | "pdf", year: string, items: UnifiedRecommendation[]) => {
+    if (items.length === 0) {
+      toast({ title: t("recommendations.exportEmpty"), variant: "destructive" });
+      return;
+    }
+    try {
+      const labels = buildExportLabels();
+      if (format === "excel") await exportRecommendationsExcel(year, items, labels);
+      else await exportRecommendationsPDF(year, items, labels);
+      toast({ title: t("recommendations.exportDone") });
+    } catch (e) {
+      console.error("Recommendations export failed", e);
+      toast({ title: t("recommendations.exportError"), variant: "destructive" });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
