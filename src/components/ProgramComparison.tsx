@@ -173,11 +173,15 @@ interface ComparisonResult {
 const ProgramComparison = () => {
   const { toast } = useToast();
   const { t } = useLanguage();
+  const [mode, setMode] = useState<'programs' | 'surveys'>('programs');
   const [programs, setPrograms] = useState<any[]>([]);
   const [academicYears, setAcademicYears] = useState<string[]>([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>('');
   const [selectedSemester, setSelectedSemester] = useState<string>('all');
   const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
+  const [singleProgram, setSingleProgram] = useState<string>('');
+  const [availableSurveys, setAvailableSurveys] = useState<{ id: string; title: string }[]>([]);
+  const [selectedSurveyIds, setSelectedSurveyIds] = useState<string[]>([]);
   const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -185,6 +189,29 @@ const ProgramComparison = () => {
     loadPrograms();
     loadAcademicYears();
   }, []);
+
+  useEffect(() => {
+    if (mode !== 'surveys' || !singleProgram || !selectedAcademicYear) {
+      setAvailableSurveys([]);
+      setSelectedSurveyIds([]);
+      return;
+    }
+    (async () => {
+      let query = supabase
+        .from("surveys")
+        .select("id, title")
+        .eq("program_id", singleProgram)
+        .eq("academic_year", selectedAcademicYear)
+        .order("created_at", { ascending: false });
+      if (selectedSemester && selectedSemester !== 'all') {
+        query = query.eq("semester", selectedSemester);
+      }
+      const { data } = await query;
+      setAvailableSurveys(data || []);
+      setSelectedSurveyIds([]);
+      setComparisonResult(null);
+    })();
+  }, [mode, singleProgram, selectedAcademicYear, selectedSemester]);
 
   const loadPrograms = async () => {
     const { data } = await supabase.from("programs").select("*").order("name");
@@ -211,11 +238,123 @@ const ProgramComparison = () => {
     }));
   }, [selectedPrograms, programs]);
 
+  const selectedSurveysWithColors = useMemo(() => {
+    return selectedSurveyIds.map((id, i) => ({
+      id,
+      name: availableSurveys.find(s => s.id === id)?.title || '',
+      color: PROGRAM_COLORS[i % PROGRAM_COLORS.length],
+    }));
+  }, [selectedSurveyIds, availableSurveys]);
+
+  const entities = mode === 'programs' ? selectedProgramsWithColors : selectedSurveysWithColors;
+
+
+  const loadSurveyComparison = async () => {
+    if (!selectedAcademicYear) {
+      toast({ title: t('progComp.notice'), description: t('progComp.needAY'), variant: "destructive" });
+      return;
+    }
+    if (!singleProgram) {
+      toast({ title: t('progComp.notice'), description: t('progComp.needProgram'), variant: "destructive" });
+      return;
+    }
+    if (selectedSurveyIds.length < 2) {
+      toast({ title: t('progComp.notice'), description: t('progComp.minSurveys'), variant: "destructive" });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const perSurvey = await mapWithConcurrency(selectedSurveysWithColors, 4, async (entity) => {
+        const [questions, responses] = await Promise.all([
+          fetchAllSurveyQuestions(entity.id),
+          fetchAllCompleteSurveyResponses(entity.id),
+        ]);
+        const ratingQuestions = questions.filter(
+          q => (q.type === 'likert' || q.type === 'rating') && !q.is_archived,
+        );
+        const ratingIds = new Set(ratingQuestions.map(q => q.id));
+        const answers = responses
+          .flatMap(r => r.answers)
+          .filter(a => ratingIds.has(a.question_id) && a.numeric_value !== null && a.numeric_value >= 1 && a.numeric_value <= 5);
+
+        const byQuestion = new Map<string, { text: string; values: number[] }>();
+        for (const q of ratingQuestions.sort((a, b) => a.order_index - b.order_index)) {
+          byQuestion.set(q.id, { text: q.text, values: [] });
+        }
+        for (const a of answers) {
+          byQuestion.get(a.question_id)?.values.push(a.numeric_value as number);
+        }
+
+        return {
+          entity,
+          responseCount: responses.length,
+          totalSurveys: 1,
+          allScores: answers.map(a => a.numeric_value as number),
+          questions: [...byQuestion.values()],
+        };
+      });
+
+      // Cluster questions across surveys by similarity
+      const rows: { label: string; values: Map<string, { avg: number; count: number }> }[] = [];
+      for (const s of perSurvey) {
+        for (const q of s.questions) {
+          if (q.values.length === 0) continue;
+          const avg = q.values.reduce((a, b) => a + b, 0) / q.values.length;
+          const existing = rows.find(r => !r.values.has(s.entity.id) && questionsMatch(r.label, q.text));
+          if (existing) {
+            existing.values.set(s.entity.id, { avg, count: q.values.length });
+            if (q.text.length < existing.label.length) existing.label = q.text;
+          } else {
+            const row = { label: q.text, values: new Map<string, { avg: number; count: number }>() };
+            row.values.set(s.entity.id, { avg, count: q.values.length });
+            rows.push(row);
+          }
+        }
+      }
+
+      const surveyTypes: SurveyTypeComparison[] = rows.map(row => ({
+        title: row.label,
+        programData: selectedSurveysWithColors.map(e => {
+          const v = row.values.get(e.id);
+          return {
+            programId: e.id,
+            programName: e.name,
+            averageScore: v ? parseFloat(v.avg.toFixed(2)) : 0,
+            responseCount: v?.count || 0,
+            exists: !!v,
+          };
+        }),
+      }));
+
+      const overall: OverallData[] = perSurvey.map(s => {
+        const mean = s.allScores.length > 0 ? s.allScores.reduce((a, b) => a + b, 0) / s.allScores.length : 0;
+        return {
+          programName: s.entity.name,
+          programId: s.entity.id,
+          color: s.entity.color,
+          overallMean: parseFloat(mean.toFixed(2)),
+          totalResponses: s.responseCount,
+          totalSurveys: 1,
+          satisfactionRate: ((mean / 5) * 100).toFixed(1),
+        };
+      });
+
+      setComparisonResult({ surveyTypes, overall });
+    } catch (error) {
+      toast({ title: t('progComp.error'), description: t('progComp.loadErr'), variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadComparisonData = async () => {
+    if (mode === 'surveys') return loadSurveyComparison();
     if (selectedPrograms.length < 2) {
       toast({ title: t('progComp.notice'), description: t('progComp.minPrograms'), variant: "destructive" });
       return;
     }
+
     if (!selectedAcademicYear) {
       toast({ title: t('progComp.notice'), description: t('progComp.needAY'), variant: "destructive" });
       return;
@@ -375,6 +514,26 @@ const ProgramComparison = () => {
           <CardDescription>{t('progComp.desc')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Mode */}
+          <div className="space-y-2 max-w-md">
+            <label className="text-sm font-medium">{t('progComp.mode')}</label>
+            <Select
+              value={mode}
+              onValueChange={(v) => {
+                setMode(v as 'programs' | 'surveys');
+                setComparisonResult(null);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="programs">{t('progComp.modePrograms')}</SelectItem>
+                <SelectItem value="surveys">{t('progComp.modeSurveys')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Academic Year */}
             <div className="space-y-2">
@@ -406,39 +565,92 @@ const ProgramComparison = () => {
               </Select>
             </div>
 
-            {/* Programs */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">{t('progComp.selectPrograms')}</label>
-              <Select
-                onValueChange={(value) => {
-                  if (!selectedPrograms.includes(value)) {
-                    setSelectedPrograms([...selectedPrograms, value]);
-                  }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t('progComp.addProgram')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {programs
-                    .filter(p => !selectedPrograms.includes(p.id))
-                    .map((p) => (
+            {/* Programs (multi) */}
+            {mode === 'programs' ? (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">{t('progComp.selectPrograms')}</label>
+                <Select
+                  onValueChange={(value) => {
+                    if (!selectedPrograms.includes(value)) {
+                      setSelectedPrograms([...selectedPrograms, value]);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('progComp.addProgram')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {programs
+                      .filter(p => !selectedPrograms.includes(p.id))
+                      .map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">{t('progComp.selectProgram')} <span className="text-destructive">*</span></label>
+                <Select
+                  value={singleProgram}
+                  onValueChange={(v) => { setSingleProgram(v); setComparisonResult(null); }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('progComp.selectOneProgram')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {programs.map((p) => (
                       <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                     ))}
-                </SelectContent>
-              </Select>
-            </div>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
-          {/* Selected Programs Badges */}
+          {/* Surveys picker */}
+          {mode === 'surveys' && singleProgram && selectedAcademicYear && (
+            <div className="space-y-2 max-w-xl">
+              <label className="text-sm font-medium">{t('progComp.selectSurveys')}</label>
+              {availableSurveys.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t('progComp.noSurveys')}</p>
+              ) : (
+                <Select
+                  onValueChange={(value) => {
+                    if (!selectedSurveyIds.includes(value)) {
+                      setSelectedSurveyIds([...selectedSurveyIds, value]);
+                      setComparisonResult(null);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('progComp.addSurvey')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSurveys
+                      .filter(s => !selectedSurveyIds.includes(s.id))
+                      .map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          )}
+
+          {/* Selected badges */}
           <div className="flex flex-wrap gap-2">
-            {selectedProgramsWithColors.map((p) => (
+            {entities.map((p) => (
               <Badge
                 key={p.id}
                 className="cursor-pointer text-white px-3 py-1 text-sm"
                 style={{ backgroundColor: p.color }}
                 onClick={() => {
-                  setSelectedPrograms(selectedPrograms.filter(id => id !== p.id));
+                  if (mode === 'programs') {
+                    setSelectedPrograms(selectedPrograms.filter(id => id !== p.id));
+                  } else {
+                    setSelectedSurveyIds(selectedSurveyIds.filter(id => id !== p.id));
+                  }
                   setComparisonResult(null);
                 }}
               >
@@ -450,11 +662,12 @@ const ProgramComparison = () => {
 
           <Button
             onClick={loadComparisonData}
-            disabled={loading || selectedPrograms.length < 2 || !selectedAcademicYear}
+            disabled={loading || entities.length < 2 || !selectedAcademicYear || (mode === 'surveys' && !singleProgram)}
             className="w-full md:w-auto"
           >
             {loading ? <><Loader2 className="h-4 w-4 animate-spin ml-2" /> {t('progComp.analyzing')}</> : t('progComp.start')}
           </Button>
+
         </CardContent>
       </Card>
 
@@ -509,9 +722,9 @@ const ProgramComparison = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-primary" />
-                  {t('progComp.byType')}
+                  {mode === 'surveys' ? t('progComp.byQuestion') : t('progComp.byType')}
                 </CardTitle>
-                <CardDescription>{t('progComp.byTypeDesc')}</CardDescription>
+                <CardDescription>{mode === 'surveys' ? t('progComp.byQuestionDesc') : t('progComp.byTypeDesc')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={400}>
@@ -528,7 +741,7 @@ const ProgramComparison = () => {
                     <YAxis domain={[0, 5]} tick={{ fontSize: 12 }} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
-                    {selectedProgramsWithColors.map((p) => (
+                    {entities.map((p) => (
                       <Bar
                         key={p.id}
                         dataKey={p.name}
@@ -560,7 +773,7 @@ const ProgramComparison = () => {
                     <PolarGrid />
                     <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11 }} />
                     <PolarRadiusAxis domain={[0, 5]} tick={{ fontSize: 10 }} />
-                    {selectedProgramsWithColors.map((p) => (
+                    {entities.map((p) => (
                       <Radar
                         key={p.id}
                         name={p.name}
@@ -591,8 +804,8 @@ const ProgramComparison = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-right min-w-[200px]">{t('progComp.tableType')}</TableHead>
-                      {selectedProgramsWithColors.map(p => (
+                      <TableHead className="text-right min-w-[200px]">{mode === 'surveys' ? t('progComp.tableQuestion') : t('progComp.tableType')}</TableHead>
+                      {entities.map(p => (
                         <TableHead key={p.id} className="text-center min-w-[120px]">
                           <div className="flex items-center justify-center gap-1">
                             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
@@ -600,7 +813,7 @@ const ProgramComparison = () => {
                           </div>
                         </TableHead>
                       ))}
-                      {selectedPrograms.length === 2 && (
+                      {entities.length === 2 && (
                         <TableHead className="text-center min-w-[80px]">{t('progComp.diff')}</TableHead>
                       )}
                     </TableRow>
@@ -608,7 +821,7 @@ const ProgramComparison = () => {
                   <TableBody>
                     {comparisonResult.surveyTypes.map((st, i) => {
                       const scores = st.programData.map(pd => pd.exists ? pd.averageScore : null);
-                      const diff = selectedPrograms.length === 2 && scores[0] !== null && scores[1] !== null
+                      const diff = entities.length === 2 && scores[0] !== null && scores[1] !== null
                         ? parseFloat((scores[0]! - scores[1]!).toFixed(2))
                         : null;
                       return (
@@ -623,7 +836,7 @@ const ProgramComparison = () => {
                               )}
                             </TableCell>
                           ))}
-                          {selectedPrograms.length === 2 && (
+                          {entities.length === 2 && (
                             <TableCell className="text-center">
                               {diff !== null ? (
                                 <Badge
@@ -648,7 +861,7 @@ const ProgramComparison = () => {
                           <span style={{ color: p.color }}>{p.overallMean}</span>
                         </TableCell>
                       ))}
-                      {selectedPrograms.length === 2 && (
+                      {entities.length === 2 && (
                         <TableCell className="text-center">
                           {(() => {
                             const d = parseFloat((comparisonResult.overall[0].overallMean - comparisonResult.overall[1].overallMean).toFixed(2));
