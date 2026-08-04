@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { fetchAllCompleteSurveyResponses, fetchAllSurveyQuestions, mapWithConcurrency } from "@/lib/paginatedSurveyData";
+import ComparisonAIAnalysis from "@/components/comparison/ComparisonAIAnalysis";
 
 const PROGRAM_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'];
 
@@ -874,11 +875,22 @@ const ProgramComparison = () => {
                         </TableCell>
                       )}
                     </TableRow>
-                  </TableBody>
+              </TableBody>
                 </Table>
               </div>
             </CardContent>
           </Card>
+
+          <ComparisonAIAnalysis
+            mode={mode}
+            context={{
+              academic_year: selectedAcademicYear,
+              semester: selectedSemester,
+              program: mode === 'surveys' ? programs.find(p => p.id === singleProgram)?.name : undefined,
+            }}
+            overall={comparisonResult.overall}
+            rows={comparisonResult.surveyTypes}
+          />
         </>
       )}
     </div>

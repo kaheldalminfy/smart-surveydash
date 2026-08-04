@@ -64,6 +64,9 @@ verify_jwt = false
 [functions.translate-survey]
 verify_jwt = false
 
+[functions.analyze-comparison]
+verify_jwt = true
+
 
 
 
