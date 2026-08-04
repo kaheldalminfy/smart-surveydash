@@ -516,28 +516,43 @@ const Reports = () => {
     navigate("/surveys");
   };
 
+  const buildContentUpdate = (courseName: string, titleForSave: string, currentReportType: string) => {
+    const baseStatistics = (report?.statistics || {}) as Record<string, any>;
+    const nextCourseContent = {
+      ...((baseStatistics.course_content || {}) as Record<string, any>),
+      ...(courseName
+        ? { [courseName]: { summary: editedSummary, recommendations: editedRecommendations } }
+        : {}),
+    };
+
+    const nextStatistics = {
+      ...baseStatistics,
+      report_title: titleForSave,
+      report_type: currentReportType,
+      course_content: nextCourseContent,
+    };
+
+    return {
+      nextCourseContent,
+      update: {
+        // Course-specific content is stored per course; report-level fields stay untouched.
+        ...(courseName ? {} : { summary: editedSummary, recommendations_text: editedRecommendations }),
+        statistics: nextStatistics,
+      },
+    };
+  };
+
   const handleSaveRecommendations = async () => {
     setIsSavingReportContent(true);
     const courseName = getSelectedCourseName();
-    if (courseName) {
-      setCourseRecommendations(prev => ({ ...prev, [courseName]: editedRecommendations }));
-    }
 
     const currentReportType = getCurrentReportType();
     const titleForSave = reportTitle.trim() || getReportCopy(currentReportType, language).reportTitle;
-    const nextStatistics = {
-      ...((report?.statistics || {}) as Record<string, any>),
-      report_title: titleForSave,
-      report_type: currentReportType,
-    };
+    const { update, nextCourseContent } = buildContentUpdate(courseName, titleForSave, currentReportType);
 
     const { error } = await supabase
       .from("reports")
-      .update({
-        summary: editedSummary,
-        recommendations_text: editedRecommendations,
-        statistics: nextStatistics,
-      })
+      .update(update)
       .eq("id", report.id);
 
     if (error) {
