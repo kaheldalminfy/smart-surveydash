@@ -206,6 +206,12 @@ const translations: Record<Language, Record<string, string>> = {
     'recommendations.notTracked': 'لم تُنقل بعد',
     'recommendations.progress': 'الإنجاز',
     'recommendations.itemsCount': 'توصية',
+    'recommendations.exportExcel': 'تصدير Excel',
+    'recommendations.exportPDF': 'تصدير PDF',
+    'recommendations.exportTitle': 'سجل التوصيات',
+    'recommendations.exportEmpty': 'لا توجد توصيات للتصدير',
+    'recommendations.exportDone': 'تم التصدير بنجاح',
+    'recommendations.exportError': 'تعذر إتمام التصدير',
     
     // Reports
     'reports.title': 'التقارير والتحليلات',
