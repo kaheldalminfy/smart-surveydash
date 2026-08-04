@@ -168,24 +168,19 @@ const RecommendationYearGroup = ({ items, onStatusChange, onEdit }: Props) => {
                               </TableCell>
                               <TableCell>{priorityBadge(item.priority)}</TableCell>
                               <TableCell>
-                                {item.id ? (
-                                  <Select
-                                    value={item.status || "pending"}
-                                    onValueChange={(v) => onStatusChange(item.id as string, v)}
-                                  >
-                                    <SelectTrigger className="h-8 w-[140px]">
-                                      <SelectValue>{statusLabel(item.status)}</SelectValue>
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="pending">{t("recommendations.pending")}</SelectItem>
-                                      <SelectItem value="in_progress">{t("recommendations.inProgress")}</SelectItem>
-                                      <SelectItem value="completed">{t("recommendations.completed")}</SelectItem>
-                                      <SelectItem value="postponed">{t("recommendations.postponed")}</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                ) : (
-                                  <Badge variant="outline">{t("recommendations.notTracked")}</Badge>
-                                )}
+                                <Select
+                                  value={item.status || "pending"}
+                                  onValueChange={(v) => onStatusChange(item, v)}
+                                >
+                                  <SelectTrigger className="h-8 w-[150px]">
+                                    <SelectValue>{statusLabel(item.status)}</SelectValue>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="completed">{t("recommendations.statusDone")}</SelectItem>
+                                    <SelectItem value="in_progress">{t("recommendations.statusInProgress")}</SelectItem>
+                                    <SelectItem value="pending">{t("recommendations.statusNotDone")}</SelectItem>
+                                  </SelectContent>
+                                </Select>
                               </TableCell>
                               <TableCell className="text-center whitespace-nowrap">
                                 {item.id && (
