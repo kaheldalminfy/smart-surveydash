@@ -11,11 +11,12 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, CalendarDays } from "lucide-react";
+import { Plus, Search, CalendarDays, FileSpreadsheet, FileText } from "lucide-react";
 import DashboardButton from "@/components/DashboardButton";
 import { useLanguage } from "@/contexts/LanguageContext";
 import RecommendationFilters from "@/components/recommendations/RecommendationFilters";
 import RecommendationYearGroup, { type UnifiedRecommendation } from "@/components/recommendations/RecommendationYearGroup";
+import { exportRecommendationsExcel, exportRecommendationsPDF, type ExportLabels } from "@/utils/exportRecommendations";
 
 interface ReportRecommendation {
   report_id: string;
@@ -234,6 +235,53 @@ const Recommendations = () => {
     toast({ title: t("recommendations.statusUpdated") });
   };
 
+  const buildExportLabels = (): ExportLabels => ({
+    isArabic: language === "ar",
+    documentTitle: t("recommendations.exportTitle"),
+    year: t("common.academicYear"),
+    program: t("recommendations.programLabel"),
+    semester: t("common.semester"),
+    course: t("recommendations.courseName"),
+    title: t("recommendations.titleLabel"),
+    description: t("recommendations.recommendationText"),
+    priority: t("recommendations.priority"),
+    status: t("recommendations.status"),
+    source: t("recommendations.source"),
+    notTracked: t("recommendations.notTracked"),
+    none: t("recommendations.noCourses"),
+    semesterLabel: (s) =>
+      s === "first" ? t("recommendations.firstSem")
+        : s === "second" ? t("recommendations.secondSem")
+        : s === "summer" ? t("recommendations.summerSemester")
+        : s || "-",
+    statusLabel: (s) =>
+      s === "completed" ? t("recommendations.completed")
+        : s === "in_progress" ? t("recommendations.inProgress")
+        : s === "postponed" ? t("recommendations.postponed")
+        : t("recommendations.pending"),
+    priorityLabel: (p) =>
+      p === "high" ? t("recommendations.high")
+        : p === "low" ? t("recommendations.low")
+        : p ? t("recommendations.medium") : "-",
+    sourceLabel: (k) => (k === "report" ? t("recommendations.sourceReport") : t("recommendations.sourceManual")),
+  });
+
+  const handleExport = async (format: "excel" | "pdf", year: string, items: UnifiedRecommendation[]) => {
+    if (items.length === 0) {
+      toast({ title: t("recommendations.exportEmpty"), variant: "destructive" });
+      return;
+    }
+    try {
+      const labels = buildExportLabels();
+      if (format === "excel") await exportRecommendationsExcel(year, items, labels);
+      else await exportRecommendationsPDF(year, items, labels);
+      toast({ title: t("recommendations.exportDone") });
+    } catch (e) {
+      console.error("Recommendations export failed", e);
+      toast({ title: t("recommendations.exportError"), variant: "destructive" });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -431,10 +479,28 @@ const Recommendations = () => {
                   return (
                     <AccordionItem key={year || "__none__"} value={year || "__none__"} className="border rounded-lg px-4">
                       <AccordionTrigger className="hover:no-underline">
-                        <div className="flex flex-wrap items-center gap-3 text-start">
+                        <div className="flex flex-1 flex-wrap items-center gap-3 text-start">
                           <span className="font-semibold">{year || t('recommendations.unknownYear')}</span>
                           <Badge variant="secondary">{items.length} {t('recommendations.itemsCount')}</Badge>
                           <Badge variant="outline">{t('recommendations.completionRate')}: {rate}%</Badge>
+                          <div className="ms-auto flex items-center gap-2 pe-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              asChild
+                              onClick={(e) => { e.stopPropagation(); handleExport("excel", year, items); }}
+                            >
+                              <span><FileSpreadsheet className="h-4 w-4 me-1" />{t('recommendations.exportExcel')}</span>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              asChild
+                              onClick={(e) => { e.stopPropagation(); handleExport("pdf", year, items); }}
+                            >
+                              <span><FileText className="h-4 w-4 me-1" />{t('recommendations.exportPDF')}</span>
+                            </Button>
+                          </div>
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="pt-2 pb-6">
