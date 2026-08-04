@@ -407,6 +407,17 @@ const Reports = () => {
     return filterValues[0] || '';
   };
 
+  const applyEditorContentForCourse = (courseName: string) => {
+    if (courseName) {
+      const saved = courseContent[courseName];
+      setEditedSummary(saved?.summary || "");
+      setEditedRecommendations(saved?.recommendations || "");
+    } else {
+      setEditedSummary(report?.summary || "");
+      setEditedRecommendations(report?.recommendations_text || "");
+    }
+  };
+
   const handleFilterValueChange = (value: string) => {
     const newValues = filterValues.includes(value)
       ? filterValues.filter(v => v !== value)
@@ -415,12 +426,7 @@ const Reports = () => {
     setFilterValues(newValues);
     processDataWithFilter(allQuestions, allResponses, filterQuestion, newValues);
 
-    const courseName = newValues.length > 0 ? newValues[0] : '';
-    if (courseName && courseRecommendations[courseName]) {
-      setEditedRecommendations(courseRecommendations[courseName]);
-    } else if (report?.recommendations_text) {
-      setEditedRecommendations(report.recommendations_text);
-    }
+    applyEditorContentForCourse(newValues.length > 0 ? newValues[0] : '');
   };
 
   const handleFilterQuestionChange = (questionId: string) => {
@@ -428,6 +434,7 @@ const Reports = () => {
     setFilterValues([]);
     setManualEnrollment("");
     processDataWithFilter(allQuestions, allResponses, questionId, []);
+    applyEditorContentForCourse('');
   };
 
   const clearFilter = () => {
@@ -435,9 +442,7 @@ const Reports = () => {
     setFilterValues([]);
     setManualEnrollment("");
     processDataWithFilter(allQuestions, allResponses, "", []);
-    if (report?.recommendations_text) {
-      setEditedRecommendations(report.recommendations_text);
-    }
+    applyEditorContentForCourse('');
   };
 
   const getTargetEnrollmentNumber = () => {
