@@ -11,11 +11,12 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, CalendarDays } from "lucide-react";
+import { Plus, Search, CalendarDays, FileSpreadsheet, FileText } from "lucide-react";
 import DashboardButton from "@/components/DashboardButton";
 import { useLanguage } from "@/contexts/LanguageContext";
 import RecommendationFilters from "@/components/recommendations/RecommendationFilters";
 import RecommendationYearGroup, { type UnifiedRecommendation } from "@/components/recommendations/RecommendationYearGroup";
+import { exportRecommendationsExcel, exportRecommendationsPDF, type ExportLabels } from "@/utils/exportRecommendations";
 
 interface ReportRecommendation {
   report_id: string;
