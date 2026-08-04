@@ -57,12 +57,13 @@ const RecommendationYearGroup = ({ items, onStatusChange, onEdit }: Props) => {
   };
 
   const priorityBadge = (priority: string | null) => {
+    if (!priority) return <span className="text-xs text-muted-foreground">-</span>;
     const map: Record<string, { label: string; variant: "outline" | "secondary" | "destructive" }> = {
       low: { label: t("recommendations.low"), variant: "outline" },
       medium: { label: t("recommendations.medium"), variant: "secondary" },
       high: { label: t("recommendations.high"), variant: "destructive" },
     };
-    const p = map[priority || "medium"] || map.medium;
+    const p = map[priority] || map.medium;
     return <Badge variant={p.variant}>{p.label}</Badge>;
   };
 
