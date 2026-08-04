@@ -431,10 +431,28 @@ const Recommendations = () => {
                   return (
                     <AccordionItem key={year || "__none__"} value={year || "__none__"} className="border rounded-lg px-4">
                       <AccordionTrigger className="hover:no-underline">
-                        <div className="flex flex-wrap items-center gap-3 text-start">
+                        <div className="flex flex-1 flex-wrap items-center gap-3 text-start">
                           <span className="font-semibold">{year || t('recommendations.unknownYear')}</span>
                           <Badge variant="secondary">{items.length} {t('recommendations.itemsCount')}</Badge>
                           <Badge variant="outline">{t('recommendations.completionRate')}: {rate}%</Badge>
+                          <div className="ms-auto flex items-center gap-2 pe-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              asChild
+                              onClick={(e) => { e.stopPropagation(); handleExport("excel", year, items); }}
+                            >
+                              <span><FileSpreadsheet className="h-4 w-4 me-1" />{t('recommendations.exportExcel')}</span>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              asChild
+                              onClick={(e) => { e.stopPropagation(); handleExport("pdf", year, items); }}
+                            >
+                              <span><FileText className="h-4 w-4 me-1" />{t('recommendations.exportPDF')}</span>
+                            </Button>
+                          </div>
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="pt-2 pb-6">
