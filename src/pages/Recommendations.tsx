@@ -1,5 +1,4 @@
 import { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,19 +6,30 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit } from "lucide-react";
+import { Plus, Search, CalendarDays } from "lucide-react";
 import DashboardButton from "@/components/DashboardButton";
 import { useLanguage } from "@/contexts/LanguageContext";
 import RecommendationFilters from "@/components/recommendations/RecommendationFilters";
-import ReportRecommendationsSection, { type ReportRecommendation } from "@/components/recommendations/ReportRecommendationsSection";
+import RecommendationYearGroup, { type UnifiedRecommendation } from "@/components/recommendations/RecommendationYearGroup";
+
+interface ReportRecommendation {
+  report_id: string;
+  recommendations_text: string;
+  academic_year: string | null;
+  semester: string | null;
+  survey_id: string | null;
+  survey_title: string;
+  program_id: string | null;
+  program_name: string;
+  course_name: string | null;
+}
 
 const Recommendations = () => {
-  const navigate = useNavigate();
   const { t, language } = useLanguage();
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [programs, setPrograms] = useState<any[]>([]);
@@ -32,13 +42,9 @@ const Recommendations = () => {
   const [filterProgram, setFilterProgram] = useState("all");
   const [filterYear, setFilterYear] = useState("all");
   const [filterSemester, setFilterSemester] = useState("all");
+  const [search, setSearch] = useState("");
 
-  // Report recommendations
   const [reportRecs, setReportRecs] = useState<ReportRecommendation[]>([]);
-
-  const [stats, setStats] = useState({
-    total: 0, completed: 0, inProgress: 0, pending: 0, completionRate: 0,
-  });
 
   const [formData, setFormData] = useState({
     title: "", description: "", program_id: "", priority: "medium",
@@ -62,42 +68,28 @@ const Recommendations = () => {
       .from("recommendations")
       .select("*, programs(name)")
       .order("created_at", { ascending: false });
-
-    if (data) {
-      setRecommendations(data);
-      const total = data.length;
-      const completed = data.filter((r) => r.status === "completed").length;
-      const inProgress = data.filter((r) => r.status === "in_progress").length;
-      const pending = data.filter((r) => r.status === "pending").length;
-      setStats({
-        total, completed, inProgress, pending,
-        completionRate: total > 0 ? Math.round((completed / total) * 100) : 0,
-      });
-    }
+    if (data) setRecommendations(data);
   };
 
   const loadReportRecommendations = async () => {
-    // Fetch reports with report-level or per-course recommendations
     const { data: reports } = await supabase
       .from("reports")
       .select("id, recommendations_text, statistics, academic_year, semester, survey_id, status, surveys(id, title, program_id, programs(id, name))");
 
     if (!reports) return;
 
-    // Fetch all survey_courses with courses
     const surveyIds = reports.map((r: any) => r.survey_id).filter(Boolean);
     const { data: surveyCoursesData } = await supabase
       .from("survey_courses")
       .select("survey_id, courses(name, code)")
       .in("survey_id", surveyIds.length > 0 ? surveyIds : ["__none__"]);
 
-    // Build course map: survey_id -> courses[]
-    const courseMap = new Map<string, { name: string; code: string }[]>();
+    const courseMap = new Map<string, string[]>();
     if (surveyCoursesData) {
       for (const sc of surveyCoursesData as any[]) {
         if (!sc.survey_id || !sc.courses) continue;
         if (!courseMap.has(sc.survey_id)) courseMap.set(sc.survey_id, []);
-        courseMap.get(sc.survey_id)!.push({ name: sc.courses.name, code: sc.courses.code });
+        courseMap.get(sc.survey_id)!.push(sc.courses.name);
       }
     }
 
@@ -106,16 +98,14 @@ const Recommendations = () => {
     for (const r of reports as any[]) {
       const base = {
         report_id: r.id,
-        academic_year: r.academic_year || r.surveys?.academic_year || null,
-        semester: r.semester || r.surveys?.semester || null,
+        academic_year: r.academic_year || null,
+        semester: r.semester || null,
         survey_id: r.survey_id,
         survey_title: r.surveys?.title || "",
         program_id: r.surveys?.program_id || null,
         program_name: r.surveys?.programs?.name || "",
-        report_status: r.status || null,
       };
 
-      // Per-course recommendations saved from the report editor
       const courseContent = (r.statistics?.course_content || {}) as Record<
         string,
         { summary?: string; recommendations?: string }
@@ -125,19 +115,14 @@ const Recommendations = () => {
       );
 
       for (const [courseName, value] of courseEntries) {
-        items.push({
-          ...base,
-          recommendations_text: value.recommendations || "",
-          courses: [{ name: courseName, code: "" }],
-        });
+        items.push({ ...base, recommendations_text: value.recommendations || "", course_name: courseName });
       }
 
-      // Report-level recommendations (only when no per-course content exists)
       if (courseEntries.length === 0 && (r.recommendations_text || "").trim() !== "") {
         items.push({
           ...base,
           recommendations_text: r.recommendations_text,
-          courses: courseMap.get(r.survey_id) || [],
+          course_name: (courseMap.get(r.survey_id) || []).join(", ") || null,
         });
       }
     }
@@ -145,44 +130,120 @@ const Recommendations = () => {
     setReportRecs(items);
   };
 
+  // Unified list: tracked rows from the recommendations table + report
+  // recommendations that were not transferred yet.
+  const unified = useMemo<UnifiedRecommendation[]>(() => {
+    const tracked: UnifiedRecommendation[] = recommendations.map((r) => ({
+      key: `rec-${r.id}`,
+      kind: r.source_type === "survey" && r.source_id ? "report" : "manual",
+      id: r.id,
+      title: r.title,
+      description: r.description || "",
+      course_name: r.course_name || null,
+      program_id: r.program_id || null,
+      program_name: r.programs?.name || "",
+      academic_year: r.academic_year || null,
+      semester: r.semester || null,
+      status: r.status || "pending",
+      priority: r.priority || "medium",
+      updated_at: r.updated_at || r.created_at || null,
+      survey_id: null,
+    }));
 
-  // Collect all academic years from both sources for filter
-  const academicYears = useMemo(() => {
-    const years = new Set<string>();
-    recommendations.forEach((r) => r.academic_year && years.add(r.academic_year));
-    reportRecs.forEach((r) => r.academic_year && years.add(r.academic_year));
-    return Array.from(years).sort().reverse();
+    const trackedKeys = new Set(
+      recommendations
+        .filter((r) => r.source_id)
+        .map((r) => `${r.source_id}::${r.course_name || ""}`)
+    );
+
+    const untracked: UnifiedRecommendation[] = reportRecs
+      .filter((r) => !trackedKeys.has(`${r.report_id}::${r.course_name || ""}`))
+      .map((r) => ({
+        key: `rep-${r.report_id}-${r.course_name || "all"}`,
+        kind: "report" as const,
+        id: null,
+        title: r.survey_title,
+        description: r.recommendations_text,
+        course_name: r.course_name,
+        program_id: r.program_id,
+        program_name: r.program_name,
+        academic_year: r.academic_year,
+        semester: r.semester,
+        status: null,
+        priority: null,
+        updated_at: null,
+        survey_id: r.survey_id,
+      }));
+
+    return [...tracked, ...untracked];
   }, [recommendations, reportRecs]);
 
-  // Apply filters
-  const filteredManual = useMemo(() => {
-    return recommendations.filter((r) => {
-      if (filterProgram !== "all" && r.program_id !== filterProgram) return false;
-      if (filterYear !== "all" && r.academic_year !== filterYear) return false;
-      if (filterSemester !== "all" && r.semester !== filterSemester) return false;
-      return true;
-    });
-  }, [recommendations, filterProgram, filterYear, filterSemester]);
+  const academicYears = useMemo(() => {
+    const years = new Set<string>();
+    unified.forEach((r) => r.academic_year && years.add(r.academic_year));
+    return Array.from(years).sort().reverse();
+  }, [unified]);
 
-  const filteredReportRecs = useMemo(() => {
-    return reportRecs.filter((r) => {
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return unified.filter((r) => {
       if (filterProgram !== "all" && r.program_id !== filterProgram) return false;
       if (filterYear !== "all" && r.academic_year !== filterYear) return false;
       if (filterSemester !== "all" && r.semester !== filterSemester) return false;
+      if (q) {
+        const haystack = `${r.title} ${r.course_name || ""} ${r.description}`.toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
       return true;
     });
-  }, [reportRecs, filterProgram, filterYear, filterSemester]);
+  }, [unified, filterProgram, filterYear, filterSemester, search]);
+
+  // Group by academic year, newest first
+  const yearGroups = useMemo(() => {
+    const map = new Map<string, UnifiedRecommendation[]>();
+    filtered.forEach((r) => {
+      const key = r.academic_year || "";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r);
+    });
+    return Array.from(map.entries()).sort((a, b) => {
+      if (!a[0]) return 1;
+      if (!b[0]) return -1;
+      return b[0].localeCompare(a[0], undefined, { numeric: true });
+    });
+  }, [filtered]);
+
+  const stats = useMemo(() => {
+    const total = filtered.length;
+    const completed = filtered.filter((r) => r.status === "completed").length;
+    const inProgress = filtered.filter((r) => r.status === "in_progress").length;
+    const pending = filtered.filter((r) => r.status === "pending" || r.status === null).length;
+    return {
+      total, completed, inProgress, pending,
+      completionRate: total > 0 ? Math.round((completed / total) * 100) : 0,
+    };
+  }, [filtered]);
+
+  const handleStatusChange = async (id: string, status: string) => {
+    const { error } = await supabase.from("recommendations").update({ status: status as any }).eq("id", id);
+    if (error) {
+      toast({ title: t("common.error"), variant: "destructive" });
+      return;
+    }
+    setRecommendations((prev) => prev.map((r) => (r.id === id ? { ...r, status, updated_at: new Date().toISOString() } : r)));
+    toast({ title: t("recommendations.statusUpdated") });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
       if (editingId) {
-        const { error } = await supabase.from("recommendations").update(formData).eq("id", editingId);
+        const { error } = await supabase.from("recommendations").update(formData as any).eq("id", editingId);
         if (error) throw error;
         toast({ title: t('common.updated') });
       } else {
-        const { error } = await supabase.from("recommendations").insert(formData);
+        const { error } = await supabase.from("recommendations").insert(formData as any);
         if (error) throw error;
         toast({ title: t('common.saved') });
       }
@@ -196,39 +257,21 @@ const Recommendations = () => {
     }
   };
 
-  const handleEdit = (rec: any) => {
+  const handleEdit = (id: string) => {
+    const rec = recommendations.find((r) => r.id === id);
+    if (!rec) return;
     setFormData({
-      title: rec.title, description: rec.description, program_id: rec.program_id,
-      priority: rec.priority, status: rec.status, source_type: rec.source_type,
-      academic_year: rec.academic_year, semester: rec.semester,
+      title: rec.title || "", description: rec.description || "", program_id: rec.program_id || "",
+      priority: rec.priority || "medium", status: rec.status || "pending", source_type: rec.source_type || "survey",
+      academic_year: rec.academic_year || "", semester: rec.semester || "",
     });
-    setEditingId(rec.id);
+    setEditingId(id);
     setIsDialogOpen(true);
   };
 
   const resetForm = () => {
     setFormData({ title: "", description: "", program_id: "", priority: "medium", status: "pending", source_type: "survey", academic_year: new Date().getFullYear().toString(), semester: "" });
     setEditingId(null);
-  };
-
-  const getStatusBadge = (status: string) => {
-    const map: Record<string, { label: string; variant: "secondary" | "default" }> = {
-      pending: { label: t('recommendations.pending'), variant: "secondary" },
-      in_progress: { label: t('recommendations.inProgress'), variant: "default" },
-      completed: { label: t('recommendations.completed'), variant: "default" },
-    };
-    const s = map[status] || map.pending;
-    return <Badge variant={s.variant}>{s.label}</Badge>;
-  };
-
-  const getPriorityBadge = (priority: string) => {
-    const map: Record<string, { label: string; variant: "outline" | "secondary" | "destructive" }> = {
-      low: { label: t('recommendations.low'), variant: "outline" },
-      medium: { label: t('recommendations.medium'), variant: "secondary" },
-      high: { label: t('recommendations.high'), variant: "destructive" },
-    };
-    const p = map[priority] || map.medium;
-    return <Badge variant={p.variant}>{p.label}</Badge>;
   };
 
   return (
@@ -290,6 +333,7 @@ const Recommendations = () => {
                           <SelectItem value="pending">{t('recommendations.pending')}</SelectItem>
                           <SelectItem value="in_progress">{t('recommendations.inProgress')}</SelectItem>
                           <SelectItem value="completed">{t('recommendations.completed')}</SelectItem>
+                          <SelectItem value="postponed">{t('recommendations.postponed')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -335,7 +379,7 @@ const Recommendations = () => {
 
       <main className="container mx-auto px-4 py-8 space-y-6">
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card><CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">{t('recommendations.total')}</CardTitle></CardHeader><CardContent><div className="text-3xl font-bold">{stats.total}</div></CardContent></Card>
           <Card><CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">{t('recommendations.completed')}</CardTitle></CardHeader><CardContent><div className="text-3xl font-bold text-green-600">{stats.completed}</div></CardContent></Card>
           <Card><CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">{t('recommendations.inProgress')}</CardTitle></CardHeader><CardContent><div className="text-3xl font-bold text-blue-600">{stats.inProgress}</div></CardContent></Card>
@@ -344,63 +388,66 @@ const Recommendations = () => {
         </div>
 
         {/* Filters */}
-        <RecommendationFilters
-          programs={programs}
-          academicYears={academicYears}
-          selectedProgram={filterProgram}
-          selectedYear={filterYear}
-          selectedSemester={filterSemester}
-          onProgramChange={setFilterProgram}
-          onYearChange={setFilterYear}
-          onSemesterChange={setFilterSemester}
-        />
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            <RecommendationFilters
+              programs={programs}
+              academicYears={academicYears}
+              selectedProgram={filterProgram}
+              selectedYear={filterYear}
+              selectedSemester={filterSemester}
+              onProgramChange={setFilterProgram}
+              onYearChange={setFilterYear}
+              onSemesterChange={setFilterSemester}
+            />
+            <div className="relative">
+              <Search className="absolute top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground ltr:left-3 rtl:right-3" />
+              <Input
+                className="ltr:pl-9 rtl:pr-9"
+                placeholder={t('recommendations.searchPlaceholder')}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Report Recommendations */}
-        <ReportRecommendationsSection reportRecommendations={filteredReportRecs} />
-
-        {/* Manual Recommendations */}
+        {/* Unified record grouped by academic year */}
         <Card>
           <CardHeader>
-            <CardTitle>{t('recommendations.manualRecommendations')}</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5" />
+              {t('recommendations.recordTitle')}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {filteredManual.length === 0 ? (
-              <p className="text-center py-8 text-muted-foreground">{t('recommendations.noManualRecommendations')}</p>
+            {yearGroups.length === 0 ? (
+              <p className="text-center py-10 text-muted-foreground">{t('recommendations.noResults')}</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('recommendations.date')}</TableHead>
-                    <TableHead>{t('recommendations.titleLabel')}</TableHead>
-                    <TableHead>{t('recommendations.programLabel')}</TableHead>
-                    <TableHead>{t('recommendations.source')}</TableHead>
-                    <TableHead>{t('recommendations.priority')}</TableHead>
-                    <TableHead>{t('recommendations.status')}</TableHead>
-                    <TableHead>{t('recommendations.actions')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredManual.map((rec) => (
-                    <TableRow key={rec.id}>
-                      <TableCell>{new Date(rec.created_at).toLocaleDateString(language === 'ar' ? "ar-SA" : "en-US")}</TableCell>
-                      <TableCell className="font-medium">{rec.title}</TableCell>
-                      <TableCell>{rec.programs?.name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {rec.source_type === "survey" ? t('recommendations.survey') : rec.source_type === "complaint" ? t('recommendations.complaint') : t('recommendations.manual')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{getPriorityBadge(rec.priority)}</TableCell>
-                      <TableCell>{getStatusBadge(rec.status)}</TableCell>
-                      <TableCell>
-                        <Button variant="outline" size="sm" onClick={() => handleEdit(rec)}>
-                          <Edit className="h-4 w-4 ml-2" />{t('recommendations.edit')}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <Accordion type="multiple" defaultValue={[yearGroups[0][0] || "__none__"]} className="space-y-2">
+                {yearGroups.map(([year, items]) => {
+                  const completed = items.filter((i) => i.status === "completed").length;
+                  const rate = items.length > 0 ? Math.round((completed / items.length) * 100) : 0;
+                  return (
+                    <AccordionItem key={year || "__none__"} value={year || "__none__"} className="border rounded-lg px-4">
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="flex flex-wrap items-center gap-3 text-start">
+                          <span className="font-semibold">{year || t('recommendations.unknownYear')}</span>
+                          <Badge variant="secondary">{items.length} {t('recommendations.itemsCount')}</Badge>
+                          <Badge variant="outline">{t('recommendations.completionRate')}: {rate}%</Badge>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-2 pb-6">
+                        <RecommendationYearGroup
+                          items={items}
+                          onStatusChange={handleStatusChange}
+                          onEdit={handleEdit}
+                        />
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
             )}
           </CardContent>
         </Card>
