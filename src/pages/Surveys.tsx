@@ -79,9 +79,8 @@ const Surveys = () => {
     const availableProgramNames = groupedSurveys.map(([programName]) => programName);
     setOpenProgramNames(prev => {
       const retained = prev.filter(programName => availableProgramNames.includes(programName));
-      const next = retained.length > 0 ? retained : availableProgramNames;
-      const unchanged = next.length === prev.length && next.every((name, index) => name === prev[index]);
-      return unchanged ? prev : next;
+      const unchanged = retained.length === prev.length && retained.every((name, index) => name === prev[index]);
+      return unchanged ? prev : retained;
     });
   }, [groupedSurveys]);
 
