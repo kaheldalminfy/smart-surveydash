@@ -552,17 +552,20 @@ const Reports = () => {
       program_id: survey?.program_id || null,
       source_type: "survey" as const,
       source_id: report.id,
+      course_name: courseName || null,
       academic_year: academicYear || null,
       semester: semester || null,
     };
 
-    const { data: existing } = await supabase
+    let lookup = supabase
       .from("recommendations")
       .select("id")
       .eq("source_id", report.id)
-      .eq("source_type", "survey")
-      .eq("title", recTitle)
-      .limit(1);
+      .eq("source_type", "survey");
+
+    lookup = courseName ? lookup.eq("course_name", courseName) : lookup.is("course_name", null);
+
+    const { data: existing } = await lookup.limit(1);
 
     if (existing && existing.length > 0) {
       const { error } = await supabase
@@ -577,6 +580,7 @@ const Reports = () => {
       .insert({ ...body, status: "pending" as const, priority: "medium" });
     return { error, created: true };
   };
+
 
   const handleSaveRecommendations = async () => {
     setIsSavingReportContent(true);
