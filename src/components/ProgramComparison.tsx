@@ -874,11 +874,22 @@ const ProgramComparison = () => {
                         </TableCell>
                       )}
                     </TableRow>
-                  </TableBody>
+              </TableBody>
                 </Table>
               </div>
             </CardContent>
           </Card>
+
+          <ComparisonAIAnalysis
+            mode={mode}
+            context={{
+              academic_year: selectedAcademicYear,
+              semester: selectedSemester,
+              program: mode === 'surveys' ? programs.find(p => p.id === singleProgram)?.name : undefined,
+            }}
+            overall={comparisonResult.overall}
+            rows={comparisonResult.surveyTypes}
+          />
         </>
       )}
     </div>
