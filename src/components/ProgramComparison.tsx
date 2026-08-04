@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { fetchAllCompleteSurveyResponses, fetchAllSurveyQuestions, mapWithConcurrency } from "@/lib/paginatedSurveyData";
+import ComparisonAIAnalysis from "@/components/comparison/ComparisonAIAnalysis";
 
 const PROGRAM_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'];
 
