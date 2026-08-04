@@ -163,6 +163,7 @@ const Recommendations = () => {
         key: `rep-${r.report_id}-${r.course_name || "all"}`,
         kind: "report" as const,
         id: null,
+        report_id: r.report_id,
         title: r.survey_title,
         description: r.recommendations_text,
         course_name: r.course_name,
