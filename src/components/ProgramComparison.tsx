@@ -514,6 +514,26 @@ const ProgramComparison = () => {
           <CardDescription>{t('progComp.desc')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Mode */}
+          <div className="space-y-2 max-w-md">
+            <label className="text-sm font-medium">{t('progComp.mode')}</label>
+            <Select
+              value={mode}
+              onValueChange={(v) => {
+                setMode(v as 'programs' | 'surveys');
+                setComparisonResult(null);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="programs">{t('progComp.modePrograms')}</SelectItem>
+                <SelectItem value="surveys">{t('progComp.modeSurveys')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Academic Year */}
             <div className="space-y-2">
@@ -545,39 +565,92 @@ const ProgramComparison = () => {
               </Select>
             </div>
 
-            {/* Programs */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">{t('progComp.selectPrograms')}</label>
-              <Select
-                onValueChange={(value) => {
-                  if (!selectedPrograms.includes(value)) {
-                    setSelectedPrograms([...selectedPrograms, value]);
-                  }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t('progComp.addProgram')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {programs
-                    .filter(p => !selectedPrograms.includes(p.id))
-                    .map((p) => (
+            {/* Programs (multi) */}
+            {mode === 'programs' ? (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">{t('progComp.selectPrograms')}</label>
+                <Select
+                  onValueChange={(value) => {
+                    if (!selectedPrograms.includes(value)) {
+                      setSelectedPrograms([...selectedPrograms, value]);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('progComp.addProgram')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {programs
+                      .filter(p => !selectedPrograms.includes(p.id))
+                      .map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">{t('progComp.selectProgram')} <span className="text-destructive">*</span></label>
+                <Select
+                  value={singleProgram}
+                  onValueChange={(v) => { setSingleProgram(v); setComparisonResult(null); }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('progComp.selectOneProgram')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {programs.map((p) => (
                       <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                     ))}
-                </SelectContent>
-              </Select>
-            </div>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
-          {/* Selected Programs Badges */}
+          {/* Surveys picker */}
+          {mode === 'surveys' && singleProgram && selectedAcademicYear && (
+            <div className="space-y-2 max-w-xl">
+              <label className="text-sm font-medium">{t('progComp.selectSurveys')}</label>
+              {availableSurveys.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t('progComp.noSurveys')}</p>
+              ) : (
+                <Select
+                  onValueChange={(value) => {
+                    if (!selectedSurveyIds.includes(value)) {
+                      setSelectedSurveyIds([...selectedSurveyIds, value]);
+                      setComparisonResult(null);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('progComp.addSurvey')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSurveys
+                      .filter(s => !selectedSurveyIds.includes(s.id))
+                      .map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          )}
+
+          {/* Selected badges */}
           <div className="flex flex-wrap gap-2">
-            {selectedProgramsWithColors.map((p) => (
+            {entities.map((p) => (
               <Badge
                 key={p.id}
                 className="cursor-pointer text-white px-3 py-1 text-sm"
                 style={{ backgroundColor: p.color }}
                 onClick={() => {
-                  setSelectedPrograms(selectedPrograms.filter(id => id !== p.id));
+                  if (mode === 'programs') {
+                    setSelectedPrograms(selectedPrograms.filter(id => id !== p.id));
+                  } else {
+                    setSelectedSurveyIds(selectedSurveyIds.filter(id => id !== p.id));
+                  }
                   setComparisonResult(null);
                 }}
               >
@@ -589,11 +662,12 @@ const ProgramComparison = () => {
 
           <Button
             onClick={loadComparisonData}
-            disabled={loading || selectedPrograms.length < 2 || !selectedAcademicYear}
+            disabled={loading || entities.length < 2 || !selectedAcademicYear || (mode === 'surveys' && !singleProgram)}
             className="w-full md:w-auto"
           >
             {loading ? <><Loader2 className="h-4 w-4 animate-spin ml-2" /> {t('progComp.analyzing')}</> : t('progComp.start')}
           </Button>
+
         </CardContent>
       </Card>
 
