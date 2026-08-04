@@ -542,6 +542,42 @@ const Reports = () => {
     };
   };
 
+  // Keeps a per-course row in the central recommendations table so course
+  // recommendations show up in Recommendations management.
+  const syncRecommendationRow = async (courseName: string) => {
+    const recTitle = `${survey?.title || ''}${courseName ? ` - ${courseName}` : ''}`;
+    const body = {
+      title: recTitle,
+      description: editedRecommendations,
+      program_id: survey?.program_id || null,
+      source_type: "survey" as const,
+      source_id: report.id,
+      academic_year: academicYear || null,
+      semester: semester || null,
+    };
+
+    const { data: existing } = await supabase
+      .from("recommendations")
+      .select("id")
+      .eq("source_id", report.id)
+      .eq("source_type", "survey")
+      .eq("title", recTitle)
+      .limit(1);
+
+    if (existing && existing.length > 0) {
+      const { error } = await supabase
+        .from("recommendations")
+        .update(body)
+        .eq("id", existing[0].id);
+      return { error, created: false };
+    }
+
+    const { error } = await supabase
+      .from("recommendations")
+      .insert({ ...body, status: "pending" as const, priority: "medium" });
+    return { error, created: true };
+  };
+
   const handleSaveRecommendations = async () => {
     setIsSavingReportContent(true);
     const courseName = getSelectedCourseName();
@@ -561,12 +597,23 @@ const Reports = () => {
       return;
     }
 
+    if (courseName && editedRecommendations.trim()) {
+      const { error: recError } = await syncRecommendationRow(courseName);
+      if (recError) {
+        setIsSavingReportContent(false);
+        toast({ title: t("reports.toastError"), description: t("reports.toastSaveRecsErr"), variant: "destructive" });
+        return;
+      }
+    }
+
     toast({ title: t("reports.toastSaveOk"), description: courseName ? t("reports.toastSaveRecsCourse").replace("{0}", courseName) : t("reports.toastSaveRecs") });
     setReportTitle(titleForSave);
     setCourseContent(nextCourseContent as Record<string, { summary: string; recommendations: string }>);
     await loadReport();
     setIsSavingReportContent(false);
   };
+
+
 
   const handleSaveAndTransferRecommendations = async () => {
     if (!editedRecommendations.trim()) {
