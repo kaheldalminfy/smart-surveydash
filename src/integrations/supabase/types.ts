@@ -821,6 +821,7 @@ export type Database = {
           assigned_to: string | null
           completed_at: string | null
           completion_notes: string | null
+          course_name: string | null
           created_at: string | null
           description: string
           due_date: string | null
@@ -839,6 +840,7 @@ export type Database = {
           assigned_to?: string | null
           completed_at?: string | null
           completion_notes?: string | null
+          course_name?: string | null
           created_at?: string | null
           description: string
           due_date?: string | null
@@ -857,6 +859,7 @@ export type Database = {
           assigned_to?: string | null
           completed_at?: string | null
           completion_notes?: string | null
+          course_name?: string | null
           created_at?: string | null
           description?: string
           due_date?: string | null
