@@ -74,7 +74,7 @@ export const getReportCopy = (reportType: SurveyReportType, language: "ar" | "en
     course_evaluation: {
       reportTitle: "تقرير نتائج الاستبيان",
       reportSubtitle: "تقييم مقرر دراسي",
-      targetEntity: "طالب",
+      targetEntity: "استجابة",
       totalResponses: "إجمالي الاستجابات",
       targetCount: "العدد المستهدف",
       targetHint: "أدخل عدد الطلبة لحساب نسبة الاستجابة بدقة",
@@ -85,7 +85,7 @@ export const getReportCopy = (reportType: SurveyReportType, language: "ar" | "en
     workshop: {
       reportTitle: "تقرير تقييم ورشة عمل",
       reportSubtitle: "ورشة عمل / تدريب",
-      targetEntity: "مشارك",
+      targetEntity: "استجابة",
       totalResponses: "إجمالي المشاركات",
       targetCount: "عدد المشاركين المستهدف",
       targetHint: "أدخل عدد المشاركين لحساب نسبة المشاركة بدقة",
@@ -96,7 +96,7 @@ export const getReportCopy = (reportType: SurveyReportType, language: "ar" | "en
     program: {
       reportTitle: "تقرير تقييم برنامج",
       reportSubtitle: "تقييم برنامج أكاديمي",
-      targetEntity: "مشارك",
+      targetEntity: "استجابة",
       totalResponses: "إجمالي الاستجابات",
       targetCount: "العدد المستهدف",
       targetHint: "أدخل العدد المستهدف لحساب نسبة الاستجابة",
@@ -107,7 +107,7 @@ export const getReportCopy = (reportType: SurveyReportType, language: "ar" | "en
     general: {
       reportTitle: "تقرير استبيان عام",
       reportSubtitle: "استبيان عام",
-      targetEntity: "مشارك",
+      targetEntity: "استجابة",
       totalResponses: "إجمالي الاستجابات",
       targetCount: "العدد المستهدف",
       targetHint: "أدخل العدد المستهدف لحساب نسبة الاستجابة",
@@ -121,7 +121,7 @@ export const getReportCopy = (reportType: SurveyReportType, language: "ar" | "en
     course_evaluation: {
       reportTitle: "Survey Results Report",
       reportSubtitle: "Course Evaluation",
-      targetEntity: "student",
+      targetEntity: "response",
       totalResponses: "Total Responses",
       targetCount: "Target Enrollment",
       targetHint: "Enter enrolled student count for an accurate response rate",
@@ -132,7 +132,7 @@ export const getReportCopy = (reportType: SurveyReportType, language: "ar" | "en
     workshop: {
       reportTitle: "Workshop Evaluation Report",
       reportSubtitle: "Workshop / Training",
-      targetEntity: "participant",
+      targetEntity: "response",
       totalResponses: "Total Participant Responses",
       targetCount: "Target Participants",
       targetHint: "Enter participant count for an accurate participation rate",
@@ -143,7 +143,7 @@ export const getReportCopy = (reportType: SurveyReportType, language: "ar" | "en
     program: {
       reportTitle: "Program Evaluation Report",
       reportSubtitle: "Academic Program Evaluation",
-      targetEntity: "participant",
+      targetEntity: "response",
       totalResponses: "Total Responses",
       targetCount: "Target Count",
       targetHint: "Enter target count for response rate calculation",
@@ -154,7 +154,7 @@ export const getReportCopy = (reportType: SurveyReportType, language: "ar" | "en
     general: {
       reportTitle: "General Survey Report",
       reportSubtitle: "General Survey",
-      targetEntity: "participant",
+      targetEntity: "response",
       totalResponses: "Total Responses",
       targetCount: "Target Count",
       targetHint: "Enter target count for response rate calculation",
