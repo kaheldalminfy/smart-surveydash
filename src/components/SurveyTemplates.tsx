@@ -1,17 +1,101 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Star, Users, BarChart3, Plus, MonitorSmartphone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import type { Tables } from "@/integrations/supabase/types";
 import { useLanguage } from "@/contexts/LanguageContext";
+
+type ReportType = "course_evaluation" | "workshop" | "program" | "general";
 
 interface Template {
   id: string; name: string; name_en: string; description: string;
   category: string; questions: any[]; is_active: boolean;
-  reportType?: "course_evaluation" | "workshop" | "program" | "general";
+  reportType?: ReportType;
 }
+
+type SurveyTemplateRow = Tables<"survey_templates">;
+
+const reportTypes: ReportType[] = ["course_evaluation", "workshop", "program", "general"];
+const knownCategories = ["course_evaluation", "satisfaction", "quality", "digital_platforms", "saved"];
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const getString = (value: unknown) => typeof value === "string" ? value.trim() : "";
+const normalizeName = (value: string) => value.trim().toLocaleLowerCase().replace(/\s+/g, " ");
+
+const getReportType = (value: unknown): ReportType | undefined =>
+  typeof value === "string" && reportTypes.includes(value as ReportType)
+    ? value as ReportType
+    : undefined;
+
+const inferStoredCategory = (
+  templateData: Record<string, unknown>,
+  name: string,
+  reportType?: ReportType,
+) => {
+  const storedCategory = getString(templateData.category);
+  if (knownCategories.includes(storedCategory)) return storedCategory;
+
+  const searchableText = normalizeName([
+    name,
+    getString(templateData.title),
+    getString(templateData.name_en),
+    getString(templateData.title_en),
+  ].join(" "));
+
+  if (
+    searchableText.includes("منص") ||
+    searchableText.includes("platform") ||
+    searchableText.includes("moodle") ||
+    searchableText.includes("sis") ||
+    searchableText.includes("iap.limu") ||
+    searchableText.includes("qr")
+  ) return "digital_platforms";
+
+  if (reportType === "course_evaluation") return "course_evaluation";
+  if (reportType === "program") return "quality";
+  return "saved";
+};
+
+const mapStoredTemplate = (row: SurveyTemplateRow): Template => {
+  const templateData = isRecord(row.template_data) ? row.template_data : {};
+  const reportType = getReportType(templateData.reportType ?? templateData.report_type);
+  const questions = Array.isArray(templateData.questions) ? templateData.questions : [];
+
+  return {
+    id: row.id,
+    name: row.name,
+    name_en: getString(templateData.name_en) || getString(templateData.title_en) || row.name,
+    description: row.description || getString(templateData.description),
+    category: inferStoredCategory(templateData, row.name, reportType),
+    questions,
+    is_active: true,
+    reportType,
+  };
+};
+
+const mergeTemplates = (predefinedTemplates: Template[], storedTemplates: Template[]) => {
+  const mergedTemplates = [...predefinedTemplates];
+
+  storedTemplates.forEach((storedTemplate) => {
+    const matchingIndex = mergedTemplates.findIndex((template) =>
+      template.id === storedTemplate.id ||
+      normalizeName(template.name) === normalizeName(storedTemplate.name) ||
+      normalizeName(template.name_en) === normalizeName(storedTemplate.name_en)
+    );
+
+    if (matchingIndex >= 0) {
+      mergedTemplates[matchingIndex] = storedTemplate;
+    } else {
+      mergedTemplates.push(storedTemplate);
+    }
+  });
+
+  return mergedTemplates;
+};
 
 interface SurveyTemplatesProps {
   onSelectTemplate: (template: Template) => void;
@@ -19,15 +103,13 @@ interface SurveyTemplatesProps {
 }
 
 const SurveyTemplates = ({ onSelectTemplate, onCreateCustom }: SurveyTemplatesProps) => {
-  const { toast } = useToast();
   const { t, language } = useLanguage();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
-  useEffect(() => { loadTemplates(); }, []);
-
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
+    setLoading(true);
     const predefinedTemplates: Template[] = [
       {
         id: "course-eval-1", name: "تقييم المقرر الدراسي", name_en: "Course Evaluation",
@@ -141,9 +223,27 @@ const SurveyTemplates = ({ onSelectTemplate, onCreateCustom }: SurveyTemplatesPr
         ]
       }
     ];
-    setTemplates(predefinedTemplates);
-    setLoading(false);
-  };
+    try {
+      const { data, error } = await supabase
+        .from("survey_templates")
+        .select("id, name, description, template_data, is_public, created_by, created_at, updated_at")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      const storedTemplates = (data || []).map(mapStoredTemplate);
+      setTemplates(mergeTemplates(predefinedTemplates, storedTemplates));
+    } catch (error) {
+      console.error("Error loading survey templates:", error);
+      setTemplates(predefinedTemplates);
+    } finally {
+      setLoading(false);
+    }
+  }, [language]);
+
+  useEffect(() => {
+    void loadTemplates();
+  }, [loadTemplates]);
 
   const categories = [
     { value: "all", label: t('templates.allTemplates'), icon: FileText },
@@ -151,6 +251,7 @@ const SurveyTemplates = ({ onSelectTemplate, onCreateCustom }: SurveyTemplatesPr
     { value: "satisfaction", label: t('templates.satisfaction'), icon: Star },
     { value: "quality", label: t('templates.quality'), icon: Users },
     { value: "digital_platforms", label: t('templates.digitalPlatforms'), icon: MonitorSmartphone },
+    { value: "saved", label: t('templates.saved'), icon: FileText },
   ];
 
   const getCategoryIcon = (category: string) => categories.find(c => c.value === category)?.icon || FileText;
