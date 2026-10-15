@@ -665,7 +665,7 @@ const Surveys = () => {
                     <CardContent>
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">
-                          {template.template_data?.questions?.length || 0} سؤال
+                          {template.template_data?.questions?.filter((question: any) => question.type !== "section").length || 0} سؤال
                         </span>
                         <div className="flex gap-2">
                           <Link to={`/surveys/new?template=${template.id}`}>

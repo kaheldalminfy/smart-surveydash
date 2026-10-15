@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Star, Users, BarChart3, Plus } from "lucide-react";
+import { FileText, Star, Users, BarChart3, Plus, MonitorSmartphone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -10,6 +10,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 interface Template {
   id: string; name: string; name_en: string; description: string;
   category: string; questions: any[]; is_active: boolean;
+  reportType?: "course_evaluation" | "workshop" | "program" | "general";
 }
 
 interface SurveyTemplatesProps {
@@ -52,6 +53,56 @@ const SurveyTemplates = ({ onSelectTemplate, onCreateCustom }: SurveyTemplatesPr
           { text: "هل تنصح الآخرين بالالتحاق بهذا البرنامج؟", type: "likert", order_index: 3, is_required: true },
           { text: "ما هي أبرز نقاط القوة في البرنامج؟", type: "text", order_index: 4, is_required: false },
           { text: "ما هي المجالات التي تحتاج للتحسين؟", type: "text", order_index: 5, is_required: false }
+        ]
+      },
+      {
+        id: "electronic-platforms-1",
+        name: "تقييم تجربة الطلبة مع المنصات الإلكترونية",
+        name_en: "Student Electronic Platforms Evaluation",
+        description: language === 'ar'
+          ? "تقييم سهولة الاستخدام والأداء والرضا عن المنصات الإلكترونية للطلبة"
+          : "Evaluate usability, performance, and student satisfaction with electronic platforms",
+        category: "digital_platforms",
+        is_active: true,
+        reportType: "general",
+        questions: [
+          { text: "القسم الأول: تقييم منصة Moodle", type: "section", order_index: 0, is_required: false },
+          { text: "ما مدى استخدامك لمنصة Moodle؟", type: "mcq", order_index: 1, is_required: true, options: { choices: ["يوميًا", "عدة مرات أسبوعيًا", "أسبوعيًا", "نادرًا", "لم أستخدمها"] } },
+          { text: "يسهل تسجيل الدخول إلى منصة Moodle.", type: "likert", order_index: 2, is_required: false },
+          { text: "واجهة منصة Moodle واضحة وسهلة التصفح.", type: "likert", order_index: 3, is_required: false },
+          { text: "تعمل منصة Moodle بسرعة واستقرار دون أخطاء متكررة.", type: "likert", order_index: 4, is_required: false },
+          { text: "يسهل الوصول إلى المحتوى التعليمي والواجبات والاختبارات عبر منصة Moodle.", type: "likert", order_index: 5, is_required: false },
+          { text: "أنا راضٍ بشكل عام عن تجربتي مع منصة Moodle.", type: "likert", order_index: 6, is_required: false },
+
+          { text: "القسم الثاني: تقييم منصة SIS", type: "section", order_index: 7, is_required: false },
+          { text: "ما مدى استخدامك لمنصة SIS؟", type: "mcq", order_index: 8, is_required: true, options: { choices: ["يوميًا", "عدة مرات أسبوعيًا", "أسبوعيًا", "نادرًا", "لم أستخدمها"] } },
+          { text: "يسهل تسجيل الدخول إلى منصة SIS.", type: "likert", order_index: 9, is_required: false },
+          { text: "واجهة منصة SIS واضحة وسهلة التصفح.", type: "likert", order_index: 10, is_required: false },
+          { text: "تعمل منصة SIS بسرعة واستقرار دون أخطاء متكررة.", type: "likert", order_index: 11, is_required: false },
+          { text: "الخدمات والمعلومات التي تقدمها منصة SIS واضحة وتلبي احتياجاتي.", type: "likert", order_index: 12, is_required: false },
+          { text: "أنا راضٍ بشكل عام عن تجربتي مع منصة SIS.", type: "likert", order_index: 13, is_required: false },
+
+          { text: "القسم الثالث: تقييم منصة iap.limu", type: "section", order_index: 14, is_required: false },
+          { text: "ما مدى استخدامك لمنصة iap.limu؟", type: "mcq", order_index: 15, is_required: true, options: { choices: ["يوميًا", "عدة مرات أسبوعيًا", "أسبوعيًا", "نادرًا", "لم أستخدمها"] } },
+          { text: "يسهل تسجيل الدخول إلى منصة iap.limu.", type: "likert", order_index: 16, is_required: false },
+          { text: "واجهة منصة iap.limu واضحة وسهلة التصفح.", type: "likert", order_index: 17, is_required: false },
+          { text: "تعمل منصة iap.limu بسرعة واستقرار دون أخطاء متكررة.", type: "likert", order_index: 18, is_required: false },
+          { text: "إجراءات تسجيل الطالب وإدخال البيانات ومتابعة طلب التسجيل عبر منصة iap.limu واضحة وسهلة.", type: "likert", order_index: 19, is_required: false },
+          { text: "أنا راضٍ بشكل عام عن تجربتي مع منصة iap.limu.", type: "likert", order_index: 20, is_required: false },
+
+          { text: "القسم الرابع: تقييم منصة تسجيل حضور الطالب بالـ QR", type: "section", order_index: 21, is_required: false },
+          { text: "ما مدى استخدامك لمنصة تسجيل حضور الطالب بالـ QR؟", type: "mcq", order_index: 22, is_required: true, options: { choices: ["يوميًا", "عدة مرات أسبوعيًا", "أسبوعيًا", "نادرًا", "لم أستخدمها"] } },
+          { text: "يسهل الوصول إلى منصة تسجيل حضور الطالب بالـ QR واستخدامها.", type: "likert", order_index: 23, is_required: false },
+          { text: "واجهة منصة تسجيل حضور الطالب بالـ QR واضحة وسهلة التصفح.", type: "likert", order_index: 24, is_required: false },
+          { text: "تعمل منصة تسجيل حضور الطالب بالـ QR بسرعة واستقرار دون أخطاء متكررة.", type: "likert", order_index: 25, is_required: false },
+          { text: "تسجل المنصة حضور الطالب باستخدام رمز QR بدقة، وتعرض حالة الحضور بوضوح.", type: "likert", order_index: 26, is_required: false },
+          { text: "أنا راضٍ بشكل عام عن تجربتي مع منصة تسجيل حضور الطالب بالـ QR.", type: "likert", order_index: 27, is_required: false },
+
+          { text: "القسم الخامس: التقييم العام والمقترحات", type: "section", order_index: 28, is_required: false },
+          { text: "ما المنصة التي تستخدمها أكثر؟", type: "mcq", order_index: 29, is_required: true, options: { choices: ["Moodle", "SIS", "iap.limu", "منصة تسجيل حضور الطالب بالـ QR"] } },
+          { text: "ما المنصة التي تحتاج إلى تحسين عاجل؟", type: "mcq", order_index: 30, is_required: true, options: { choices: ["Moodle", "SIS", "iap.limu", "منصة تسجيل حضور الطالب بالـ QR"] } },
+          { text: "ما المشكلة الأكثر تكرارًا عند استخدام المنصات الإلكترونية؟", type: "mcq", order_index: 31, is_required: true, options: { choices: ["صعوبة تسجيل الدخول", "بطء المنصة", "أخطاء أو توقف متكرر", "صعوبة التصفح", "بيانات ناقصة أو غير دقيقة", "ضعف العمل على الهاتف", "مشكلة أخرى"] } },
+          { text: "اذكر اسم المنصة ومقترحك لتحسينها.", type: "text", order_index: 32, is_required: false }
         ]
       },
       {
@@ -99,6 +150,7 @@ const SurveyTemplates = ({ onSelectTemplate, onCreateCustom }: SurveyTemplatesPr
     { value: "course_evaluation", label: t('templates.courseEval'), icon: BarChart3 },
     { value: "satisfaction", label: t('templates.satisfaction'), icon: Star },
     { value: "quality", label: t('templates.quality'), icon: Users },
+    { value: "digital_platforms", label: t('templates.digitalPlatforms'), icon: MonitorSmartphone },
   ];
 
   const getCategoryIcon = (category: string) => categories.find(c => c.value === category)?.icon || FileText;
@@ -147,7 +199,7 @@ const SurveyTemplates = ({ onSelectTemplate, onCreateCustom }: SurveyTemplatesPr
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <span>{template.questions?.length || 0} {t('designer.questions')}</span>
+                  <span>{template.questions?.filter(question => question.type !== "section").length || 0} {t('designer.questions')}</span>
                   <Button size="sm" variant="ghost">{t('designer.useTemplate')}</Button>
                 </div>
               </CardContent>
