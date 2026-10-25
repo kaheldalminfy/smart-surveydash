@@ -22,6 +22,7 @@ const ComplaintSubmitted = lazy(() => import("./pages/ComplaintSubmitted"));
 const Recommendations = lazy(() => import("./pages/Recommendations"));
 const Archives = lazy(() => import("./pages/Archives"));
 const ProgramComparison = lazy(() => import("./pages/ProgramComparison"));
+const AnnualProgramReport = lazy(() => import("./pages/AnnualProgramReport"));
 const Users = lazy(() => import("./pages/Users"));
 const SystemSettings = lazy(() => import("./pages/SystemSettings"));
 const AcademicCalendar = lazy(() => import("./pages/AcademicCalendar"));
@@ -65,6 +66,7 @@ const App = () => (
             <Route path="/recommendations" element={<ProtectedRoute><Recommendations /></ProtectedRoute>} />
             <Route path="/archives" element={<ProtectedRoute allowedRoles={["admin", "dean", "coordinator", "program_manager"]}><Archives /></ProtectedRoute>} />
             <Route path="/comparison" element={<ProtectedRoute allowedRoles={["admin", "dean", "coordinator", "program_manager"]}><ProgramComparison /></ProtectedRoute>} />
+            <Route path="/annual-program-report" element={<ProtectedRoute allowedRoles={["admin", "dean", "coordinator", "program_manager"]}><AnnualProgramReport /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute allowedRoles={["admin"]}><Users /></ProtectedRoute>} />
             <Route path="/system-settings" element={<ProtectedRoute allowedRoles={["admin"]}><SystemSettings /></ProtectedRoute>} />
             <Route path="/academic-calendar" element={<ProtectedRoute allowedRoles={["admin", "dean", "coordinator", "program_manager"]}><AcademicCalendar /></ProtectedRoute>} />
