@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { Loader2, Printer, FileBarChart } from "lucide-react";
+import { Loader2, Printer, FileBarChart, Sparkles } from "lucide-react";
 import DashboardButton from "@/components/DashboardButton";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +36,59 @@ const AnnualProgramReport = () => {
   const [complaints, setComplaints] = useState<any[]>([]);
   const [analysis, setAnalysis] = useState("");
   const [plan, setPlan] = useState("");
+  const [aiRecommendations, setAiRecommendations] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+
+  const generateAI = async (results: SurveyStat[], recommendations: any[], complaintRows: any[]) => {
+    setAiLoading(true); setAiError("");
+    try {
+      const bySemester = (key: SemesterKey) => {
+        const rows = results.filter(s => s.semester === key);
+        const responses = rows.reduce((sum, s) => sum + s.responses, 0);
+        const target = rows.reduce((sum, s) => sum + (s.target ?? 0), 0);
+        return { count: rows.length, responses, rate: target ? Math.min(100, responses / target * 100) : null, mean: meanOf(rows.flatMap(s => s.questions.flatMap(q => q.values))) };
+      };
+      const { data, error } = await supabase.functions.invoke("analyze-annual-report", { body: {
+        programId, year, language,
+        context: {
+          fall: bySemester("fall"), spring: bySemester("spring"),
+          annualMean: meanOf(results.flatMap(s => s.questions.flatMap(q => q.values))),
+          surveys: results.map(({ title, semester, responses, mean }) => ({ title, semester, responses, mean })),
+          questions: aggregateQuestions(results),
+          recommendations: {
+            completed: recommendations.filter(r => r.status === "completed").length,
+            in_progress: recommendations.filter(r => r.status === "in_progress").length,
+            pending: recommendations.filter(r => !r.status || r.status === "pending" || r.status === "postponed").length,
+          },
+          complaints: {
+            total: complaintRows.length,
+            resolved: complaintRows.filter(c => c.status === "resolved" || c.status === "closed").length,
+            in_progress: complaintRows.filter(c => c.status === "in_progress").length,
+            pending: complaintRows.filter(c => c.status === "pending").length,
+          },
+        },
+      } });
+      if (error) {
+        let message = error.message;
+        if (error.context instanceof Response) {
+          const details = await error.context.json().catch(() => null);
+          message = details?.error || details?.message || message;
+        }
+        throw new Error(message);
+      }
+      if (!data?.analysis || !Array.isArray(data.recommendations) || !Array.isArray(data.improvementPlan)) throw new Error(ar ? "لم تصل نتائج صالحة من الذكاء الاصطناعي" : "Invalid AI report response");
+      setAnalysis(data.analysis);
+      setAiRecommendations(data.recommendations.map((r: string, i: number) => `${i + 1}. ${r}`).join("\n\n"));
+      setPlan(data.improvementPlan.map((p: { action: string; evidence: string; owner: string; timeframe: string; indicator: string; target: string }, i: number) =>
+        `${i + 1}. ${p.action}\n${ar ? "الدليل" : "Evidence"}: ${p.evidence}\n${ar ? "المسؤول المقترح" : "Proposed owner"}: ${p.owner}\n${ar ? "الموعد" : "Timeframe"}: ${p.timeframe}\n${ar ? "مؤشر القياس" : "Indicator"}: ${p.indicator}\n${ar ? "الهدف المقترح" : "Proposed target"}: ${p.target}`
+      ).join("\n\n"));
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      setAiError(message);
+      toast({ title: ar ? "تعذر توليد محتوى التقرير" : "Report AI generation failed", description: message, variant: "destructive" });
+    } finally { setAiLoading(false); }
+  };
 
   useEffect(() => {
     (async () => {
@@ -54,14 +107,14 @@ const AnnualProgramReport = () => {
       if (list.length === 1) setProgramId(list[0].id);
     })();
     supabase.from("surveys").select("academic_year").not("academic_year", "is", null).then(({ data }) => {
-      const ys = Array.from(new Set((data ?? []).map((d) => d.academic_year!.trim()))).sort().reverse();
+      const ys = Array.from(new Set((data ?? []).flatMap((d) => d.academic_year?.trim() ? [d.academic_year.trim()] : []))).sort().reverse();
       setYears(ys);
     });
   }, []);
 
   const generate = async () => {
     if (!programId || !year) return;
-    setLoading(true); setStats(null);
+    setLoading(true); setStats(null); setAnalysis(""); setPlan(""); setAiRecommendations(""); setAiError("");
     try {
       const { data: surveys, error } = await supabase.from("surveys")
         .select("id,title,semester,target_enrollment").eq("program_id", programId).eq("academic_year", year);
@@ -69,6 +122,8 @@ const AnnualProgramReport = () => {
       const relevant = (surveys ?? []).filter((s) => normalizeSemester(s.semester));
       const result: SurveyStat[] = [];
       for (const s of relevant) {
+        const semester = normalizeSemester(s.semester);
+        if (!semester) continue;
         const [qs, rs] = await Promise.all([fetchAllSurveyQuestions(s.id), fetchAllCompleteSurveyResponses(s.id)]);
         const scored = qs.filter((q) => q.type === "likert" || q.type === "rating");
         const byQ = new Map<string, number[]>();
@@ -79,15 +134,18 @@ const AnnualProgramReport = () => {
         }));
         const questions = scored.map((q) => ({ text: q.text.trim(), values: byQ.get(q.id) ?? [] }));
         result.push({
-          id: s.id, title: s.title, semester: normalizeSemester(s.semester)!, responses: rs.length,
+          id: s.id, title: s.title, semester, responses: rs.length,
           target: s.target_enrollment, mean: meanOf(questions.flatMap((q) => q.values)), questions,
         });
       }
-      const [{ data: r }, { data: c }] = await Promise.all([
+      const [{ data: r, error: recError }, { data: c, error: complaintError }] = await Promise.all([
         supabase.from("recommendations").select("title,description,status,semester,course_name").eq("program_id", programId).eq("academic_year", year),
         supabase.from("complaints").select("status,semester").eq("program_id", programId).eq("academic_year", year),
       ]);
+      if (recError) throw recError;
+      if (complaintError) throw complaintError;
       setRecs(r ?? []); setComplaints(c ?? []); setStats(result);
+      if (result.some(s => s.mean != null)) await generateAI(result, r ?? [], c ?? []);
     } catch (e: any) {
       toast({ title: ar ? "خطأ" : "Error", description: e.message, variant: "destructive" });
     } finally { setLoading(false); }
@@ -122,7 +180,7 @@ const AnnualProgramReport = () => {
   const programName = programs.find((p) => p.id === programId)?.name ?? "";
   const fmt = (n: number | null) => (n == null ? "—" : n.toFixed(2));
   const strengths = summary?.questions.filter((q) => q.mean != null && q.mean >= 4).slice(0, 8) ?? [];
-  const weaknesses = summary?.questions.filter((q) => q.mean != null && q.mean < 3.5).sort((a, b) => a.mean! - b.mean!).slice(0, 8) ?? [];
+  const weaknesses = summary?.questions.filter((q) => q.mean != null && q.mean < 3.5).sort((a, b) => (a.mean ?? 0) - (b.mean ?? 0)).slice(0, 8) ?? [];
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8" dir={ar ? "rtl" : "ltr"}>
@@ -136,14 +194,14 @@ const AnnualProgramReport = () => {
           <CardContent className="pt-6 grid gap-4 md:grid-cols-3 items-end">
             <div>
               <label className="text-sm font-medium">{ar ? "البرنامج" : "Program"}</label>
-              <Select value={programId} onValueChange={setProgramId}>
+              <Select disabled={loading || aiLoading} value={programId} onValueChange={(value) => { setProgramId(value); setStats(null); }}>
                 <SelectTrigger><SelectValue placeholder={ar ? "اختر البرنامج" : "Select program"} /></SelectTrigger>
                 <SelectContent>{programs.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div>
               <label className="text-sm font-medium">{ar ? "السنة الأكاديمية" : "Academic year"}</label>
-              <Select value={year} onValueChange={setYear}>
+              <Select disabled={loading || aiLoading} value={year} onValueChange={(value) => { setYear(value); setStats(null); }}>
                 <SelectTrigger><SelectValue placeholder={ar ? "اختر السنة" : "Select year"} /></SelectTrigger>
                 <SelectContent>{years.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
               </Select>
@@ -152,7 +210,7 @@ const AnnualProgramReport = () => {
               <Button onClick={generate} disabled={!programId || !year || loading} className="flex-1">
                 {loading && <Loader2 className="h-4 w-4 animate-spin mx-1" />}{ar ? "إنشاء التقرير" : "Generate"}
               </Button>
-              {stats && <Button variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 mx-1" />{ar ? "طباعة / PDF" : "Print / PDF"}</Button>}
+              {stats && <Button disabled={aiLoading} variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 mx-1" />{ar ? "طباعة / PDF" : "Print / PDF"}</Button>}
             </div>
           </CardContent>
         </Card>
@@ -245,6 +303,11 @@ const AnnualProgramReport = () => {
                   <Badge variant="outline">{recLabel("pending")}: {recCounts.pending}</Badge>
                   <Badge variant="outline">{ar ? "نسبة الإنجاز" : "Completion"}: {recs.length ? Math.round((recCounts.completed / recs.length) * 100) : 0}%</Badge>
                 </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">{ar ? "التوصيات المقترحة للعام القادم" : "Proposed recommendations for next year"}</label>
+                  <Textarea disabled={aiLoading} rows={8} value={aiRecommendations} onChange={(e) => setAiRecommendations(e.target.value)} className="print:hidden" />
+                  <p className="hidden print:block whitespace-pre-wrap">{aiRecommendations}</p>
+                </div>
                 {recs.length > 0 && (
                   <Table>
                     <TableHeader><TableRow><TableHead>{ar ? "التوصية" : "Recommendation"}</TableHead><TableHead>{ar ? "المقرر" : "Course"}</TableHead><TableHead>{ar ? "الفصل" : "Semester"}</TableHead><TableHead>{ar ? "الحالة" : "Status"}</TableHead></TableRow></TableHeader>
@@ -269,13 +332,22 @@ const AnnualProgramReport = () => {
             <Card>
               <CardHeader><CardTitle>{ar ? "6. التحليل العام وخطة التحسين للعام القادم" : "6. Analysis & next-year improvement plan"}</CardTitle></CardHeader>
               <CardContent className="space-y-4">
+                <div className="print:hidden space-y-2">
+                  <Button variant="outline" disabled={loading || aiLoading || summary.annualMean == null} onClick={() => { if (stats) void generateAI(stats, recs, complaints); }}>
+                    {aiLoading ? <Loader2 className="h-4 w-4 animate-spin mx-1" /> : <Sparkles className="h-4 w-4 mx-1" />}
+                    {aiLoading ? (ar ? "جارٍ توليد التحليل والتوصيات والخطة…" : "Generating analysis, recommendations and plan…") : (ar ? "توليد التحليل والتوصيات والخطة بالذكاء الاصطناعي" : "Generate AI analysis, recommendations and plan")}
+                  </Button>
+                  {aiError && <p role="alert" className="text-sm text-destructive whitespace-pre-wrap">{aiError}</p>}
+                </div>
                 <div>
                   <label className="text-sm font-medium">{ar ? "تحليل المنسق للنتائج" : "Coordinator analysis"}</label>
-                  <Textarea rows={4} value={analysis} onChange={(e) => setAnalysis(e.target.value)} className="print:border-0" />
+                  <Textarea disabled={aiLoading} rows={4} value={analysis} onChange={(e) => setAnalysis(e.target.value)} className="print:hidden" />
+                  <p className="hidden print:block whitespace-pre-wrap">{analysis}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">{ar ? "خطة التحسين (الإجراء، المسؤول، الموعد، مؤشر القياس)" : "Improvement plan (action, owner, date, KPI)"}</label>
-                  <Textarea rows={5} value={plan} onChange={(e) => setPlan(e.target.value)} className="print:border-0" />
+                  <Textarea disabled={aiLoading} rows={12} value={plan} onChange={(e) => setPlan(e.target.value)} className="print:hidden" />
+                  <p className="hidden print:block whitespace-pre-wrap">{plan}</p>
                 </div>
                 <div className="hidden print:grid grid-cols-2 gap-8 pt-10 text-sm">
                   <div>{ar ? "منسق البرنامج: ................" : "Program coordinator: ........"}</div>
