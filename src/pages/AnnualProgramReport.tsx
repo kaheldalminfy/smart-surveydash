@@ -38,7 +38,21 @@ const AnnualProgramReport = () => {
   const [plan, setPlan] = useState("");
 
   useEffect(() => {
-    supabase.from("programs").select("id,name").order("name").then(({ data }) => setPrograms(data ?? []));
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const [{ data: roles }, { data: all }] = await Promise.all([
+        supabase.from("user_roles").select("role,program_id").eq("user_id", user.id),
+        supabase.from("programs").select("id,name").order("name"),
+      ]);
+      const full = (roles ?? []).some((r) => r.role === "admin" || r.role === "dean");
+      const allowed = new Set((roles ?? [])
+        .filter((r) => (r.role === "coordinator" || r.role === "program_manager") && r.program_id)
+        .map((r) => r.program_id));
+      const list = full ? (all ?? []) : (all ?? []).filter((p) => allowed.has(p.id));
+      setPrograms(list);
+      if (list.length === 1) setProgramId(list[0].id);
+    })();
     supabase.from("surveys").select("academic_year").not("academic_year", "is", null).then(({ data }) => {
       const ys = Array.from(new Set((data ?? []).map((d) => d.academic_year!.trim()))).sort().reverse();
       setYears(ys);
