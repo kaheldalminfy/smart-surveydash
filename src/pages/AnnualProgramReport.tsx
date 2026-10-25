@@ -303,6 +303,11 @@ const AnnualProgramReport = () => {
                   <Badge variant="outline">{recLabel("pending")}: {recCounts.pending}</Badge>
                   <Badge variant="outline">{ar ? "نسبة الإنجاز" : "Completion"}: {recs.length ? Math.round((recCounts.completed / recs.length) * 100) : 0}%</Badge>
                 </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">{ar ? "التوصيات المقترحة للعام القادم" : "Proposed recommendations for next year"}</label>
+                  <Textarea disabled={aiLoading} rows={8} value={aiRecommendations} onChange={(e) => setAiRecommendations(e.target.value)} className="print:hidden" />
+                  <p className="hidden print:block whitespace-pre-wrap">{aiRecommendations}</p>
+                </div>
                 {recs.length > 0 && (
                   <Table>
                     <TableHeader><TableRow><TableHead>{ar ? "التوصية" : "Recommendation"}</TableHead><TableHead>{ar ? "المقرر" : "Course"}</TableHead><TableHead>{ar ? "الفصل" : "Semester"}</TableHead><TableHead>{ar ? "الحالة" : "Status"}</TableHead></TableRow></TableHeader>
@@ -338,11 +343,6 @@ const AnnualProgramReport = () => {
                   <label className="text-sm font-medium">{ar ? "تحليل المنسق للنتائج" : "Coordinator analysis"}</label>
                   <Textarea disabled={aiLoading} rows={4} value={analysis} onChange={(e) => setAnalysis(e.target.value)} className="print:hidden" />
                   <p className="hidden print:block whitespace-pre-wrap">{analysis}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">{ar ? "التوصيات المقترحة للعام القادم" : "Proposed recommendations for next year"}</label>
-                  <Textarea disabled={aiLoading} rows={6} value={aiRecommendations} onChange={(e) => setAiRecommendations(e.target.value)} className="print:hidden" />
-                  <p className="hidden print:block whitespace-pre-wrap">{aiRecommendations}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">{ar ? "خطة التحسين (الإجراء، المسؤول، الموعد، مؤشر القياس)" : "Improvement plan (action, owner, date, KPI)"}</label>
