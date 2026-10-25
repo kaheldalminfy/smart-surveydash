@@ -335,6 +335,12 @@ const Dashboard = () => {
                       {t('nav.comparison')}
                     </Button>
                   </Link>
+                  <Link to="/annual-program-report">
+                    <Button variant="outline" className="w-full justify-start">
+                      <FileText className="h-4 w-4 ml-2" />
+                      {language === 'ar' ? 'التقرير السنوي للبرنامج' : 'Annual Program Report'}
+                    </Button>
+                  </Link>
                   <Link to="/recommendations">
                     <Button variant="outline" className="w-full justify-start">
                       <CheckCircle2 className="h-4 w-4 ml-2" />
