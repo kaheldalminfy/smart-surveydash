@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1793285086563,
+      "tag": "0000_restore_manual_survey_status_gate",
+      "breakpoints": true
+    }
+  ]
+}
