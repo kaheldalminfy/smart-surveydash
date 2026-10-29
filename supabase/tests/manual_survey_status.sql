@@ -1,12 +1,7 @@
 -- Transactional regression: no test responses or changes survive ROLLBACK.
 BEGIN;
-CREATE TEMP TABLE survey_status_fixture AS
-SELECT id FROM public.surveys
-WHERE id = '181d1535-8093-4715-bc02-d9a7423b3d61';
-GRANT SELECT ON survey_status_fixture TO anon;
-
 DO $$ BEGIN
-  IF (SELECT count(*) FROM survey_status_fixture) <> 1 THEN
+  IF (SELECT count(*) FROM public.surveys WHERE id = '181d1535-8093-4715-bc02-d9a7423b3d61') <> 1 THEN
     RAISE EXCEPTION 'Missing regression survey';
   END IF;
 END $$;
@@ -14,12 +9,12 @@ END $$;
 -- Active surveys with expired end dates remain readable and accept submissions.
 UPDATE public.surveys SET status = 'active',
   start_date = NULL, end_date = now() - interval '1 day'
-WHERE id IN (SELECT id FROM survey_status_fixture);
+WHERE id = '181d1535-8093-4715-bc02-d9a7423b3d61';
 SET LOCAL ROLE anon;
 DO $$
 DECLARE sid uuid; payload jsonb; rid uuid;
 BEGIN
-  SELECT id INTO sid FROM survey_status_fixture;
+  sid := '181d1535-8093-4715-bc02-d9a7423b3d61';
   IF NOT EXISTS (SELECT 1 FROM public.surveys WHERE id = sid) THEN
     RAISE EXCEPTION 'Active expired survey must remain public';
   END IF;
@@ -40,11 +35,11 @@ RESET ROLE;
 
 -- Active surveys are not hidden by a future start date either.
 UPDATE public.surveys SET start_date = now() + interval '1 day', end_date = NULL
-WHERE id IN (SELECT id FROM survey_status_fixture);
+WHERE id = '181d1535-8093-4715-bc02-d9a7423b3d61';
 SET LOCAL ROLE anon;
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM public.surveys WHERE id IN (SELECT id FROM survey_status_fixture))
-     OR NOT EXISTS (SELECT 1 FROM public.questions WHERE survey_id IN (SELECT id FROM survey_status_fixture)) THEN
+  IF NOT EXISTS (SELECT 1 FROM public.surveys WHERE id = '181d1535-8093-4715-bc02-d9a7423b3d61')
+     OR NOT EXISTS (SELECT 1 FROM public.questions WHERE survey_id = '181d1535-8093-4715-bc02-d9a7423b3d61') THEN
     RAISE EXCEPTION 'Active future survey and questions must remain public';
   END IF;
 END $$;
@@ -54,7 +49,7 @@ RESET ROLE;
 DO $$
 DECLARE sid uuid; state public.survey_status;
 BEGIN
-  SELECT id INTO sid FROM survey_status_fixture;
+  sid := '181d1535-8093-4715-bc02-d9a7423b3d61';
   FOREACH state IN ARRAY ARRAY['closed', 'draft']::public.survey_status[] LOOP
     UPDATE public.surveys SET status = state WHERE id = sid;
     SET LOCAL ROLE anon;
