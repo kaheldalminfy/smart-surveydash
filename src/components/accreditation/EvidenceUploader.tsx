@@ -24,9 +24,13 @@ interface Evidence {
 interface EvidenceUploaderProps {
   responseId?: string;
   indicatorId: string;
+  programId?: string | null;
+  year?: string;
+  readOnly?: boolean;
+  ensureResponse?: () => Promise<string>;
 }
 
-export const EvidenceUploader = ({ responseId, indicatorId }: EvidenceUploaderProps) => {
+export const EvidenceUploader = ({ responseId, indicatorId, readOnly = false, ensureResponse }: EvidenceUploaderProps) => {
   const { toast } = useToast();
   const { language } = useLanguage();
   const [evidence, setEvidence] = useState<Evidence[]>([]);
@@ -66,7 +70,11 @@ export const EvidenceUploader = ({ responseId, indicatorId }: EvidenceUploaderPr
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!responseId) {
+    let rid = responseId;
+    if (!rid && ensureResponse && !readOnly) {
+      try { rid = await ensureResponse(); } catch { rid = undefined; }
+    }
+    if (!rid) {
       toast({
         title: language === 'ar' ? "تنبيه" : "Note",
         description: language === 'ar' 
@@ -83,7 +91,7 @@ export const EvidenceUploader = ({ responseId, indicatorId }: EvidenceUploaderPr
       
       // Upload file to storage
       const fileExt = file.name.split('.').pop();
-      const fileName = `${indicatorId}/${Date.now()}.${fileExt}`;
+      const fileName = `${user?.id}/${indicatorId}/${crypto.randomUUID()}.${fileExt}`;
       
       const { error: uploadError } = await supabase.storage
         .from('accreditation-files')
@@ -98,7 +106,8 @@ export const EvidenceUploader = ({ responseId, indicatorId }: EvidenceUploaderPr
       const { error: insertError } = await supabase
         .from("indicator_evidence")
         .insert({
-          response_id: responseId,
+          response_id: rid,
+          file_size: file.size,
           title: file.name,
           file_url: filePath,
           file_type: file.type,
@@ -189,14 +198,14 @@ export const EvidenceUploader = ({ responseId, indicatorId }: EvidenceUploaderPr
             id="evidence-upload"
             className="hidden"
             onChange={handleUpload}
-            disabled={uploading || !responseId}
+            disabled={uploading || readOnly}
           />
           <label htmlFor="evidence-upload">
             <Button 
               variant="outline" 
               className="w-full" 
               asChild
-              disabled={uploading || !responseId}
+              disabled={uploading || readOnly}
             >
               <span className="cursor-pointer">
                 {uploading ? (

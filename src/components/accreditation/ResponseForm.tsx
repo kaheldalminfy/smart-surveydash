@@ -29,10 +29,12 @@ interface Response {
 interface ResponseFormProps {
   indicator: Indicator;
   response: Response | null;
+  scope: { programId: string | null; year: string };
+  readOnly?: boolean;
   onResponseUpdate: () => void;
 }
 
-export const ResponseForm = ({ indicator, response, onResponseUpdate }: ResponseFormProps) => {
+export const ResponseForm = ({ indicator, response, scope, readOnly = false, onResponseUpdate }: ResponseFormProps) => {
   const { toast } = useToast();
   const { language } = useLanguage();
   const [saving, setSaving] = useState(false);
@@ -67,7 +69,8 @@ export const ResponseForm = ({ indicator, response, onResponseUpdate }: Response
       const payload = {
         indicator_id: indicator.id,
         response_text: formData.response_text || null,
-        academic_year: formData.academic_year || null,
+        program_id: scope.programId,
+        academic_year: scope.year,
         semester: formData.semester || null,
         status,
         submitted_by: user?.id,
@@ -86,7 +89,7 @@ export const ResponseForm = ({ indicator, response, onResponseUpdate }: Response
         // Create new response
         const { error } = await supabase
           .from("indicator_responses")
-          .insert(payload);
+          .upsert(payload, { onConflict: "indicator_id,program_id,academic_year" });
 
         if (error) throw error;
       }
@@ -202,7 +205,7 @@ export const ResponseForm = ({ indicator, response, onResponseUpdate }: Response
           <Button 
             variant="outline"
             onClick={() => handleSave('draft')}
-            disabled={saving || submitting}
+            disabled={readOnly || saving || submitting}
           >
             {saving ? (
               <Loader2 className="h-4 w-4 animate-spin ml-2" />
@@ -213,7 +216,7 @@ export const ResponseForm = ({ indicator, response, onResponseUpdate }: Response
           </Button>
           <Button 
             onClick={() => handleSave('submitted')}
-            disabled={saving || submitting || !formData.response_text}
+            disabled={readOnly || saving || submitting || !formData.response_text}
           >
             {submitting ? (
               <Loader2 className="h-4 w-4 animate-spin ml-2" />
