@@ -17,7 +17,8 @@ import { AIAnalysisPanel } from "@/components/accreditation/AIAnalysisPanel";
 import { EvidenceUploader } from "@/components/accreditation/EvidenceUploader";
 import { ComplianceProgress } from "@/components/accreditation/ComplianceProgress";
 import { ResponseForm } from "@/components/accreditation/ResponseForm";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScopeSelector } from "@/components/accreditation/ScopeSelector";
+import { useAccreditationScope } from "@/lib/accreditationScope";
 
 interface Indicator {
   id: string;
@@ -37,6 +38,7 @@ interface Indicator {
     framework: {
       id: string;
       name: string;
+      type: 'institutional' | 'programmatic';
     };
   };
 }
@@ -49,6 +51,10 @@ interface Response {
   compliance_percentage: number;
   ai_feedback: string | null;
   ai_score: number | null;
+  responsible_person: string | null;
+  due_date: string | null;
+  follow_up_notes: string | null;
+  program_id: string | null;
   strengths: string[];
   gaps: string[];
   improvement_notes: string | null;
@@ -67,12 +73,15 @@ const IndicatorDetails = () => {
   const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const scope = useAccreditationScope(indicator?.standard.framework.type);
+
   useEffect(() => {
-    if (id) {
-      loadIndicator();
-      loadResponse();
-    }
+    if (id) loadIndicator();
   }, [id]);
+
+  useEffect(() => {
+    if (id && indicator && scope.ready) loadResponse();
+  }, [id, indicator?.id, scope.ready, scope.programId, scope.year]);
 
   const loadIndicator = async () => {
     const { data, error } = await supabase
@@ -83,7 +92,7 @@ const IndicatorDetails = () => {
           id,
           code,
           name,
-          framework:accreditation_frameworks(id, name)
+          framework:accreditation_frameworks(id, name, type)
         )
       `)
       .eq("id", id)
@@ -104,21 +113,31 @@ const IndicatorDetails = () => {
   };
 
   const loadResponse = async () => {
-    const { data } = await supabase
-      .from("indicator_responses")
-      .select("*")
-      .eq("indicator_id", id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
+    let q = supabase.from("indicator_responses").select("*").eq("indicator_id", id!).eq("academic_year", scope.year);
+    q = scope.programId ? q.eq("program_id", scope.programId) : q.is("program_id", null);
+    const { data } = await q.maybeSingle();
+    if (!data) { setResponse(null); return; }
 
-    if (data) {
+    {
       setResponse({
         ...data,
         strengths: Array.isArray(data.strengths) ? data.strengths : [],
         gaps: Array.isArray(data.gaps) ? data.gaps : []
       } as Response);
     }
+  };
+
+  /** Returns the assessment id for the current scope, creating a draft when missing. */
+  const ensureResponse = async (): Promise<string> => {
+    if (response?.id) return response.id;
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data, error } = await supabase.from("indicator_responses")
+      .upsert({ indicator_id: id!, program_id: scope.programId, academic_year: scope.year, status: 'draft', submitted_by: user?.id },
+        { onConflict: "indicator_id,program_id,academic_year", ignoreDuplicates: false })
+      .select("id").single();
+    if (error) throw error;
+    await loadResponse();
+    return data.id;
   };
 
   const getImportanceColor = (level: string) => {
@@ -168,7 +187,7 @@ const IndicatorDetails = () => {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => navigate(`/accreditation/framework/${indicator.standard.framework.id}`)}
+                onClick={() => navigate(`/accreditation/framework/${indicator.standard.framework.id}${scope.query}`)}
               >
                 {language === 'ar' ? <ArrowRight className="h-5 w-5" /> : <ArrowLeft className="h-5 w-5" />}
               </Button>
@@ -244,17 +263,34 @@ const IndicatorDetails = () => {
               </CardContent>
             </Card>
 
+            <ScopeSelector
+              frameworkType={indicator.standard.framework.type}
+              programs={scope.programs}
+              programId={scope.programId}
+              year={scope.year}
+              canEdit={scope.canEdit}
+              onChange={scope.update}
+            />
+
             {/* Response Form */}
             <ResponseForm 
+              key={`${scope.programId}-${scope.year}`}
               indicator={indicator}
               response={response}
+              scope={{ programId: scope.programId, year: scope.year }}
+              readOnly={!scope.canEdit}
               onResponseUpdate={loadResponse}
             />
 
             {/* Evidence Uploader */}
             <EvidenceUploader 
+              key={`ev-${scope.programId}-${scope.year}`}
               responseId={response?.id}
               indicatorId={indicator.id}
+              programId={scope.programId}
+              year={scope.year}
+              readOnly={!scope.canEdit}
+              ensureResponse={ensureResponse}
             />
           </div>
 

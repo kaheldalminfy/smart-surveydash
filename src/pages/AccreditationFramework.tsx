@@ -16,7 +16,8 @@ import { LanguageToggle } from "@/components/LanguageToggle";
 import { StandardAccordion } from "@/components/accreditation/StandardAccordion";
 import { AddStandardDialog } from "@/components/accreditation/AddStandardDialog";
 import { ComplianceProgress } from "@/components/accreditation/ComplianceProgress";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ScopeSelector } from "@/components/accreditation/ScopeSelector";
+import { useAccreditationScope } from "@/lib/accreditationScope";
 
 interface Framework {
   id: string;
@@ -65,13 +66,15 @@ const AccreditationFramework = () => {
   const [loading, setLoading] = useState(true);
   const [showAddStandardDialog, setShowAddStandardDialog] = useState(false);
   const [expandedStandards, setExpandedStandards] = useState<string[]>([]);
+  const scope = useAccreditationScope(framework?.type);
 
   useEffect(() => {
-    if (id) {
-      loadFramework();
-      loadStandards();
-    }
+    if (id) loadFramework();
   }, [id]);
+
+  useEffect(() => {
+    if (id && framework && scope.ready) loadStandards();
+  }, [id, framework?.id, scope.ready, scope.programId, scope.year]);
 
   const loadFramework = async () => {
     const { data, error } = await supabase
@@ -104,37 +107,26 @@ const AccreditationFramework = () => {
 
       if (standardsError) throw standardsError;
 
-      // Load indicators for each standard
-      const standardsWithIndicators = await Promise.all(
-        (standardsData || []).map(async (standard) => {
-          const { data: indicators } = await supabase
-            .from("accreditation_indicators")
-            .select("*")
-            .eq("standard_id", standard.id)
-            .order("order_index", { ascending: true });
+      const standardIds = (standardsData || []).map((st) => st.id);
+      const { data: allIndicators } = standardIds.length
+        ? await supabase.from("accreditation_indicators").select("*").in("standard_id", standardIds).order("order_index", { ascending: true })
+        : { data: [] as any[] };
+      const indicatorIds = (allIndicators || []).map((i) => i.id);
+      let respQuery = supabase.from("indicator_responses")
+        .select("indicator_id, status, compliance_percentage")
+        .eq("academic_year", scope.year);
+      respQuery = scope.programId ? respQuery.eq("program_id", scope.programId) : respQuery.is("program_id", null);
+      const { data: responses } = indicatorIds.length ? await respQuery.in("indicator_id", indicatorIds) : { data: [] as any[] };
+      const byIndicator = new Map((responses || []).map((r) => [r.indicator_id, r]));
 
-          // Load responses for each indicator
-          const indicatorsWithResponses = await Promise.all(
-            (indicators || []).map(async (indicator) => {
-              const { data: response } = await supabase
-                .from("indicator_responses")
-                .select("status, compliance_percentage")
-                .eq("indicator_id", indicator.id)
-                .order("created_at", { ascending: false })
-                .limit(1)
-                .single();
+      const standardsWithIndicators = (standardsData || []).map((standard) => {
+          const indicatorsWithResponses = (allIndicators || [])
+            .filter((i) => i.standard_id === standard.id)
+            .map((indicator) => ({ ...indicator, response: byIndicator.get(indicator.id) || undefined }));
 
-              return {
-                ...indicator,
-                response: response || undefined
-              };
-            })
-          );
-
-          // Calculate standard compliance
-          const indicatorsWithCompliance = indicatorsWithResponses.filter(i => i.response?.compliance_percentage != null);
-          const standardCompliance = indicatorsWithCompliance.length > 0
-            ? Math.round(indicatorsWithCompliance.reduce((sum, i) => sum + (i.response?.compliance_percentage || 0), 0) / indicatorsWithCompliance.length)
+          // Unassessed indicators count as 0%
+          const standardCompliance = indicatorsWithResponses.length > 0
+            ? Math.round(indicatorsWithResponses.reduce((sum, i) => sum + (i.response?.compliance_percentage || 0), 0) / indicatorsWithResponses.length)
             : 0;
 
           return {
@@ -142,8 +134,7 @@ const AccreditationFramework = () => {
             indicators: indicatorsWithResponses,
             compliance_percentage: standardCompliance
           };
-        })
-      );
+      });
 
       setStandards(standardsWithIndicators);
     } catch (error: any) {
@@ -237,6 +228,17 @@ const AccreditationFramework = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        <div className="mb-6">
+          <ScopeSelector
+            frameworkType={framework.type}
+            programs={scope.programs}
+            programId={scope.programId}
+            year={scope.year}
+            canEdit={scope.canEdit}
+            onChange={scope.update}
+          />
+        </div>
+
         {/* Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <Card>

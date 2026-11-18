@@ -81,7 +81,7 @@ export const IndicatorCard = ({ indicator, onRefresh }: IndicatorCardProps) => {
   return (
     <div 
       className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/30 transition-colors cursor-pointer group"
-      onClick={() => navigate(`/accreditation/indicator/${indicator.id}`)}
+      onClick={() => navigate(`/accreditation/indicator/${indicator.id}${window.location.search}`)}
     >
       <div className="flex items-center gap-3 flex-1">
         <div className="flex items-center gap-2">

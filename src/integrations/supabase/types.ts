@@ -577,34 +577,40 @@ export type Database = {
           created_at: string | null
           description: string | null
           evidence_type: string | null
+          file_size: number | null
           file_type: string | null
           file_url: string | null
           id: string
           response_id: string
           title: string
           uploaded_by: string | null
+          uploaded_by_name: string | null
         }
         Insert: {
           created_at?: string | null
           description?: string | null
           evidence_type?: string | null
+          file_size?: number | null
           file_type?: string | null
           file_url?: string | null
           id?: string
           response_id: string
           title: string
           uploaded_by?: string | null
+          uploaded_by_name?: string | null
         }
         Update: {
           created_at?: string | null
           description?: string | null
           evidence_type?: string | null
+          file_size?: number | null
           file_type?: string | null
           file_url?: string | null
           id?: string
           response_id?: string
           title?: string
           uploaded_by?: string | null
+          uploaded_by_name?: string | null
         }
         Relationships: [
           {
@@ -626,12 +632,15 @@ export type Database = {
             | null
           compliance_percentage: number | null
           created_at: string | null
+          due_date: string | null
+          follow_up_notes: string | null
           gaps: Json | null
           id: string
           improvement_notes: string | null
           indicator_id: string
           program_id: string | null
           response_text: string | null
+          responsible_person: string | null
           reviewed_by: string | null
           semester: string | null
           status:
@@ -650,12 +659,15 @@ export type Database = {
             | null
           compliance_percentage?: number | null
           created_at?: string | null
+          due_date?: string | null
+          follow_up_notes?: string | null
           gaps?: Json | null
           id?: string
           improvement_notes?: string | null
           indicator_id: string
           program_id?: string | null
           response_text?: string | null
+          responsible_person?: string | null
           reviewed_by?: string | null
           semester?: string | null
           status?:
@@ -674,12 +686,15 @@ export type Database = {
             | null
           compliance_percentage?: number | null
           created_at?: string | null
+          due_date?: string | null
+          follow_up_notes?: string | null
           gaps?: Json | null
           id?: string
           improvement_notes?: string | null
           indicator_id?: string
           program_id?: string | null
           response_text?: string | null
+          responsible_person?: string | null
           reviewed_by?: string | null
           semester?: string | null
           status?:
@@ -1253,12 +1268,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_accreditation_file: {
+        Args: { p_manage: boolean; p_name: string }
+        Returns: boolean
+      }
+      can_edit_accreditation_scope: {
+        Args: { _program_id: string }
+        Returns: boolean
+      }
       can_manage_complaint_attachment: {
         Args: { p_object_name: string }
         Returns: boolean
       }
       can_upload_complaint_attachment: {
         Args: { p_object_name: string }
+        Returns: boolean
+      }
+      can_view_accreditation_scope: {
+        Args: { _program_id: string }
         Returns: boolean
       }
       delete_email: {
