@@ -833,6 +833,7 @@ export type Database = {
       recommendations: {
         Row: {
           academic_year: string | null
+          accreditation_indicator_id: string | null
           assigned_to: string | null
           completed_at: string | null
           completion_notes: string | null
@@ -840,9 +841,11 @@ export type Database = {
           created_at: string | null
           description: string
           due_date: string | null
+          evidence_notes: string | null
           id: string
           priority: string | null
           program_id: string | null
+          responsible_person: string | null
           semester: string | null
           source_id: string | null
           source_type: string
@@ -852,6 +855,7 @@ export type Database = {
         }
         Insert: {
           academic_year?: string | null
+          accreditation_indicator_id?: string | null
           assigned_to?: string | null
           completed_at?: string | null
           completion_notes?: string | null
@@ -859,9 +863,11 @@ export type Database = {
           created_at?: string | null
           description: string
           due_date?: string | null
+          evidence_notes?: string | null
           id?: string
           priority?: string | null
           program_id?: string | null
+          responsible_person?: string | null
           semester?: string | null
           source_id?: string | null
           source_type: string
@@ -871,6 +877,7 @@ export type Database = {
         }
         Update: {
           academic_year?: string | null
+          accreditation_indicator_id?: string | null
           assigned_to?: string | null
           completed_at?: string | null
           completion_notes?: string | null
@@ -878,9 +885,11 @@ export type Database = {
           created_at?: string | null
           description?: string
           due_date?: string | null
+          evidence_notes?: string | null
           id?: string
           priority?: string | null
           program_id?: string | null
+          responsible_person?: string | null
           semester?: string | null
           source_id?: string | null
           source_type?: string
@@ -889,6 +898,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "recommendations_accreditation_indicator_id_fkey"
+            columns: ["accreditation_indicator_id"]
+            isOneToOne: false
+            referencedRelation: "accreditation_indicators"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "recommendations_program_id_fkey"
             columns: ["program_id"]
