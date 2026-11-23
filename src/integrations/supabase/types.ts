@@ -1304,6 +1304,15 @@ export type Database = {
         Args: { _program_id: string }
         Returns: boolean
       }
+      create_accreditation_improvement_plan: {
+        Args: {
+          p_framework_id: string
+          p_language?: string
+          p_program_id: string
+          p_year: string
+        }
+        Returns: number
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
